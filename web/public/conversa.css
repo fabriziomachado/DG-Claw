@@ -621,3 +621,29 @@ html.teclado .barra{padding-bottom:10px}
 .linha1.transcrevendo #micTxt{left:0;right:0;justify-content:center;max-width:none;padding:0;
                               background:transparent;color:#8a978d;font-weight:500;font-size:14px}
 
+/* ── Estilo do chat inspirado no ChatGPT (17/10/2026, a pedido do dono) ──
+   Fundo quase branco, resposta do agente sem balão (texto direto na página),
+   mensagem do dono num balão azul clarinho bem arredondado, cabeçalho limpo.
+   Alertas, lembretes e visuais continuam com o cartão próprio. */
+:root{--txt:#0d0d0d;--bub-out:#e8f1fb;--time:#9a9a9a;--muted:#6b6b6b}
+body{font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+     color:var(--txt);-webkit-font-smoothing:antialiased}
+header{background:#fbfbfb;border-bottom:0;box-shadow:none}
+#chat{background:#fbfbfb;padding-top:20px}
+.wrap{max-width:780px}
+.dia span{background:transparent;box-shadow:none;color:#8f8f8f;font-weight:500;font-size:12.5px}
+.bub{font-size:16px;line-height:1.6}
+.row{margin-bottom:6px}
+.row.gap{margin-top:22px}
+.row.me .bub{background:var(--bub-out);border:0;box-shadow:none;border-radius:22px;
+             padding:10px 18px 8px;color:#0d0d0d;max-width:min(75%,560px)}
+.row.her:not(.alerta-entrega):not(.alerta-pedido):not(.cron):not(.vis) .bub{
+  background:transparent;border:0;box-shadow:none;border-radius:0;padding:4px 2px;max-width:100%}
+.row.cron .bub{border:1px solid #e6e6e6;border-left:3px solid var(--accent);box-shadow:none;background:#fff}
+.row.vis .bub{border:1px solid #ececec;box-shadow:none;background:#fff;border-radius:16px}
+.meta{color:var(--time);font-size:11px}
+.row.her .meta{text-align:left}
+.bub a{color:#2563eb}
+.p + .p{margin-top:12px}
+@media(max-width:520px){.row.me .bub{max-width:85%}}
+

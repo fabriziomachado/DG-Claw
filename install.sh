@@ -562,6 +562,14 @@ configurar_firewall() {
     executar_log ufw allow 22/tcp
     executar_log ufw allow 80/tcp
     executar_log ufw allow 443/tcp
+    # Com o podman 5 o netavark escreve as regras dele no nftables (tabela inet netavark), e o
+    # "deny (routed)" padrao do ufw continua derrubando no FORWARD do iptables tudo o que sai dos
+    # containers: a imagem dos agentes nao baixa os pacotes ("Temporary failure resolving") e o
+    # agente fica sem internet. Libera a saida roteada da rede padrao do podman (10.88, onde a
+    # imagem e construida) e da rede dos agentes (10.89). A cerca do lib/firewall.sh continua no
+    # topo do FORWARD e segue barrando as redes privadas.
+    executar_log ufw route allow from 10.88.0.0/16
+    executar_log ufw route allow from 10.89.0.0/16
     st="$(ufw status 2>/dev/null)" || st="" # sem resposta = trata como desligado e liga abaixo
     if [[ "$st" == *"Status: active"* ]]; then
         ok "ufw ja estava ligado; as portas 22, 80 e 443 estao liberadas"

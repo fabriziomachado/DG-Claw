@@ -69,6 +69,8 @@ caso_instalacao_cria_arquivos_com_os_modos_certos() {
     afirma "apt instalou o podman" grep -qE '^apt-get install -y .*podman' "$STUB_LOG"
     afirma "ufw liberou a 22" tem "$STUB_LOG" "ufw allow 22/tcp"
     afirma "ufw ligou" tem "$STUB_LOG" "ufw --force enable"
+    afirma "ufw liberou a saida dos containers do build" tem "$STUB_LOG" "ufw route allow from 10.88.0.0/16"
+    afirma "ufw liberou a saida dos agentes" tem "$STUB_LOG" "ufw route allow from 10.89.0.0/16"
     afirma "caddy validado" tem "$STUB_LOG" "caddy validate --config $RAIZ/etc/caddy/Caddyfile"
     afirma "npm do web" tem "$STUB_LOG" "npm ci --omit=dev (em $a/app/web)"
     afirma "npm do runner (ci)" tem "$STUB_LOG" "npm ci (em $a/app/runner)"

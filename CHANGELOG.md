@@ -9,6 +9,10 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
 
 ### Adicionado
 
+- Conversa no estilo do ChatGPT: barra de digitação em cápsula com ícones de traço fino, enviar azul que
+  fica apagado com o campo vazio, ditado com onda de voz, rodinha ao ligar o microfone e "Transcrevendo" no
+  campo; respostas do agente sem balão, mensagens do dono em balão azul clarinho, fotos do dono em miniaturas
+  lado a lado, botões de copiar e ouvir embaixo de cada resposta e ícones de traço fino no cabeçalho.
 - Modo escondido (botão 👁 no cabeçalho da conversa): troca por asteriscos nomes, empresas, valores,
   e-mails, telefones, documentos e chaves de todas as mensagens da tela, para o dono mostrar a conversa numa
   aula sem expor cliente. Um filtro automático age na hora e um modelo (Claude Haiku com `ANTHROPIC_API_KEY`, ou
@@ -26,6 +30,12 @@ O formato segue o [Keep a Changelog](https://keepachangelog.com/pt-BR/1.1.0/) e 
   `/api/v1/foco/<agente>` (lista, itens, eventos com cursor e `docs.md`), evento `foco` no stream da
   conversa, gancho `foco-hook` (`promptHooks` do `runner.json`) que avisa o agente dos tiques do dono no
   começo do turno, e a skill `foco`. Contrato em `web/docs/MODO-FOCO.md`.
+
+### Corrigido
+
+- Instalação com podman 5: o ufw derrubava a saída roteada dos containers, a imagem dos agentes não
+  baixava os pacotes e os agentes ficavam sem internet. O instalador agora libera a saída das redes
+  10.88 e 10.89 (`ufw route allow`); a cerca de rede dos agentes continua valendo.
 
 ## [1.0.0] - 2026-10-17
 

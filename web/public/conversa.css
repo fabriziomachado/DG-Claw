@@ -567,3 +567,57 @@ html[data-tema="escuro"] .cartaoarq-info{color:#9bb0a0}
   html:not([data-tema="claro"]) .cartaoarq{background:#26302a;color:#dbe6dc}
   html:not([data-tema="claro"]) .cartaoarq-info{color:#9bb0a0}
 }
+
+/* ── Barra de digitação em cápsula (17/10/2026, a pedido do dono) ──
+   O campo, o anexo, o mic e o enviar ficam dentro de uma cápsula branca com
+   sombra leve, sobre o mesmo fundo do chat. Só aparência: os ids e o JS são os
+   mesmos de antes. Para voltar ao visual anterior, apague este bloco. */
+.barra{background:#fbfbfb;border-top:0;padding:6px 12px 10px;
+       padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+.barra>*{width:100%;max-width:880px;margin-left:auto;margin-right:auto}
+.linha1{background:#fff;border:1px solid #e1e6e2;border-radius:28px;padding:6px 6px 6px 8px;gap:4px;
+        box-shadow:0 2px 10px rgba(15,28,20,.06),0 1px 2px rgba(15,28,20,.04);
+        transition:box-shadow .15s,border-color .15s}
+.linha1:focus-within{border-color:#cfd8d1;box-shadow:0 3px 14px rgba(15,28,20,.09),0 1px 2px rgba(15,28,20,.05)}
+.linha1.cresceu{border-radius:22px}
+#entrada,#entrada:focus{border:1px solid transparent;background:transparent;border-radius:0;padding:11px 6px;height:46px;min-height:46px}
+#entrada::placeholder{color:#8a978d}
+#micTxt{background:#fff;border-radius:0}
+#btnAnexo,#btnMic{flex:0 0 40px;width:40px;height:40px;border:0;border-radius:50%;background:transparent;
+          color:#2b3a30;padding:0;display:flex;align-items:center;justify-content:center}
+#btnAnexo:hover,#btnMic:hover{background:#eef2ef}
+/* enviar: azul, redondo, com a seta para cima; mais claro com o campo vazio */
+#btnEnviar{flex:0 0 38px;width:38px;height:38px;margin-left:2px;border:0;border-radius:50%;
+           background:#3b82f6;color:#fff;padding:0;display:flex;align-items:center;justify-content:center;
+           box-shadow:none;transition:background .15s,opacity .15s}
+#btnEnviar:hover{background:#2f6fdc}
+#btnEnviar.apagado{background:#a9c8fb}
+#btnEnviar.direto{background:#3b82f6;box-shadow:none}
+#btnEnviar:disabled{opacity:.35}
+
+/* ditado: X em círculo à esquerda, onda de pontinhos no lugar do texto,
+   parar em círculo cinza e a seta azul que para e envia direto */
+#micOnda{display:none}
+.linha1.ditando #micOnda{display:block;position:absolute;left:6px;right:52px;top:0;bottom:0;
+                         width:calc(100% - 58px);height:100%;pointer-events:none}
+.linha1.ditando #entrada{color:transparent;caret-color:transparent}
+.linha1.ditando #entrada::placeholder{color:transparent}
+.linha1.ditando #micTxt{left:auto;right:4px;max-width:none;padding:0;background:transparent;
+                        font-size:12.5px;font-variant-numeric:tabular-nums;color:#8a978d;font-weight:500}
+.linha1.ditando #micTxt.vivo{color:#8a978d;font-weight:500}
+.linha1.ditando #btnAnexo,#btnAnexo.cancela{background:#fff;color:#1f2a23;border:1px solid #dfe5e0}
+#btnAnexo.cancela:hover{background:#f3f5f3}
+#btnMic.gravando{background:#f1f3f1;color:#111;border:1px solid #e3e7e4}
+#btnMic.gravando:hover{background:#e8ebe8}
+html.pwa .barra{padding-bottom:max(10px, calc(env(safe-area-inset-bottom) - 10px))}
+html.teclado .barra{padding-bottom:10px}
+/* rodinha no mic enquanto ele liga e enquanto transcreve; "Transcrevendo" no meio do campo */
+#btnMic svg.gira{animation:giraMic .8s linear infinite}
+@keyframes giraMic{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#btnMic svg.gira{animation-duration:2.4s}}
+#btnMic:disabled{opacity:1;color:#5d6a61}
+.linha1.transcrevendo #entrada{color:transparent;caret-color:transparent}
+.linha1.transcrevendo #entrada::placeholder{color:transparent}
+.linha1.transcrevendo #micTxt{left:0;right:0;justify-content:center;max-width:none;padding:0;
+                              background:transparent;color:#8a978d;font-weight:500;font-size:14px}
+

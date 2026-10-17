@@ -676,3 +676,16 @@ header{background:#fbfbfb;border-bottom:0;box-shadow:none}
 .acoes .ac.feito{color:#2f9e5e}
 .sem-voz .acoes .ac-ouvir{display:none}
 
+/* botões do topo no estilo do ChatGPT: ícone de traço fino + texto, sem moldura (17/10/2026) */
+header .btn,header .tools a.btn{background:transparent;border:0;color:#0d0d0d;font-weight:500;font-size:14px;
+  border-radius:10px;padding:6px 10px;min-height:36px;display:inline-flex;align-items:center;gap:6px;box-shadow:none}
+header .btn:hover,header .tools a.btn:hover{background:#efefef}
+header .btn .ico{flex:0 0 auto;display:block}
+header .btn.on{background:#e8f1fb;color:#1d4ed8}
+header #btnMenu{color:#0d0d0d;padding:6px 8px}
+header .who span{color:#8f8f8f}
+@media(max-width:520px){
+  header .tools .btn{font-size:14px;min-width:38px;min-height:38px;padding:4px 8px}
+  header #btnTutorial{font-size:14px}
+}
+header #btnTutorial{font-size:14px}

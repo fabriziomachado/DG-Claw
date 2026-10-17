@@ -1119,6 +1119,34 @@ function separaDoVisual(txt) {
   return r ? { titulo: r[1].trim(), texto: r[2] } : null;
 }
 
+/* Hora discreta embaixo do balão, em linguagem de gente ("agora", "há 5 min", "ontem, 20:24").
+   O HTML leva só a hora fixa e o ep: o texto humano é posto no DOM por humanizaHoras(), assim
+   o render continua reaproveitando o nó (o HTML não muda a cada minuto). */
+function htmlHora(m, extra) {
+  if (!m || m.pendente || typeof m.ep !== 'number') return '';
+  return `<span class="hora" data-ep="${m.ep}" title="${esc(m.dia + ' ' + m.hhmm)}">` +
+         `${m.editada ? 'editada · ' : ''}${esc(m.hhmm)}</span>`;
+}
+function horaHumana(ep, agora) {
+  const s = Math.max(0, agora / 1000 - ep);
+  if (s < 60) return 'agora';
+  if (s < 3600) return 'há ' + Math.floor(s / 60) + ' min';
+  const d = new Date(ep * 1000), h = new Date(agora);
+  const hhmm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  const meiaNoite = new Date(h.getFullYear(), h.getMonth(), h.getDate()).getTime() / 1000;
+  if (ep >= meiaNoite) return s < 6 * 3600 ? 'há ' + Math.floor(s / 3600) + ' h' : 'hoje, ' + hhmm;
+  if (ep >= meiaNoite - 86400) return 'ontem, ' + hhmm;
+  return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + ', ' + hhmm;
+}
+function humanizaHoras() {
+  const agora = Date.now();
+  for (const el of wrap.querySelectorAll('.hora[data-ep]')) {
+    const txt = (el.textContent.startsWith('editada · ') ? 'editada · ' : '') + horaHumana(Number(el.dataset.ep), agora);
+    if (el.textContent !== txt) el.textContent = txt;
+  }
+}
+setInterval(humanizaHoras, 30000);
+
 function htmlCorpo(m) {
   let midia = '';
   if (m.local && m.local.anexos) {
@@ -1144,8 +1172,8 @@ function htmlCorpo(m) {
   const corpo = leg ? doVisual + htmlLeg : doVisual;
   const reac = (m.reacoes && m.reacoes.length)
     ? `<span class="reac">${m.reacoes.map(esc).join(' ')}</span>` : '';
-  const meta = m.pendente ? metaPendente(m.local)
-    : `<span class="meta">${m.editada ? 'editada · ' : ''}${esc(m.hhmm)}</span>`;
+  // a hora das mensagens já entregues fica fora do balão (htmlHora); a do pendente segue dentro
+  const meta = m.pendente ? metaPendente(m.local) : '';
   return htmlSelo(m) + cita + midia + corpo + reac + meta;
 }
 
@@ -1206,11 +1234,9 @@ function htmlFotosDono(grupo, troca) {
     const leg = legendaUtil(m);
     return leg ? paragrafos(leg, m.fmt) : '';
   }).filter(Boolean).join('');
-  const ult = grupo[grupo.length - 1];
-  const meta = `<span class="meta">${ult.editada ? 'editada · ' : ''}${esc(ult.hhmm)}</span>`;
   return `<div class="row me mfotos-row${troca}" data-msg="${esc(grupo[0].id)}">` +
          `<div class="mfotos">${fotos}</div>` +
-         (textos ? `<div class="bub">${textos}${meta}</div>` : `<div class="mfotos-meta">${meta}</div>`) + '</div>';
+         (textos ? `<div class="bub">${textos}</div>` : '') + htmlHora(grupo[grupo.length - 1]) + '</div>';
 }
 
 /* Ações embaixo de cada resposta do agente, como no ChatGPT: copiar e ouvir. */
@@ -1219,12 +1245,13 @@ const ICONE_ACAO = {
   ok:     '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   ouvir:  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>'
 };
-function htmlAcoes(m) {
-  if (!m || m.pendente || !legendaUtil(m) || ehVisual(m.media)) return '';
+function htmlAcoes(m, hora) {
+  hora = hora || '';
+  if (!m || m.pendente || !legendaUtil(m) || ehVisual(m.media)) return hora ? `<div class="acoes so-hora">${hora}</div>` : '';
   return `<div class="acoes" data-acoes="${esc(m.id)}">` +
          `<button type="button" class="ac" data-ac="copiar" title="Copiar" aria-label="Copiar a resposta">${ICONE_ACAO.copiar}</button>` +
          `<button type="button" class="ac ac-ouvir" data-ac="ouvir" title="Ouvir em voz alta" aria-label="Ouvir a resposta em voz alta">${ICONE_ACAO.ouvir}</button>` +
-         '</div>';
+         hora + '</div>';
 }
 wrap.addEventListener('click', async ev => {
   const b = ev.target.closest ? ev.target.closest('.acoes .ac') : null;
@@ -1337,7 +1364,7 @@ function render(opt) {
       continue;
     }
     itens.push([m.id, `<div class="row ${lado}${ehVisual(m.media) ? ' vis' : ''}${troca}" data-msg="${esc(m.id)}">` +
-                      `<div class="bub">${htmlCorpo(m)}</div>${lado === 'her' ? htmlAcoes(m) : ''}</div>`]);
+                      `<div class="bub">${htmlCorpo(m)}</div>${lado === 'her' ? htmlAcoes(m, htmlHora(m)) : htmlHora(m)}</div>`]);
     anterior = lado;
   }
   if (!itens.length && carregouUmaVez) itens.push(['vazio', htmlVazio()]);
@@ -1368,6 +1395,7 @@ function render(opt) {
   // Mensagens antigas entrando no topo, mensagem nova no fim, balão refeito: a posição
   // fica por conta do observador de rolagem (no fim acompanha, lendo mais acima não mexe).
   aplicaNos(nos);
+  humanizaHoras();
   visuaisAposRender();
   respiroDasFaixas();
   guardaCache();

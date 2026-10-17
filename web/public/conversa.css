@@ -689,3 +689,13 @@ header .who span{color:#8f8f8f}
   header #btnTutorial{font-size:14px}
 }
 header #btnTutorial{font-size:14px}
+
+/* hora fora do balão, discreta e humanizada; topo só com o essencial (17/10/2026) */
+.hora{display:block;font-size:11.5px;color:#9a9a9a;line-height:1;margin:4px 6px 2px;white-space:nowrap}
+.row.me{flex-wrap:wrap}
+.row.me > .hora{flex:0 0 100%;text-align:right}
+.row.mfotos-row > .hora{flex:0 0 auto}
+.acoes{align-items:center}
+.acoes .hora{display:inline-block;margin:0 0 0 6px}
+.acoes.so-hora .hora{margin-left:4px}
+header #btnMesa,header #btnLembretes,header #btnTutorial,header #btnSigilo{display:none!important}

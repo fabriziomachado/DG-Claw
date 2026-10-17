@@ -567,3 +567,125 @@ html[data-tema="escuro"] .cartaoarq-info{color:#9bb0a0}
   html:not([data-tema="claro"]) .cartaoarq{background:#26302a;color:#dbe6dc}
   html:not([data-tema="claro"]) .cartaoarq-info{color:#9bb0a0}
 }
+
+/* ── Barra de digitação em cápsula (17/10/2026, a pedido do dono) ──
+   O campo, o anexo, o mic e o enviar ficam dentro de uma cápsula branca com
+   sombra leve, sobre o mesmo fundo do chat. Só aparência: os ids e o JS são os
+   mesmos de antes. Para voltar ao visual anterior, apague este bloco. */
+.barra{background:#fbfbfb;border-top:0;padding:6px 12px 10px;
+       padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+.barra>*{width:100%;max-width:880px;margin-left:auto;margin-right:auto}
+.linha1{background:#fff;border:1px solid #e1e6e2;border-radius:28px;padding:6px 6px 6px 8px;gap:4px;
+        box-shadow:0 2px 10px rgba(15,28,20,.06),0 1px 2px rgba(15,28,20,.04);
+        transition:box-shadow .15s,border-color .15s}
+.linha1:focus-within{border-color:#cfd8d1;box-shadow:0 3px 14px rgba(15,28,20,.09),0 1px 2px rgba(15,28,20,.05)}
+.linha1.cresceu{border-radius:22px}
+#entrada,#entrada:focus{border:1px solid transparent;background:transparent;border-radius:0;padding:11px 6px;height:46px;min-height:46px}
+#entrada::placeholder{color:#8a978d}
+#micTxt{background:#fff;border-radius:0}
+#btnAnexo,#btnMic{flex:0 0 40px;width:40px;height:40px;border:0;border-radius:50%;background:transparent;
+          color:#2b3a30;padding:0;display:flex;align-items:center;justify-content:center}
+#btnAnexo:hover,#btnMic:hover{background:#eef2ef}
+/* enviar: azul, redondo, com a seta para cima; mais claro com o campo vazio */
+#btnEnviar{flex:0 0 38px;width:38px;height:38px;margin-left:2px;border:0;border-radius:50%;
+           background:#3b82f6;color:#fff;padding:0;display:flex;align-items:center;justify-content:center;
+           box-shadow:none;transition:background .15s,opacity .15s}
+#btnEnviar:hover{background:#2f6fdc}
+#btnEnviar.apagado{background:#a9c8fb}
+#btnEnviar.direto{background:#3b82f6;box-shadow:none}
+#btnEnviar:disabled{opacity:.35}
+
+/* ditado: X em círculo à esquerda, onda de pontinhos no lugar do texto,
+   parar em círculo cinza e a seta azul que para e envia direto */
+#micOnda{display:none}
+.linha1.ditando #micOnda{display:block;position:absolute;left:6px;right:52px;top:0;bottom:0;
+                         width:calc(100% - 58px);height:100%;pointer-events:none}
+.linha1.ditando #entrada{color:transparent;caret-color:transparent}
+.linha1.ditando #entrada::placeholder{color:transparent}
+.linha1.ditando #micTxt{left:auto;right:4px;max-width:none;padding:0;background:transparent;
+                        font-size:12.5px;font-variant-numeric:tabular-nums;color:#8a978d;font-weight:500}
+.linha1.ditando #micTxt.vivo{color:#8a978d;font-weight:500}
+.linha1.ditando #btnAnexo,#btnAnexo.cancela{background:#fff;color:#1f2a23;border:1px solid #dfe5e0}
+#btnAnexo.cancela:hover{background:#f3f5f3}
+#btnMic.gravando{background:#f1f3f1;color:#111;border:1px solid #e3e7e4}
+#btnMic.gravando:hover{background:#e8ebe8}
+html.pwa .barra{padding-bottom:max(10px, calc(env(safe-area-inset-bottom) - 10px))}
+html.teclado .barra{padding-bottom:10px}
+/* rodinha no mic enquanto ele liga e enquanto transcreve; "Transcrevendo" no meio do campo */
+#btnMic svg.gira{animation:giraMic .8s linear infinite}
+@keyframes giraMic{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#btnMic svg.gira{animation-duration:2.4s}}
+#btnMic:disabled{opacity:1;color:#5d6a61}
+.linha1.transcrevendo #entrada{color:transparent;caret-color:transparent}
+.linha1.transcrevendo #entrada::placeholder{color:transparent}
+.linha1.transcrevendo #micTxt{left:0;right:0;justify-content:center;max-width:none;padding:0;
+                              background:transparent;color:#8a978d;font-weight:500;font-size:14px}
+
+/* ── Estilo do chat inspirado no ChatGPT (17/10/2026, a pedido do dono) ──
+   Fundo quase branco, resposta do agente sem balão (texto direto na página),
+   mensagem do dono num balão azul clarinho bem arredondado, cabeçalho limpo.
+   Alertas, lembretes e visuais continuam com o cartão próprio. */
+:root{--txt:#0d0d0d;--bub-out:#e8f1fb;--time:#9a9a9a;--muted:#6b6b6b}
+body{font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+     color:var(--txt);-webkit-font-smoothing:antialiased}
+header{background:#fbfbfb;border-bottom:0;box-shadow:none}
+#chat{background:#fbfbfb;padding-top:20px}
+.wrap{max-width:780px}
+.dia span{background:transparent;box-shadow:none;color:#8f8f8f;font-weight:500;font-size:12.5px}
+.bub{font-size:16px;line-height:1.6}
+.row{margin-bottom:6px}
+.row.gap{margin-top:22px}
+.row.me .bub{background:var(--bub-out);border:0;box-shadow:none;border-radius:22px;
+             padding:10px 18px 8px;color:#0d0d0d;max-width:min(75%,560px)}
+.row.her:not(.alerta-entrega):not(.alerta-pedido):not(.cron):not(.vis) .bub{
+  background:transparent;border:0;box-shadow:none;border-radius:0;padding:4px 2px;max-width:100%}
+.row.cron .bub{border:1px solid #e6e6e6;border-left:3px solid var(--accent);box-shadow:none;background:#fff}
+.row.vis .bub{border:1px solid #ececec;box-shadow:none;background:#fff;border-radius:16px}
+.meta{color:var(--time);font-size:11px}
+.row.her .meta{text-align:left}
+.bub a{color:#2563eb}
+.p + .p{margin-top:12px}
+@media(max-width:520px){.row.me .bub{max-width:85%}}
+
+/* fotos do dono: miniaturas quadradas lado a lado, fora do balão (17/10/2026) */
+.row.mfotos-row{flex-direction:column;align-items:flex-end;gap:6px}
+.mfotos{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;max-width:min(85%,560px)}
+.mfoto-item{display:block;width:112px;height:112px;flex:0 0 112px}
+.mfoto-item .midcx{width:100%;height:100%}
+.mfoto-item .mid{width:100%;height:100%;margin:0;border-radius:14px;border:1px solid #e4e4e4;background:#f2f2f2}
+.mfoto-item .mid img{width:100%;height:100%;max-height:none;object-fit:cover}
+.mfoto-item .lupa,.mfoto-item .midbx{display:none}
+.mfoto-item .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;
+                  font-size:22px;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+.mfoto-item:hover .midbx{display:flex;top:6px;right:6px;width:28px;height:28px;font-size:13px}
+.mfotos-meta .meta{margin:0}
+@media(max-width:520px){.mfoto-item{width:96px;height:96px;flex-basis:96px}}
+
+/* enviando várias fotos: a mesma fileira de miniaturas, no balão otimista */
+.row.me .midgrade.varios{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.row.me .midgrade.varios .mid{width:112px;height:112px;border-radius:14px}
+.row.me .midgrade.varios .mid img,.row.me .midgrade.varios .mid video{height:112px}
+
+/* ações embaixo da resposta do agente: copiar e ouvir */
+.row.her{flex-wrap:wrap}
+.row.her > .bub{flex:0 1 auto}
+.acoes{flex:0 0 100%;display:flex;gap:2px;margin:0 0 4px -4px}
+.acoes .ac{width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:#6b6b6b;
+           display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.acoes .ac:hover{background:#efefef;color:#0d0d0d}
+.acoes .ac.feito{color:#2f9e5e}
+.sem-voz .acoes .ac-ouvir{display:none}
+
+/* botões do topo no estilo do ChatGPT: ícone de traço fino + texto, sem moldura (17/10/2026) */
+header .btn,header .tools a.btn{background:transparent;border:0;color:#0d0d0d;font-weight:500;font-size:14px;
+  border-radius:10px;padding:6px 10px;min-height:36px;display:inline-flex;align-items:center;gap:6px;box-shadow:none}
+header .btn:hover,header .tools a.btn:hover{background:#efefef}
+header .btn .ico{flex:0 0 auto;display:block}
+header .btn.on{background:#e8f1fb;color:#1d4ed8}
+header #btnMenu{color:#0d0d0d;padding:6px 8px}
+header .who span{color:#8f8f8f}
+@media(max-width:520px){
+  header .tools .btn{font-size:14px;min-width:38px;min-height:38px;padding:4px 8px}
+  header #btnTutorial{font-size:14px}
+}
+header #btnTutorial{font-size:14px}

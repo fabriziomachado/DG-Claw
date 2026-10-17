@@ -231,7 +231,7 @@ document.documentElement.style.setProperty('--accent', AGENTE.cor || '#2f9e5e');
 document.title = AGENTE.nome + ' - DG Claw';
 $('nomeAgente').textContent = AGENTE.nome;
 pintaAvatar(avEl, AGENTE);
-entrada.placeholder = 'Escrever para ' + AGENTE.nome;
+entrada.placeholder = 'Pergunte ao ' + AGENTE.nome;
 if (EH_ADMIN) $('avisoAdmin').hidden = false;
 if (!caps.microfone) document.documentElement.classList.add('sem-mic');
 if (!caps.voz) document.documentElement.classList.add('sem-voz');
@@ -1193,6 +1193,61 @@ wrap.addEventListener('toggle', ev => {
   if (d.open) trilhaAbertas.add(d.dataset.tl); else trilhaAbertas.delete(d.dataset.tl);
 }, true);
 
+/* Fotos do dono no estilo do ChatGPT (17/10/2026): miniaturas quadradas lado a lado,
+   fora do balão, e o texto (se houver) num balão logo abaixo. Só foto e vídeo com
+   miniatura; o resto continua no balão de sempre. */
+function fotoDoDono(m) {
+  return !!(m && ehDono(m) && !m.pendente && m.media && m.media.disponivel && m.media.thumb &&
+            !ehVisual(m.media) && (m.media.kind === 'photo' || m.media.kind === 'image' || m.media.kind === 'video'));
+}
+function htmlFotosDono(grupo, troca) {
+  const fotos = grupo.map(m => `<span class="mfoto-item" data-msg="${esc(m.id)}">${htmlMidia(m)}</span>`).join('');
+  const textos = grupo.map(m => {
+    const leg = legendaUtil(m);
+    return leg ? paragrafos(leg, m.fmt) : '';
+  }).filter(Boolean).join('');
+  const ult = grupo[grupo.length - 1];
+  const meta = `<span class="meta">${ult.editada ? 'editada · ' : ''}${esc(ult.hhmm)}</span>`;
+  return `<div class="row me mfotos-row${troca}" data-msg="${esc(grupo[0].id)}">` +
+         `<div class="mfotos">${fotos}</div>` +
+         (textos ? `<div class="bub">${textos}${meta}</div>` : `<div class="mfotos-meta">${meta}</div>`) + '</div>';
+}
+
+/* Ações embaixo de cada resposta do agente, como no ChatGPT: copiar e ouvir. */
+const ICONE_ACAO = {
+  copiar: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/></svg>',
+  ok:     '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  ouvir:  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>'
+};
+function htmlAcoes(m) {
+  if (!m || m.pendente || !legendaUtil(m) || ehVisual(m.media)) return '';
+  return `<div class="acoes" data-acoes="${esc(m.id)}">` +
+         `<button type="button" class="ac" data-ac="copiar" title="Copiar" aria-label="Copiar a resposta">${ICONE_ACAO.copiar}</button>` +
+         `<button type="button" class="ac ac-ouvir" data-ac="ouvir" title="Ouvir em voz alta" aria-label="Ouvir a resposta em voz alta">${ICONE_ACAO.ouvir}</button>` +
+         '</div>';
+}
+wrap.addEventListener('click', async ev => {
+  const b = ev.target.closest ? ev.target.closest('.acoes .ac') : null;
+  if (!b) return;
+  const id = b.closest('.acoes').dataset.acoes;
+  const m = msgs.find(x => x.id === id);
+  const texto = m ? legendaUtil(m) : '';
+  if (!texto) return;
+  if (b.dataset.ac === 'copiar') {
+    try {
+      await navigator.clipboard.writeText(texto);
+      b.innerHTML = ICONE_ACAO.ok;
+      b.classList.add('feito');
+      setTimeout(() => { b.innerHTML = ICONE_ACAO.copiar; b.classList.remove('feito'); }, 1500);
+    } catch (e) {
+      mostraAviso('Não consegui copiar: ' + e.message);
+    }
+  } else if (b.dataset.ac === 'ouvir') {
+    destravarAudio();
+    falar(texto);
+  }
+});
+
 /* Conversa vazia: nunca tela em branco. */
 function htmlVazio() {
   return '<div class="vazio"><div class="vz-ico" aria-hidden="true">🦞</div>' +
@@ -1251,7 +1306,9 @@ function render(opt) {
       : '<div class="topo">início da conversa</div>']);
   }
   let dia = '', anterior = null;
-  for (const bloco of (TR ? TR.agrupa(todas) : todas.map(x => ({ msg: x })))) {
+  const blocos = TR ? TR.agrupa(todas) : todas.map(x => ({ msg: x }));
+  for (let bi = 0; bi < blocos.length; bi++) {
+    const bloco = blocos[bi];
     const m = bloco.msg || bloco.trilha[0];
     if (m.dia !== dia) {
       dia = m.dia;
@@ -1267,8 +1324,20 @@ function render(opt) {
     const lado = ehDono(m) ? 'me' : 'her';
     const troca = (anterior !== null && anterior !== lado ? ' gap' : '') +
       (['entrega', 'pedido'].includes(m.alerta) ? ' alerta-' + m.alerta : '');
+    if (lado === 'me' && fotoDoDono(m)) {
+      // fotos que o dono mandou juntas viram uma fileira de miniaturas, com o texto embaixo
+      const grupo = [m];
+      while (bi + 1 < blocos.length) {
+        const prox = blocos[bi + 1].msg;
+        if (!prox || !fotoDoDono(prox) || prox.dia !== m.dia || prox.ep - grupo[grupo.length - 1].ep > 120) break;
+        grupo.push(prox); bi++;
+      }
+      itens.push([m.id + (grupo.length > 1 ? '~' + grupo.length : ''), htmlFotosDono(grupo, troca)]);
+      anterior = lado;
+      continue;
+    }
     itens.push([m.id, `<div class="row ${lado}${ehVisual(m.media) ? ' vis' : ''}${troca}" data-msg="${esc(m.id)}">` +
-                      `<div class="bub">${htmlCorpo(m)}</div></div>`]);
+                      `<div class="bub">${htmlCorpo(m)}</div>${lado === 'her' ? htmlAcoes(m) : ''}</div>`]);
     anterior = lado;
   }
   if (!itens.length && carregouUmaVez) itens.push(['vazio', htmlVazio()]);
@@ -2485,6 +2554,24 @@ function ajustaBarra() {
    pra ver o que vai sair, pedido de 03/10/2026); dali pra frente rola por
    dentro. Chamado a cada digitação e sempre que o código muda o valor. */
 const CAMPO_MIN = 46, CAMPO_LINHAS = 4;
+
+/* Ícones de linha da barra, no estilo do ChatGPT (17/10/2026). Strings fixas,
+   nunca texto de fora, por isso o innerHTML é seguro aqui. */
+const ICONE = {
+  mais:   '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+  fechar: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  mic:    '<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg>',
+  gira:   '<svg class="gira" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9"/></svg>',
+  parar:  '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="5" y="5" width="14" height="14" rx="2.5" fill="currentColor"/></svg>'
+};
+/* Enviar fica apagado com o campo vazio e sem anexo, como no ChatGPT. Só a
+   aparência: o clique continua funcionando (Enter e /comandos também). */
+function pintaEnviar() {
+  if (typeof btnEnviar === 'undefined' || !btnEnviar) return;
+  const vazio = !entrada.value.trim() && !(typeof anexos !== 'undefined' && anexos.length) &&
+                !(typeof gravando !== 'undefined' && gravando);
+  btnEnviar.classList.toggle('apagado', vazio);
+}
 function ajustaCampo() {
   const antes = entrada.offsetHeight;
   entrada.style.height = CAMPO_MIN + 'px';
@@ -2499,6 +2586,7 @@ function ajustaCampo() {
   entrada.style.overflowY = quer > max ? 'auto' : 'hidden';
   const l1 = entrada.parentElement;
   if (l1) l1.classList.toggle('cresceu', h > CAMPO_MIN);
+  pintaEnviar();
   if (h !== antes) {
     ajustaBarra();
     if (typeof posicionaSeta === 'function') posicionaSeta();
@@ -2594,6 +2682,7 @@ function pintaAnexos() {
     atualizaCartao(a);
   }
   anexoChip.hidden = !anexos.length;
+  pintaEnviar();
   entrada.placeholder = anexos.length ? 'Legenda (opcional), Enter envia'
                                       : PLACEHOLDER_ORIGINAL;
   pintaInfoAnexos();
@@ -2807,13 +2896,85 @@ function tempoGravando() {
   return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0');
 }
 
+/* Onda do ditado (17/10/2026): uma linha de pontinhos que corre da direita para
+   a esquerda, com cada ponto subindo conforme o volume da voz, como no ditado do
+   ChatGPT. Lê o mesmo stream da gravação por um AnalyserNode; não grava nada. */
+const micOnda = $('micOnda');
+let onda = null;   // { ctx, fonte, an, buf, niveis, raf, ultimo, proprio }
+function ondaLiga(stream) {
+  if (onda || !micOnda || !stream) return;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    const proprio = !ctxAudio;
+    const ctx = ctxAudio || new AC();
+    if (ctx.state === 'suspended') ctx.resume();
+    const fonte = ctx.createMediaStreamSource(stream);
+    const an = ctx.createAnalyser();
+    an.fftSize = 512;
+    fonte.connect(an);
+    onda = { ctx, fonte, an, buf: new Uint8Array(an.fftSize), niveis: [], raf: 0, ultimo: 0, proprio };
+    const passo = t => {
+      if (!onda) return;
+      onda.raf = requestAnimationFrame(passo);
+      if (t - onda.ultimo < 70) return;          // ~14 pontos novos por segundo
+      onda.ultimo = t;
+      onda.an.getByteTimeDomainData(onda.buf);
+      let soma = 0;
+      for (const v of onda.buf) { const d = (v - 128) / 128; soma += d * d; }
+      onda.niveis.push(Math.min(1, Math.sqrt(soma / onda.buf.length) * 4));
+      if (onda.niveis.length > 400) onda.niveis.shift();
+      ondaDesenha();
+    };
+    onda.raf = requestAnimationFrame(passo);
+  } catch (e) {
+    console.warn('onda do microfone:', e.message);
+    ondaDesliga();
+  }
+}
+function ondaDesenha() {
+  const dpr = window.devicePixelRatio || 1;
+  const w = micOnda.clientWidth, h = micOnda.clientHeight;
+  if (!w || !h) return;
+  if (micOnda.width !== Math.round(w * dpr)) { micOnda.width = Math.round(w * dpr); micOnda.height = Math.round(h * dpr); }
+  const c = micOnda.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.clearRect(0, 0, w, h);
+  const esp = 6, n = Math.floor(w / esp), meio = h / 2;
+  const niv = onda ? onda.niveis : [];
+  for (let i = 0; i < n; i++) {
+    const v = niv[niv.length - n + i] || 0;      // o mais novo fica na direita
+    const alt = Math.max(2.5, v * (h - 6));
+    c.fillStyle = v > 0.04 ? '#5d6a61' : '#c5ccc7';
+    const x = w - (n - i) * esp + 2;
+    c.beginPath();
+    if (c.roundRect) c.roundRect(x, meio - alt / 2, 2.5, alt, 1.25); else c.rect(x, meio - alt / 2, 2.5, alt);
+    c.fill();
+  }
+}
+function ondaDesliga() {
+  if (!onda) return;
+  cancelAnimationFrame(onda.raf);
+  try { onda.fonte.disconnect(); } catch (e) {}
+  if (onda.proprio) { try { onda.ctx.close(); } catch (e) {} }
+  onda = null;
+  if (micOnda) micOnda.getContext('2d').clearRect(0, 0, micOnda.width, micOnda.height);
+}
+
 function pintaMic() {
   btnMic.classList.toggle('gravando', gravando);
-  btnMic.textContent = gravando ? '■' : '🎤';
+  if (btnMic.parentElement) {
+    btnMic.parentElement.classList.toggle('ditando', gravando);
+    btnMic.parentElement.classList.toggle('transcrevendo', transcrevendo);
+  }
+  if (gravando && !micAbrindo && gravacao && gravacao.stream) ondaLiga(gravacao.stream);
+  else if (!gravando) ondaDesliga();
+  btnMic.innerHTML = (micAbrindo || transcrevendo) ? ICONE.gira : gravando ? ICONE.parar : ICONE.mic;
   btnMic.setAttribute('aria-label', gravando
     ? (continua ? 'Parar e enviar' : 'Parar e escrever no campo')
     : 'Gravar áudio');
   btnEnviar.classList.toggle('direto', gravando);
+  pintaEnviar();
   btnEnviar.setAttribute('aria-label', gravando ? 'Parar e enviar direto' : 'Enviar');
   /* O estado vai dentro do campo (#micTxt) e o 📎 vira ✕ que cancela a gravação. */
   if (micAbrindo) micTxt.textContent = 'abrindo o microfone…';
@@ -2821,7 +2982,7 @@ function pintaMic() {
   else micTxt.textContent = '';
   micTxt.classList.toggle('vivo', gravando && !micAbrindo);
   btnAnexo.classList.toggle('cancela', gravando);
-  btnAnexo.textContent = gravando ? '✕' : '📎';
+  btnAnexo.innerHTML = gravando ? ICONE.fechar : ICONE.mais;
   btnAnexo.setAttribute('aria-label', gravando ? 'Cancelar a gravação'
     : 'Anexar fotos, vídeos, áudios ou PDFs');
   btnAnexo.title = gravando ? 'Cancelar a gravação (nada é enviado)'
@@ -3017,9 +3178,11 @@ async function transcreveEEntrega(item) {
   transcrevendo = true;
   mostraErro('');
   setEstado('transcrevendo…');
-  micTxt.textContent = 'transcrevendo…';
+  micTxt.textContent = 'Transcrevendo';
   micTxt.classList.add('vivo');
   btnMic.disabled = true;
+  pintaMic();
+  micTxt.textContent = 'Transcrevendo';
   let texto = '';
   try {
     texto = await transcreveAudio(item);

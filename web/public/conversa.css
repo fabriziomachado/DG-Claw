@@ -647,3 +647,32 @@ header{background:#fbfbfb;border-bottom:0;box-shadow:none}
 .p + .p{margin-top:12px}
 @media(max-width:520px){.row.me .bub{max-width:85%}}
 
+/* fotos do dono: miniaturas quadradas lado a lado, fora do balão (17/10/2026) */
+.row.mfotos-row{flex-direction:column;align-items:flex-end;gap:6px}
+.mfotos{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;max-width:min(85%,560px)}
+.mfoto-item{display:block;width:112px;height:112px;flex:0 0 112px}
+.mfoto-item .midcx{width:100%;height:100%}
+.mfoto-item .mid{width:100%;height:100%;margin:0;border-radius:14px;border:1px solid #e4e4e4;background:#f2f2f2}
+.mfoto-item .mid img{width:100%;height:100%;max-height:none;object-fit:cover}
+.mfoto-item .lupa,.mfoto-item .midbx{display:none}
+.mfoto-item .play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;
+                  font-size:22px;text-shadow:0 1px 4px rgba(0,0,0,.5)}
+.mfoto-item:hover .midbx{display:flex;top:6px;right:6px;width:28px;height:28px;font-size:13px}
+.mfotos-meta .meta{margin:0}
+@media(max-width:520px){.mfoto-item{width:96px;height:96px;flex-basis:96px}}
+
+/* enviando várias fotos: a mesma fileira de miniaturas, no balão otimista */
+.row.me .midgrade.varios{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.row.me .midgrade.varios .mid{width:112px;height:112px;border-radius:14px}
+.row.me .midgrade.varios .mid img,.row.me .midgrade.varios .mid video{height:112px}
+
+/* ações embaixo da resposta do agente: copiar e ouvir */
+.row.her{flex-wrap:wrap}
+.row.her > .bub{flex:0 1 auto}
+.acoes{flex:0 0 100%;display:flex;gap:2px;margin:0 0 4px -4px}
+.acoes .ac{width:32px;height:32px;border:0;border-radius:8px;background:transparent;color:#6b6b6b;
+           display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.acoes .ac:hover{background:#efefef;color:#0d0d0d}
+.acoes .ac.feito{color:#2f9e5e}
+.sem-voz .acoes .ac-ouvir{display:none}
+

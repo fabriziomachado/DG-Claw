@@ -1193,6 +1193,61 @@ wrap.addEventListener('toggle', ev => {
   if (d.open) trilhaAbertas.add(d.dataset.tl); else trilhaAbertas.delete(d.dataset.tl);
 }, true);
 
+/* Fotos do dono no estilo do ChatGPT (17/10/2026): miniaturas quadradas lado a lado,
+   fora do balão, e o texto (se houver) num balão logo abaixo. Só foto e vídeo com
+   miniatura; o resto continua no balão de sempre. */
+function fotoDoDono(m) {
+  return !!(m && ehDono(m) && !m.pendente && m.media && m.media.disponivel && m.media.thumb &&
+            !ehVisual(m.media) && (m.media.kind === 'photo' || m.media.kind === 'image' || m.media.kind === 'video'));
+}
+function htmlFotosDono(grupo, troca) {
+  const fotos = grupo.map(m => `<span class="mfoto-item" data-msg="${esc(m.id)}">${htmlMidia(m)}</span>`).join('');
+  const textos = grupo.map(m => {
+    const leg = legendaUtil(m);
+    return leg ? paragrafos(leg, m.fmt) : '';
+  }).filter(Boolean).join('');
+  const ult = grupo[grupo.length - 1];
+  const meta = `<span class="meta">${ult.editada ? 'editada · ' : ''}${esc(ult.hhmm)}</span>`;
+  return `<div class="row me mfotos-row${troca}" data-msg="${esc(grupo[0].id)}">` +
+         `<div class="mfotos">${fotos}</div>` +
+         (textos ? `<div class="bub">${textos}${meta}</div>` : `<div class="mfotos-meta">${meta}</div>`) + '</div>';
+}
+
+/* Ações embaixo de cada resposta do agente, como no ChatGPT: copiar e ouvir. */
+const ICONE_ACAO = {
+  copiar: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/></svg>',
+  ok:     '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  ouvir:  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>'
+};
+function htmlAcoes(m) {
+  if (!m || m.pendente || !legendaUtil(m) || ehVisual(m.media)) return '';
+  return `<div class="acoes" data-acoes="${esc(m.id)}">` +
+         `<button type="button" class="ac" data-ac="copiar" title="Copiar" aria-label="Copiar a resposta">${ICONE_ACAO.copiar}</button>` +
+         `<button type="button" class="ac ac-ouvir" data-ac="ouvir" title="Ouvir em voz alta" aria-label="Ouvir a resposta em voz alta">${ICONE_ACAO.ouvir}</button>` +
+         '</div>';
+}
+wrap.addEventListener('click', async ev => {
+  const b = ev.target.closest ? ev.target.closest('.acoes .ac') : null;
+  if (!b) return;
+  const id = b.closest('.acoes').dataset.acoes;
+  const m = msgs.find(x => x.id === id);
+  const texto = m ? legendaUtil(m) : '';
+  if (!texto) return;
+  if (b.dataset.ac === 'copiar') {
+    try {
+      await navigator.clipboard.writeText(texto);
+      b.innerHTML = ICONE_ACAO.ok;
+      b.classList.add('feito');
+      setTimeout(() => { b.innerHTML = ICONE_ACAO.copiar; b.classList.remove('feito'); }, 1500);
+    } catch (e) {
+      mostraAviso('Não consegui copiar: ' + e.message);
+    }
+  } else if (b.dataset.ac === 'ouvir') {
+    destravarAudio();
+    falar(texto);
+  }
+});
+
 /* Conversa vazia: nunca tela em branco. */
 function htmlVazio() {
   return '<div class="vazio"><div class="vz-ico" aria-hidden="true">🦞</div>' +
@@ -1251,7 +1306,9 @@ function render(opt) {
       : '<div class="topo">início da conversa</div>']);
   }
   let dia = '', anterior = null;
-  for (const bloco of (TR ? TR.agrupa(todas) : todas.map(x => ({ msg: x })))) {
+  const blocos = TR ? TR.agrupa(todas) : todas.map(x => ({ msg: x }));
+  for (let bi = 0; bi < blocos.length; bi++) {
+    const bloco = blocos[bi];
     const m = bloco.msg || bloco.trilha[0];
     if (m.dia !== dia) {
       dia = m.dia;
@@ -1267,8 +1324,20 @@ function render(opt) {
     const lado = ehDono(m) ? 'me' : 'her';
     const troca = (anterior !== null && anterior !== lado ? ' gap' : '') +
       (['entrega', 'pedido'].includes(m.alerta) ? ' alerta-' + m.alerta : '');
+    if (lado === 'me' && fotoDoDono(m)) {
+      // fotos que o dono mandou juntas viram uma fileira de miniaturas, com o texto embaixo
+      const grupo = [m];
+      while (bi + 1 < blocos.length) {
+        const prox = blocos[bi + 1].msg;
+        if (!prox || !fotoDoDono(prox) || prox.dia !== m.dia || prox.ep - grupo[grupo.length - 1].ep > 120) break;
+        grupo.push(prox); bi++;
+      }
+      itens.push([m.id + (grupo.length > 1 ? '~' + grupo.length : ''), htmlFotosDono(grupo, troca)]);
+      anterior = lado;
+      continue;
+    }
     itens.push([m.id, `<div class="row ${lado}${ehVisual(m.media) ? ' vis' : ''}${troca}" data-msg="${esc(m.id)}">` +
-                      `<div class="bub">${htmlCorpo(m)}</div></div>`]);
+                      `<div class="bub">${htmlCorpo(m)}</div>${lado === 'her' ? htmlAcoes(m) : ''}</div>`]);
     anterior = lado;
   }
   if (!itens.length && carregouUmaVez) itens.push(['vazio', htmlVazio()]);

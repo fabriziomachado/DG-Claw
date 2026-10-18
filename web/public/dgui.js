@@ -215,11 +215,23 @@
     return f ? `<div class="dgui-fonte">${f}</div>` : '';
   }
   // botões de pergunta pronta embaixo do componente: um toque manda ao agente
+  const ICO_SUG = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>';
+  const ICO_SETA = '<svg class="dgui-sug-seta" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>';
+  // Sem sugestões do agente, o painel ganha perguntas de análise que servem para qualquer dado:
+  // o dono nunca fica sem um próximo passo.
+  function sugestoesPadrao(dados) {
+    const itens = dados && dados.tipo === 'painel' ? (dados.itens || []) : [dados];
+    const temSeries = itens.some((it) => it && it.tipo === 'grafico' && Array.isArray(it.series) && it.series.length > 1);
+    const oQue = dados && dados.tipo === 'painel' ? 'este painel' : dados && dados.tipo === 'tabela' ? 'esta tabela' : 'este gráfico';
+    return ['Interprete ' + oQue, 'Quais são os 3 principais pontos de atenção?',
+      temSeries ? 'Explique as maiores variações entre os períodos' : 'O que explica os números mais altos?',
+      'Que ações você recomenda a partir destes dados?'];
+  }
   function sugestoes(lista) {
     const ok = (Array.isArray(lista) ? lista : []).filter((x) => typeof x === 'string' && x.trim()).slice(0, 4);
     if (!ok.length) return '';
-    return '<div class="dgui-sugestoes" role="group" aria-label="Perguntas sugeridas">' +
-      ok.map((q) => `<button type="button" class="dgui-sugestao" data-dgui-pergunta="${esc(q.trim().slice(0, 200))}">${txt(q.trim().slice(0, 200))}</button>`).join('') + '</div>';
+    return '<div class="dgui-sugestoes" role="group" aria-label="Continue a análise"><div class="dgui-sug-tit">' + ICO_SUG + 'Continue a análise</div>' +
+      ok.map((q) => `<button type="button" class="dgui-sugestao" data-dgui-pergunta="${esc(q.trim().slice(0, 200))}"><span>${txt(q.trim().slice(0, 200))}</span>${ICO_SETA}</button>`).join('') + '</div>';
   }
 
   function aviso(m) { return `<div class="dgui-aviso">Não consegui desenhar este componente: ${esc(m)}.</div>`; }
@@ -258,7 +270,8 @@
     try { dados = JSON.parse(m[1]); } catch (e) {
       return `<div class="dgui">${aviso('o JSON do bloco está inválido (' + String(e.message).slice(0, 120) + ')')}<pre class="dgui-cru">${esc(m[1].slice(0, 2000))}</pre></div>`;
     }
-    const sug = dados && !Array.isArray(dados) ? sugestoes(dados.sugestoes) : '';
+    const analitico = dados && !Array.isArray(dados) && ['painel', 'grafico', 'gráfico', 'tabela'].includes(dados.tipo);
+    const sug = analitico ? sugestoes(Array.isArray(dados.sugestoes) && dados.sugestoes.length ? dados.sugestoes : sugestoesPadrao(dados)) : '';
     return `<div class="dgui">${componente(dados, 0)}${sug}</div>`;
   }
 

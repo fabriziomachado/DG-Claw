@@ -40,7 +40,8 @@
     pilula.type = 'button'; pilula.className = 'nas-pilula'; pilula.hidden = true;
     document.body.append(modal, pilula);
     let tela = '', preenchendo = false, id = '', foto = null, nome = '';
-    let outro = false;   // "+ Novo" da fileira: criar mais um agente, não o primeiro (18/10/2026)
+    let outro = false;
+    let chavesComp = [];   // [{nome, deNome}] que outros agentes já têm: o formulário oferece usar as mesmas   // "+ Novo" da fileira: criar mais um agente, não o primeiro (18/10/2026)
     let minimizado = false, aberto = false, focoAnterior = null, finalDe = null;
     let faseAtual = '', comErroAtual = false, nomeAtual = '';
     /* Depois de tocar, a animação vira um cartão estático no histórico (posicionado pela hora em que a
@@ -249,6 +250,7 @@
       host.innerHTML = cab('Dê um jeito só dele') + '<p>Me conte o que você quer delegar. Eu preparo o resto.</p><form id="nasForm">'+
         '<section data-tour="nas-nome"><div class="nas-rotulo"><label for="nasNomeCompleto">Nome</label><button type="button" data-ajuda="[data-tour=&quot;nas-nome&quot;]" aria-label="Ajuda sobre o nome">?</button></div><input id="nasNomeCompleto" name="nome" value="'+esc(nome)+'" maxlength="70" required><label for="nasDono">Como você quer ser chamado?</label><input id="nasDono" name="dono" maxlength="70" placeholder="Seu nome (opcional)" autocomplete="given-name"></section>'+
         '<section data-tour="nas-papel"><div class="nas-rotulo"><label for="nasPapel">O que ele vai fazer por você?</label><button type="button" data-ajuda="[data-tour=&quot;nas-papel&quot;]" aria-label="Ajuda sobre função e tom">?</button></div><textarea id="nasPapel" name="papel" rows="3" maxlength="700" placeholder="Ex.: organizar minha agenda e me ajudar a escrever para o Instagram" required></textarea><label for="nasTom" title="O jeito de conversar que será gravado na identidade do agente">Tom da conversa</label><select id="nasTom" name="jeito"><option>Acolhedor e direto</option><option>Descontraído e bem-humorado</option><option>Formal e objetivo</option><option>Paciente e didático</option></select></section>'+
+        (chavesComp.length ? '<section class="nas-chaves"><label class="nas-marcar"><input type="checkbox" name="usarChaves" checked> <span>Usar as mesmas chaves dos meus outros agentes: <b>' + esc(chavesComp.map(c => c.nome).join(' e ')) + '</b> <small>(do ' + esc([...new Set(chavesComp.map(c => c.deNome))].join(' e ')) + ')</small></span></label></section>' : '') +
         '<section data-tour="nas-foto"><div class="nas-rotulo"><label for="nasFoto">Foto <span>(opcional)</span></label><button type="button" data-ajuda="[data-tour=&quot;nas-foto&quot;]" aria-label="Ajuda sobre a foto">?</button></div><div class="nas-foto"><div class="nas-avatar" id="nasPrevia" aria-label="Avatar neutro">◉</div><div><input id="nasFoto" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG, JPEG ou WebP · até 5 MB</small><button type="button" id="nasGerarFoto" title="Cria um avatar ilustrado neste navegador, sem IA e sem custo">Gerar avatar</button></div></div></section>'+
         '<p class="nas-nota">Ao tocar em criar, você confirma essas escolhas. Seu agente usará a mesma assinatura do Admin e vocês conversarão aqui no painel.</p><button type="submit" class="nas-principal" data-pergunta="Crie meu agente com as escolhas deste formulário">Criar meu agente</button></form><p class="nas-erro" role="alert" hidden></p>';
       abreModal();
@@ -285,7 +287,7 @@
         try {
           let fotoId = null;
           if (foto) { const fd = new FormData(); fd.append('file',foto); fd.append('enviar','0'); fd.append('cliente_id',id+'-foto'); const up = await json('/api/v1/agents/'+encodeURIComponent(agente.id)+'/upload',{method:'POST',body:fd}); fotoId = up.anexo.id; }
-          const pedido = { id, dono:f.elements.dono.value.trim() || undefined, nome:f.elements.nome.value.trim(), papel:f.elements.papel.value.trim().replace(/\s+/g,' '), jeito:f.elements.jeito.value, foto:fotoId };
+          const pedido = { id, dono:f.elements.dono.value.trim() || undefined, nome:f.elements.nome.value.trim(), papel:f.elements.papel.value.trim().replace(/\s+/g,' '), jeito:f.elements.jeito.value, foto:fotoId, usarChaves: !!(f.elements.usarChaves && f.elements.usarChaves.checked) };
           const d = await json('/api/v1/onboarding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pedido)});
           preenchendo = false; outro = false; mostrar(d);
         } catch(e) { erro(e.message); bot.disabled = false; bot.textContent = 'Tentar enviar novamente'; }
@@ -341,6 +343,7 @@
     }
     function mostrar(d) { mostrarInterno(d); atualizaPilula(); }
     function mostrarInterno(d) {
+      if (Array.isArray(d.chavesCompartilhaveis)) chavesComp = d.chavesCompartilhaveis;
       faseAtual = d.fase; comErroAtual = !!(d.progresso && d.progresso.erro); nomeAtual = d.nome || nomeAtual;
       let novos = false;
       for (const c of d.cartoes || []) if (c.id !== animando && !cartoes.has(c.id) && !dispensados.has(c.id)) { cartoes.set(c.id, c); novos = true; }

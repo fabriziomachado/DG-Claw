@@ -4,6 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { execFile } = require('node:child_process');
+const { criarCofreAgente } = require('./cofre-agente');
+const chavesComp = require('./chaves-compartilhadas');
 const RX_ID = /^[a-f0-9]{32}$/;
 function erro(texto, status = 400) { return Object.assign(new Error(texto), { status }); }
 function campo(v, nome, max) {
@@ -150,6 +152,9 @@ function loja(dataDir) {
 }
 function criarOnboarding({ config, registro, conversa, midia, log = () => {}, imagem = {} }) {
   const db = loja(config.dataDir);
+  const cofre = criarCofreAgente({ config, log });
+  // Só nomes e de qual agente vêm: o formulário oferece "usar as mesmas chaves" quando há alguma.
+  const compartilhaveis = () => { try { return chavesComp.disponiveis(registro, cofre).map(({ nome, deNome }) => ({ nome, deNome })); } catch (_) { return []; } };
   let ocupado = false;
   const unidade = imagem.unidade || 'dgclaw-imagem.service';
   const logImagem = imagem.log || path.join(process.env.DGCLAW_RAIZ || '', 'var/log/dgclaw/imagem.log');
@@ -265,14 +270,16 @@ function criarOnboarding({ config, registro, conversa, midia, log = () => {}, im
     }
     let slug = slugNome(nome);
     if (!anterior && registro.obter(slug)) slug = slug.slice(0, 22) + '-' + body.id.slice(0, 6);
-    const p = anterior || { id: body.id, criado: new Date().toISOString(), nome, papel, jeito, dono, slug, foto, fotoPath, provedor: admin.provedor === 'codex' ? 'codex' : 'claude' };
+    const p = anterior || { id: body.id, criado: new Date().toISOString(), nome, papel, jeito, dono, slug, foto, fotoPath, provedor: admin.provedor === 'codex' ? 'codex' : 'claude',
+      usarChaves: body.usarChaves === true };
     ocupado = true;
     try {
       db.gravar({ ...p, fase: 'enviando', mensagem: 'Enviando suas escolhas ao Admin.' });
       // As escolhas ficam no JSON do pedido e nunca viram código de shell.
       const texto = '[do visual Criar meu agente] Quero criar meu agente com estas escolhas: ' +
         'Pode me chamar de ' + p.dono + '. Nome: ' + p.nome + '. Função: ' + p.papel + '. Tom: ' + p.jeito + '. ' +
-        (p.foto ? 'Escolhi a foto em anexo.' : 'Pode usar o avatar neutro.') + ' Confirmo a criação pelo formulário do painel.';
+        (p.foto ? 'Escolhi a foto em anexo.' : 'Pode usar o avatar neutro.') +
+        (p.usarChaves ? ' Use as mesmas chaves dos meus outros agentes (Groq, Gemini).' : '') + ' Confirmo a criação pelo formulário do painel.';
       const r = await conversa.enviar(admin, { text: texto, anexos: p.foto ? [p.foto] : [] });
       if (r.status >= 300) {
         db.gravar({ ...p, fase: 'erro-envio', mensagem: 'O pedido não chegou ao Admin. Confira a conexão e tente enviar novamente.' });
@@ -288,7 +295,7 @@ function criarOnboarding({ config, registro, conversa, midia, log = () => {}, im
       throw e;
     } finally { ocupado = false; }
   }
-  return { estado: async () => { const p = db.ultimo(); await atualizarImagem(p); return { ...publico(p), cartoes: cartoes() }; }, solicitar, animacaoVista, dispensarCartao, db, foto: slug => {
+  return { estado: async () => { const p = db.ultimo(); await atualizarImagem(p); return { ...publico(p), cartoes: cartoes(), chavesCompartilhaveis: compartilhaveis() }; }, solicitar, animacaoVista, dispensarCartao, db, foto: slug => {
     try { const p = db.todos().find(p => p.slug === slug && p.foto); return p ? publico(p).foto : null; }
     catch (e) { log('aviso', 'Não consegui ler a foto do onboarding (' + (e.code || e.name) + '). A conversa continua com o avatar do registro.'); return null; }
   } };

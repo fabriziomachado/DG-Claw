@@ -842,7 +842,7 @@ function criarServidor(opcoes) {
   });
 
   return {
-    servidor, config, registro, auth, midia, conversa, log, caixa, push, lembretes, avisos,
+    servidor, config, registro, auth, midia, conversa, log, caixa, push, lembretes, avisos, cofreAgente,
     ouvir(porta, host) {
       return new Promise((resolve, reject) => {
         servidor.once('error', reject);

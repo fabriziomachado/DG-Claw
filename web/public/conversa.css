@@ -947,3 +947,6 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 .row.trilha .pg-resumo>summary{display:inline-flex;min-height:28px;padding:3px 10px 3px 8px}
 .row.trilha .pg-passo>details>summary{display:flex;min-height:26px;padding:0}
 @media (prefers-reduced-motion:reduce){#atividade.trab .atv-ponto,.pg-gira{animation-duration:2.4s}}
+
+/* botão do painel no topo: no celular o menu lateral já leva a todas as abas do painel (18/10/2026) */
+@media(max-width:700px){header #btnPainel{display:none!important}}

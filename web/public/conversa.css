@@ -759,6 +759,15 @@ header #btnMesa,header #btnLembretes,header #btnTutorial,header #btnSigilo{displ
   #fileira .fil-badge{left:calc(50% + 9px)}
 }
 @media(prefers-reduced-motion:reduce){#fileira .fil-foto{transition:none}}
+/* trabalhando: um arco da cor do agente gira na borda da foto (18/10/2026, opção A) */
+#fileira .fil{--arco:var(--accent)}
+#fileira .fil.trab .fil-foto{box-shadow:none;overflow:visible}
+#fileira .fil.trab .fil-foto img{border-radius:50%}
+#fileira .fil.trab .fil-foto::before{content:"";position:absolute;inset:-5px;border-radius:50%;pointer-events:none;
+  border:2.5px solid var(--dg-borda);border-top-color:var(--arco);border-right-color:var(--arco);animation:fil-gira 1.1s linear infinite}
+#fileira .fil-foto{position:relative}
+@keyframes fil-gira{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){#fileira .fil.trab .fil-foto::before{animation:none;border-color:var(--arco)}}
 /* a fileira mora no cabeçalho: some o avatar e o nome soltos; o estado vai para baixo do nome do aberto */
 header.com-fileira{height:auto;align-items:center}
 /* antes de saber quem é o agente, o cabeçalho não mostra o avatar e o nome padrão (piscava "DG Claw") */

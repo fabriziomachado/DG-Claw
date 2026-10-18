@@ -232,6 +232,20 @@ document.documentElement.style.setProperty('--accent', AGENTE.cor || '#2f9e5e');
 document.title = AGENTE.nome + ' - DG Claw';
 $('nomeAgente').textContent = AGENTE.nome;
 pintaAvatar(avEl, AGENTE);
+/* Foto trocada no menu (menu-lado.js): o cabeçalho e a conversa vazia mudam sem recarregar. */
+document.addEventListener('dgavatar', ev => {
+  const d = ev.detail || {};
+  if (d.id !== AGENTE.id) return;
+  AGENTE.avatar = d.avatar; AGENTE.avatar_img = d.avatar_img;
+  const noMenu = agentesMenu.find(a => a.id === d.id);
+  if (noMenu) Object.assign(noMenu, { avatar: d.avatar, avatar_img: d.avatar_img });
+  pintaAvatar(avEl, AGENTE);
+  const vz = document.querySelector('.vazio .vz-av');
+  if (vz) {
+    const img = d.avatar_img || '';
+    vz.innerHTML = img ? `<img src="${esc(img)}" alt="">` : esc(d.avatar || (AGENTE.nome || '?').slice(0, 1));
+  }
+});
 
 /* Grupo de avatares dos outros agentes no topo, à esquerda do agente aberto (18/10/2026, a
    pedido do dono, no estilo do "avatar group" do shadcn): sobrepostos com borda branca, o

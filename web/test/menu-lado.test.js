@@ -67,3 +67,19 @@ test('manifesto instalável: standalone, start_url, ícones 192/512 e maskable e
   for (const i of m.icons) assert.ok(fs.existsSync(path.join(__dirname, '../public', i.src)), i.src);
   assert.ok(m.icons.some(i => i.sizes === '192x192') && m.icons.some(i => i.sizes === '512x512'));
 });
+
+test('trocar foto: recorte quadrado pelo centro e conferência do arquivo escolhido', () => {
+  const M = require('../public/menu-lado.js');
+  assert.deepEqual(M.recorteQuadrado(800, 600), { sx: 100, sy: 0, lado: 600 });
+  assert.deepEqual(M.recorteQuadrado(300, 1001), { sx: 0, sy: 350, lado: 300 });
+  assert.deepEqual(M.recorteQuadrado(512, 512), { sx: 0, sy: 0, lado: 512 });
+  assert.equal(M.problemaArquivo({ type: 'image/jpeg', name: 'a.jpg', size: 3e6 }), '');
+  assert.equal(M.problemaArquivo({ type: '', name: 'IMG_1.HEIC', size: 3e6 }), '', 'tipo vazio: o navegador tenta abrir');
+  assert.match(M.problemaArquivo({ type: 'application/pdf', name: 'a.pdf', size: 10 }), /não é uma foto/);
+  assert.match(M.problemaArquivo({ type: 'image/svg+xml', name: 'a.svg', size: 10 }), /SVG/);
+  assert.match(M.problemaArquivo({ type: 'image/png', name: 'a.png', size: 50 * 1024 * 1024 }), /grande demais/);
+  assert.match(M.problemaArquivo(null), /Nenhuma/);
+  for (const t of [M.problemaArquivo({ type: 'application/pdf' }), M.problemaArquivo({ type: 'image/svg+xml' }), M.problemaArquivo({ type: 'image/png', size: 9e9 })]) {
+    assert.doesNotMatch(t, /[—–]/, 'sem travessão no texto da tela');
+  }
+});

@@ -98,3 +98,60 @@ aside#menu .pe{margin-top:auto;padding-top:6px}
 .ml-tema-opcoes button:hover{color:var(--ml-texto)}
 .ml-tema-opcoes button.on{background:var(--dg-superficie,#fff);color:var(--ml-texto);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}
 #mlInstalar[hidden]{display:none!important}
+
+/* foto grande que abre "Trocar foto" (18/10/2026) */
+.ml-foto-btn{position:relative;z-index:1;display:grid;place-items:center;padding:0;border:0;background:none;
+  border-radius:50%;cursor:pointer;color:inherit;font:inherit}
+.ml-foto-btn:focus-visible{outline:2px solid var(--dg-azul);outline-offset:6px}
+.ml-foto-selo{position:absolute;right:2px;bottom:2px;z-index:2;width:30px;height:30px;border-radius:50%;
+  display:grid;place-items:center;background:var(--dg-superficie);color:var(--dg-texto);
+  border:1px solid var(--dg-borda);box-shadow:var(--dg-sombra);transition:transform .15s}
+.ml-foto-btn:hover .ml-foto-selo{transform:scale(1.08)}
+.ml-foto-selo svg{width:16px;height:16px}
+.ml-foto-selo svg,.ml-fs svg{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+/* folha "Trocar foto": sobe de baixo no celular, janela no meio no computador */
+.ml-fs-veu{position:fixed;inset:0;z-index:80;background:var(--dg-sobreposicao);display:flex;align-items:flex-end;
+  justify-content:center;opacity:0;transition:opacity .18s}
+.ml-fs-veu[hidden]{display:none}
+.ml-fs-veu.aberto{opacity:1}
+.ml-fs{width:100%;max-width:420px;background:var(--dg-superficie);color:var(--dg-texto);border:1px solid var(--dg-borda);
+  border-bottom:0;border-radius:18px 18px 0 0;padding:16px 18px calc(18px + env(safe-area-inset-bottom));
+  box-shadow:0 -8px 30px rgba(0,0,0,.18);display:flex;flex-direction:column;align-items:center;gap:12px;
+  transform:translateY(16px);transition:transform .2s;max-height:92vh;overflow-y:auto}
+.ml-fs-veu.aberto .ml-fs{transform:none}
+@media (min-width:600px){
+  .ml-fs-veu{align-items:center}
+  .ml-fs{border-radius:16px;border-bottom:1px solid var(--dg-borda);padding-bottom:18px;box-shadow:0 12px 40px rgba(0,0,0,.2)}
+}
+.ml-fs-cab{width:100%;display:flex;align-items:center;justify-content:space-between}
+.ml-fs-cab h2{margin:0;font-size:17px;font-weight:600;letter-spacing:-.01em}
+.ml-fs-x{width:36px;height:36px;border:0;border-radius:10px;background:none;color:var(--dg-texto-2);cursor:pointer;
+  display:grid;place-items:center;margin-right:-8px}
+.ml-fs-x:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
+.ml-fs-x svg{width:20px;height:20px}
+.ml-fs-sub{margin:-6px 0 0;width:100%;font-size:13px;color:var(--dg-texto-2);line-height:1.45}
+.ml-fs-previa{width:128px;height:128px;border-radius:50%;overflow:hidden;display:grid;place-items:center;
+  color:#fff;font-size:46px;font-weight:600;margin:6px 0 2px;box-shadow:0 0 0 1px var(--dg-borda)}
+.ml-fs-previa img{width:100%;height:100%;object-fit:cover;display:block}
+.ml-fs-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 14px;
+  border:1px solid var(--dg-borda);border-radius:999px;background:var(--dg-superficie);color:var(--dg-texto);
+  font:inherit;font-size:14px;cursor:pointer;white-space:nowrap}
+.ml-fs-btn:hover:not(:disabled){background:var(--dg-superficie-2)}
+.ml-fs-btn:disabled{opacity:.45;cursor:default}
+.ml-fs-btn[hidden]{display:none}
+.ml-fs-btn svg{width:18px;height:18px;flex:0 0 auto}
+.ml-fs-btn:focus-visible,.ml-fs-x:focus-visible{outline:2px solid var(--dg-azul);outline-offset:2px}
+.ml-fs-salvar{background:var(--dg-texto);border-color:var(--dg-texto);color:var(--dg-superficie);font-weight:600}
+.ml-fs-salvar:hover:not(:disabled){background:var(--dg-texto);opacity:.88}
+.ml-fs-remover{color:var(--dg-erro-texto);border-color:var(--dg-erro-borda)}
+.ml-fs-remover:hover:not(:disabled){background:var(--dg-erro-fundo)}
+.ml-fs-dica{margin:-4px 0 0;font-size:12px;color:var(--dg-texto-3);text-align:center}
+.ml-fs-erro{margin:0;width:100%;padding:9px 12px;border-radius:10px;font-size:13px;line-height:1.45;
+  background:var(--dg-erro-fundo);border:1px solid var(--dg-erro-borda);color:var(--dg-erro-texto)}
+.ml-fs-erro[hidden]{display:none}
+.ml-fs-acoes{width:100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px;
+  padding-top:14px;border-top:1px solid var(--dg-borda)}
+.ml-fs-esp{flex:1}
+@media (max-width:380px){ .ml-fs-remover{flex:1 0 100%} }
+.ml-fs:focus{outline:none}

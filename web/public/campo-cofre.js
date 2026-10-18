@@ -64,6 +64,7 @@
         `<div class="dgc-linha"><input type="password" class="dgc-valor" autocomplete="off" ` +
         `spellcheck="false" autocapitalize="off" aria-label="Valor de ${esc(envName)}" placeholder="Cole a chave aqui">` +
         `<button type="button" class="dgc-salvar">Salvar no cofre</button></div>` +
+        `<div class="dgc-outros" hidden></div>` +
         `<div class="dgc-msg" role="alert" hidden></div>`) +
       `</div>`;
   }
@@ -124,14 +125,80 @@
       return;
     }
     inp.value = '';
+    concluido(card, envName, status, corpo, '');
+  }
+
+  function concluido(card, envName, status, corpo, origem) {
     const naoAplicou = !(status >= 200 && status < 300);
     if (card.dataset.id) marcaSalvo(cfg.agente, card.dataset.id);
     const alvo = card.dataset.alvo || '';
     card.innerHTML = htmlSalvo(envName, alvo) + (naoAplicou
       ? `<div class="dgc-aviso">O agente ainda não reiniciou para usar a chave${corpo && corpo.howToFix ? ': ' + esc(corpo.howToFix) : ''}.</div>` : '');
     const onde = alvo ? ' no cofre de ' + alvo : ' no cofre';
-    avisaAgente(naoAplicou ? envName + ' salva' + onde + ' (o agente ainda não reiniciou para usar).'
-                           : envName + ' salva' + onde + '.');
+    avisaAgente(naoAplicou ? envName + ' salva' + onde + origem + ' (o agente ainda não reiniciou para usar).'
+                           : envName + ' salva' + onde + origem + '.');
+  }
+
+  /* "Usar a do smartsau": se outro agente já tem a mesma chave no cofre, o cartão oferece copiar
+     de lá (o servidor copia; o valor não passa pelo navegador). A lista vem do GET do cofre do
+     agente de destino, campo `outros`, só com nomes. Uma consulta por agente a cada carga da página. */
+  const outrosCache = {};
+  function outrosDe(agente) {
+    if (!outrosCache[agente]) {
+      outrosCache[agente] = fetch('/p/' + encodeURIComponent(agente) + '/api/cofre', { credentials: 'same-origin' })
+        .then(r => r.ok ? r.json() : null).then(d => (d && Array.isArray(d.outros)) ? d.outros : [])
+        .catch(() => []);
+    }
+    return outrosCache[agente];
+  }
+
+  function htmlOutros(lista) {
+    return '<span class="dgc-ou">ou use a mesma chave de outro agente:</span>' +
+      lista.map(o => `<button type="button" class="dgc-usar" data-de="${esc(o.de)}" data-de-nome="${esc(o.deNome || o.de)}">` +
+        `Usar a do ${esc(o.deNome || o.de)}</button>`).join('');
+  }
+
+  async function mostraOutros(card) {
+    if (card.dataset.outros) return;
+    card.dataset.outros = '1';
+    const caixa = card.querySelector('.dgc-outros');
+    if (!caixa) return;
+    // Na conversa do Admin só o cartão com `slug:NOME` tem destino; o Admin não tem cofre.
+    const agente = card.dataset.alvo || (cfg.outrosAgentes ? '' : cfg.agente);
+    if (!agente) return;
+    const lista = (await outrosDe(agente)).filter(o => o.envName === card.dataset.env && o.de !== agente);
+    if (!lista.length || !card.isConnected) return;
+    caixa.innerHTML = htmlOutros(lista);
+    caixa.hidden = false;
+  }
+
+  function procuraCartoes(doc) {
+    doc.querySelectorAll('.dgcofre:not([data-outros])').forEach(c => { if (c.querySelector('.dgc-outros')) mostraOutros(c); });
+  }
+
+  async function usarDeOutro(card, botao) {
+    if (card.dataset.enviando === '1') return;
+    const envName = card.dataset.env, de = botao.dataset.de;
+    const agente = card.dataset.alvo || cfg.agente;
+    card.dataset.enviando = '1'; botao.disabled = true;
+    const rotulo = botao.textContent; botao.textContent = 'Copiando…';
+    const msg = card.querySelector('.dgc-msg'); if (msg) msg.hidden = true;
+    let corpo = null, status = 0, falhaRede = '';
+    try {
+      const r = await fetch('/p/' + encodeURIComponent(agente) + '/api/cofre/copiar', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
+        body: JSON.stringify({ de, envName, aplicar: true }),
+      });
+      status = r.status; corpo = await r.json().catch(() => null);
+    } catch (e) { falhaRede = (e && e.message) || 'sem conexão'; }
+    finally { card.dataset.enviando = ''; botao.disabled = false; botao.textContent = rotulo; }
+    const copiou = !falhaRede && ((status >= 200 && status < 300) || (corpo && corpo.guardado));
+    if (!copiou) {
+      mostraErro(card, falhaRede ? 'Não consegui falar com o servidor (' + falhaRede + '). Tente de novo.'
+        : ((corpo && corpo.error) || 'Não consegui copiar (erro ' + status + ').') + (corpo && corpo.howToFix ? ' ' + corpo.howToFix : ''));
+      return;
+    }
+    concluido(card, envName, status, corpo, ' (copiada do ' + (botao.dataset.deNome || de) + ')');
   }
 
   function configurar(c) { cfg = Object.assign({}, cfg, c || {}); }
@@ -139,8 +206,20 @@
   function ligar(doc) {
     doc.addEventListener('click', ev => {
       const b = ev.target.closest && ev.target.closest('.dgcofre .dgc-salvar');
-      if (b) { ev.preventDefault(); salvar(b.closest('.dgcofre')); }
+      if (b) { ev.preventDefault(); salvar(b.closest('.dgcofre')); return; }
+      const u = ev.target.closest && ev.target.closest('.dgcofre .dgc-usar');
+      if (u) { ev.preventDefault(); usarDeOutro(u.closest('.dgcofre'), u); }
     });
+    // Os cartões nascem no render da conversa: um observador acha os novos e pergunta pelos outros agentes.
+    if (typeof MutationObserver === 'function' && doc.body) {
+      let agendado = false;
+      new MutationObserver(() => {
+        if (agendado) return;
+        agendado = true;
+        setTimeout(() => { agendado = false; procuraCartoes(doc); }, 50);
+      }).observe(doc.body, { childList: true, subtree: true });
+      procuraCartoes(doc);
+    }
     doc.addEventListener('keydown', ev => {
       if (ev.key !== 'Enter' || !ev.target.classList || !ev.target.classList.contains('dgc-valor')) return;
       ev.preventDefault(); salvar(ev.target.closest('.dgcofre'));

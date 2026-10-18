@@ -1397,7 +1397,21 @@ wrap.addEventListener('click', async ev => {
 /* Conversa vazia: nunca tela em branco (18/10/2026, no padrão de estado vazio): o avatar do agente,
    uma pergunta curta e sugestões que só preenchem o campo (o dono revisa e envia). Depois de um
    /clear, aponta para as conversas arquivadas no Histórico. */
-const SUGESTOES_VAZIO = ['O que você consegue fazer por mim?', 'O que ficou pendente da última conversa?', 'Me dê um resumo do que você sabe sobre o meu trabalho'];
+const SUGESTOES_VAZIO = ['O que você consegue fazer por mim?', 'O que ficou pendente da última conversa?', 'Me dê um resumo do que você sabe sobre o meu trabalho']
+  .map(texto => ({ texto, tipo: '' }));
+// As do próprio agente (objetivo dele e últimas conversas), em ~/.dgclaw/sugestoes.json; as de cima são o reserva.
+let sugestoesAgente = null;
+const ROTULO_SUGESTAO = { continuar: 'Continuar', insight: 'Ideia' };
+if (!EH_ADMIN) {
+  fetch('/api/v1/historico/' + encodeURIComponent(AGENTE.id) + '/sugestoes', { credentials: 'same-origin', cache: 'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (!d || !Array.isArray(d.sugestoes) || !d.sugestoes.length) return;
+      sugestoesAgente = d.sugestoes;
+      if (wrap.querySelector('.vazio')) render({ semRolar: true });
+    })
+    .catch(() => { /* fica com as genéricas */ });
+}
 function htmlVazio() {
   const img = AGENTE.avatar_img || (/^https:\/\//i.test(AGENTE.avatar || '') ? AGENTE.avatar : '');
   const foto = img ? `<img src="${esc(img)}" alt="">` : esc(AGENTE.avatar || (AGENTE.nome || '?').slice(0, 1));
@@ -1405,8 +1419,9 @@ function htmlVazio() {
   const sub = arquivadasTela && comHist
     ? 'Conversa nova. As anteriores estão no <button type="button" class="vz-link" data-abre-historico>Histórico</button>.'
     : `Mande a primeira mensagem para o ${esc(AGENTE.nome)}. A resposta aparece aqui.`;
-  const sug = EH_ADMIN ? '' : '<div class="vz-sug" role="list">' + SUGESTOES_VAZIO.map(t =>
-    `<button type="button" role="listitem" class="vz-chip" data-vz-sugestao="${esc(t)}">${esc(t)}</button>`).join('') + '</div>';
+  const sug = EH_ADMIN ? '' : '<div class="vz-sug" role="list">' + (sugestoesAgente || SUGESTOES_VAZIO).map(t =>
+    `<button type="button" role="listitem" class="vz-chip" data-vz-sugestao="${esc(t.texto)}">` +
+    (ROTULO_SUGESTAO[t.tipo] ? `<span class="vz-tipo">${ROTULO_SUGESTAO[t.tipo]}</span>` : '') + `${esc(t.texto)}</button>`).join('') + '</div>';
   return `<div class="vazio"><div class="vz-av" style="background:${esc(AGENTE.cor || '#2f9e5e')}" aria-hidden="true">${foto}</div>` +
     `<b>Como posso ajudar?</b><small>${sub}</small>${sug}</div>`;
 }

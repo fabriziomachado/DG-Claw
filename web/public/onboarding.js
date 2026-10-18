@@ -40,6 +40,7 @@
     pilula.type = 'button'; pilula.className = 'nas-pilula'; pilula.hidden = true;
     document.body.append(modal, pilula);
     let tela = '', preenchendo = false, id = '', foto = null, nome = '';
+    let outro = false;   // "+ Novo" da fileira: criar mais um agente, não o primeiro (18/10/2026)
     let minimizado = false, aberto = false, focoAnterior = null, finalDe = null;
     let faseAtual = '', comErroAtual = false, nomeAtual = '';
     /* Depois de tocar, a animação vira um cartão estático no histórico (posicionado pela hora em que a
@@ -182,6 +183,15 @@
       if (b) { ev.preventDefault(); reabrir(b); }
     });
     window.DGOnboarding.abrir = () => reabrir(null);
+    /* "+ Novo" da fileira: abre o cartão no nome de um agente novo. Se uma criação está em andamento
+       (preenchendo, criando, esperando o login), só reabre a janela dela. */
+    window.DGOnboarding.novo = () => {
+      const andando = tela === 'formulario' || (temConteudo() && faseAtual && !['pronto', 'inativo', 'boas-vindas'].includes(faseAtual));
+      if (andando) { minimizado = false; abreModal(); return; }
+      encerraModal();
+      outro = true; id = ''; nome = ''; foto = null; preenchendo = false; minimizado = false;
+      boasVindas();
+    };
     const dataHora = ep => {
       const dt = new Date(ep * 1000), z = n => String(n).padStart(2, '0');
       return { dia: z(dt.getDate()) + '/' + z(dt.getMonth() + 1) + '/' + dt.getFullYear(), hhmm: z(dt.getHours()) + ':' + z(dt.getMinutes()) };
@@ -218,7 +228,9 @@
     }
     function boasVindas() {
       tela = 'boas-vindas';
-      host.innerHTML = cab('Vamos criar seu primeiro agente?') + '<p>Eu sou o Admin. Cuido deste servidor e preparo seus agentes. Como vai se chamar o primeiro?</p><form id="nasNome"><section data-tour="nas-nome"><div class="nas-rotulo"><label for="nasNomeInput">Nome do agente</label><button type="button" data-ajuda="[data-tour=nas-nome]" aria-label="Ajuda sobre o nome">?</button></div><input id="nasNomeInput" name="nome" maxlength="70" placeholder="Ex.: Sofia" required autocomplete="off"><button class="nas-principal" type="submit" data-pergunta="Quero criar meu primeiro agente">Continuar</button></section></form><p class="nas-erro" role="alert" hidden></p>';
+      host.innerHTML = cab(outro ? 'Vamos criar um agente novo?' : 'Vamos criar seu primeiro agente?') + (outro
+        ? '<p>Eu preparo a caixa dele e te aviso quando estiver pronto. Como ele vai se chamar?</p>'
+        : '<p>Eu sou o Admin. Cuido deste servidor e preparo seus agentes. Como vai se chamar o primeiro?</p>') + '<form id="nasNome"><section data-tour="nas-nome"><div class="nas-rotulo"><label for="nasNomeInput">Nome do agente</label><button type="button" data-ajuda="[data-tour=nas-nome]" aria-label="Ajuda sobre o nome">?</button></div><input id="nasNomeInput" name="nome" maxlength="70" placeholder="Ex.: Sofia" required autocomplete="off"><button class="nas-principal" type="submit" data-pergunta="Quero criar meu primeiro agente">Continuar</button></section></form><p class="nas-erro" role="alert" hidden></p>';
       abreModal();
       // Os seletores de tutorial são âncoras estáveis, sem dependência da aparência.
       host.querySelector('[data-ajuda]').onclick = () => tutorial('[data-tour="nas-nome"]');
@@ -226,7 +238,7 @@
       host.querySelector('form').onsubmit = async ev => {
         ev.preventDefault(); nome = host.querySelector('input').value.trim(); if (!nome) return;
         const bot = host.querySelector('[type=submit]'); bot.disabled = true;
-        try { await enviar('Quero criar meu primeiro agente. O nome será ' + nome + '. Vou preencher a função, o tom e a foto no formulário do painel. Aguarde minha confirmação em Criar meu agente.'); formulario(); }
+        try { await enviar((outro ? 'Quero criar um agente novo' : 'Quero criar meu primeiro agente') + '. O nome será ' + nome + '. Vou preencher a função, o tom e a foto no formulário do painel. Aguarde minha confirmação em Criar meu agente.'); formulario(); }
         catch (e) { erro(e.message); bot.disabled = false; }
       };
     }
@@ -275,7 +287,7 @@
           if (foto) { const fd = new FormData(); fd.append('file',foto); fd.append('enviar','0'); fd.append('cliente_id',id+'-foto'); const up = await json('/api/v1/agents/'+encodeURIComponent(agente.id)+'/upload',{method:'POST',body:fd}); fotoId = up.anexo.id; }
           const pedido = { id, dono:f.elements.dono.value.trim() || undefined, nome:f.elements.nome.value.trim(), papel:f.elements.papel.value.trim().replace(/\s+/g,' '), jeito:f.elements.jeito.value, foto:fotoId };
           const d = await json('/api/v1/onboarding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pedido)});
-          preenchendo = false; mostrar(d);
+          preenchendo = false; outro = false; mostrar(d);
         } catch(e) { erro(e.message); bot.disabled = false; bot.textContent = 'Tentar enviar novamente'; }
       };
     }
@@ -333,7 +345,7 @@
       let novos = false;
       for (const c of d.cartoes || []) if (c.id !== animando && !cartoes.has(c.id) && !dispensados.has(c.id)) { cartoes.set(c.id, c); novos = true; }
       if (novos) pedeRender();
-      if (preenchendo) return;
+      if (preenchendo || (outro && (tela === 'boas-vindas' || tela === 'formulario'))) return;
       if (d.fase === 'pronto' && (d.cartaoDispensado || dispensados.has(d.id))) {
         encerraModal(); return;
       }

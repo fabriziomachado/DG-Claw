@@ -351,11 +351,21 @@ document.addEventListener('dgavatar', ev => {
   badges(); setInterval(badges, 30000);
   document.addEventListener('visibilitychange', badges);
 })();
-/* O "+" da fileira abre o Admin com o pedido de criar um agente já escrito. */
-if (EH_ADMIN && location.hash === '#criar') {
-  history.replaceState(null, '', location.pathname + location.search);
-  if (!entrada.value.trim()) entrada.value = 'Quero criar um agente novo';
-  setTimeout(() => { try { entrada.focus(); entrada.dispatchEvent(new Event('input')); } catch (_) {} }, 300);
+/* O "+" da fileira abre o cartão "criar um agente novo" do Admin (onboarding.js). Já na conversa do
+   Admin o toque abre direto; de outro agente, o link leva ao Admin com #criar e ele abre ao carregar. */
+function abreCriacao() {
+  if (window.DGOnboarding && typeof window.DGOnboarding.novo === 'function') { window.DGOnboarding.novo(); return true; }
+  return false;
+}
+if (EH_ADMIN) {
+  document.addEventListener('click', ev => {
+    const n = ev.target.closest && ev.target.closest('#fileira .fil.novo');
+    if (n && abreCriacao()) ev.preventDefault();
+  });
+  if (location.hash === '#criar') {
+    history.replaceState(null, '', location.pathname + location.search);
+    setTimeout(abreCriacao, 400);
+  }
 }
 entrada.placeholder = 'Pergunte ao ' + AGENTE.nome;
 if (EH_ADMIN) $('avisoAdmin').hidden = false;

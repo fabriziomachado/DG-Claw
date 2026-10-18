@@ -26,7 +26,7 @@
   ];
   const ESTADO = { conectado: 'Conectado', precisa_entrar: 'Precisa entrar', falha: 'Com falha', nao_configurado: 'Não configurado', pendente: 'Aguardando aprovação', desconhecido: 'Desconhecido' };
   // conector sem endereço (roda como programa dentro da caixa, ou ainda sem configuração)
-  const DETALHE = { falha: 'não conseguiu iniciar (o canal ainda não foi configurado?)', nao_configurado: 'ainda sem endereço configurado', precisa_entrar: 'precisa entrar na conta' };
+  const DETALHE = { falha: 'não conseguiu iniciar (ainda não configurado)', nao_configurado: 'ainda sem endereço configurado', precisa_entrar: 'precisa entrar na conta' };
   const ORIGEM = { conta: 'da sua conta do Claude', plugin: 'de um plugin', manual: 'adicionado à mão' };
 
   let dados = null, aba = null, precisaReiniciar = new Set();
@@ -104,7 +104,9 @@
     const linhaCon = (c) => {
       const origem = c.origem === 'plugin' ? `do plugin ${c.plugin}` : ORIGEM[c.origem] || '';
       const acoes = [];
-      if (!so && (c.estado === 'precisa_entrar' || c.estado === 'falha')) acoes.push(`<button type="button" class="ig-btn peq" data-pedir="${esc(c.nome)}" data-agente="${esc(a.slug)}" title="O Admin te guia no login deste conector">Pedir ao Admin para conectar</button>`);
+      const ehCanal = c.origem === 'plugin' && /^(telegram|whatsapp)$/i.test(c.plugin);
+      if (!so && ehCanal && c.estado !== 'conectado') acoes.push(`<a class="ig-btn peq" href="/a/${encodeURIComponent(a.slug)}?texto=${encodeURIComponent('quero falar com você no ' + (c.plugin.toLowerCase() === 'telegram' ? 'Telegram' : 'WhatsApp'))}" title="Canal: o próprio agente conduz a ligação">Ligar pelo chat do agente</a>`);
+      else if (!so && (c.estado === 'precisa_entrar' || c.estado === 'falha')) acoes.push(`<button type="button" class="ig-btn peq" data-pedir="${esc(c.nome)}" data-agente="${esc(a.slug)}" title="O Admin te guia no login deste conector">Pedir ao Admin para conectar</button>`);
       if (!so && c.origem === 'manual') acoes.push(`<button type="button" class="ig-btn peq perigo" data-remover="${esc(c.nome)}" data-agente="${esc(a.slug)}">Remover</button>`);
       return `<li class="ig-item" data-busca="${esc((c.nome + ' ' + c.endereco + ' ' + origem).toLowerCase())}">` +
         `<span class="ig-ico">${esc(c.nome.slice(0, 1))}</span>` +

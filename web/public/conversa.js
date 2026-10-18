@@ -1031,28 +1031,27 @@ function htmlMidia(m) {
            `<span class="lupa">${md.kind === 'video' ? 'vídeo' : 'toque para abrir'}</span></button>` +
            `${botaoBaixaMidia(md, rot)}</span>`;
   }
-  return `<span class="midcx"><button class="mid semthumb" data-mid="${esc(md.id)}">` +
-         `<img alt="" src="" hidden><span class="midfb">${rot} ${legenda}</span></button>` +
-         `${botaoBaixaMidia(md, rot)}</span>`;
+  // sem miniatura (PDF, por exemplo): o mesmo cartão de arquivo, com o selo do tipo
+  return `<span class="midcx cxarq">${cartaoArquivo(md, md.id)}${botaoBaixaMidia(md, rot)}</span>`;
 }
 
 /* Cartão de arquivo que não é mídia (zip, planilha, texto, código...): ícone pelo tipo,
    nome como texto comum (outras partes da tela leem e mascaram o texto do balão, então
    o nome não pode ficar só em atributo) e "tamanho · TIPO". */
-const ICONES_ARQ = [
-  ['🗜️', /^(zip|rar|7z|tar|gz|tgz|bz2|xz)$/],
-  ['📊', /^(xlsx|xls|csv|tsv|ods|numbers)$/],
-  ['📝', /^(docx?|odt|rtf|txt|md|pages)$/],
-  ['📽️', /^(pptx?|key|odp)$/],
-  ['🧩', /^(js|mjs|cjs|ts|tsx|jsx|py|sh|bash|json|html?|css|ya?ml|xml|sql|toml|ini|rb|go|rs|java|c|cpp|h|php|ipynb)$/],
-];
 function extDe(nome) {
   const m = /\.([A-Za-z0-9]{1,8})$/.exec(nome || '');
   return m ? m[1].toLowerCase() : '';
 }
+// selo do tipo (PDF, XLSX...) com a cor discreta da família do arquivo, no lugar do emoji
+const FAMILIA_ARQ = [
+  ['pdf', /^pdf$/], ['planilha', /^(xlsx|xls|csv|tsv|ods|numbers)$/], ['texto', /^(docx?|odt|rtf|txt|md|pages)$/],
+  ['slide', /^(pptx?|key|odp)$/], ['zip', /^(zip|rar|7z|tar|gz|tgz|bz2|xz)$/],
+  ['codigo', /^(js|mjs|cjs|ts|tsx|jsx|py|sh|bash|json|html?|css|ya?ml|xml|sql|toml|ini|rb|go|rs|java|c|cpp|h|php|ipynb)$/],
+];
 function cartaoArquivo(md, mid) {
   const ext = extDe(md.nome);
-  const ic = (ICONES_ARQ.find(i => i[1].test(ext)) || ['📄'])[0];
+  const fam = (FAMILIA_ARQ.find(i => i[1].test(ext)) || ['outro'])[0];
+  const ic = `<span class="selo-arq ${fam}">${esc((ext || 'arq').slice(0, 4).toUpperCase())}</span>`;
   const info = [md.bytes ? tamanhoHumano(md.bytes) : '', ext ? ext.toUpperCase() : 'ARQUIVO']
     .filter(Boolean).join(' · ');
   const abre = mid ? ` data-mid="${esc(mid)}"` : '';
@@ -1067,7 +1066,8 @@ function cartaoArquivo(md, mid) {
    (botão dentro de botão não vale). */
 function botaoBaixaMidia(md, rot) {
   return `<a class="midbx" href="${esc(md.url)}" download="${esc(md.nome || '')}" ` +
-         `title="Baixar ${esc(md.nome || '')}" aria-label="Baixar ${rot.replace(/^\S+\s/, '')}">⬇</a>`;
+         `title="Baixar ${esc(md.nome || '')}" aria-label="Baixar ${rot.replace(/^\S+\s/, '')}">` +
+         '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg></a>';
 }
 
 /* Miniatura que não veio (documento que não é PDF, ou geração falhou): o balão

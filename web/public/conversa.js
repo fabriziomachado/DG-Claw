@@ -1095,6 +1095,22 @@ function formata(htmlSeguro, fmt) {
   return s;
 }
 
+/* ```diff (18/10/2026, pedido do dono): o que mudou num código, linha a linha, como no GitHub.
+   Vale para ```diff e ```patch, e para bloco sem língua que tem cara de diff (@@ ou ---/+++).
+   Cada linha vira um <span> com o \n dentro: o copiar (pre.textContent) devolve o texto igual. */
+function ehDiff(lingua, cod) {
+  if (lingua === 'diff' || lingua === 'patch') return true;
+  if (lingua) return false;
+  const l = cod.split('\n');
+  return l.some(x => /^@@ .* @@/.test(x)) || (l.some(x => x.startsWith('--- ')) && l.some(x => x.startsWith('+++ ')));
+}
+function htmlDiff(cod) {
+  return cod.split('\n').map(x => {
+    const c = /^(\+\+\+ |--- |diff --git|index )/.test(x) ? 'd-meta' : x.startsWith('@@') ? 'd-hunk'
+      : x.startsWith('+') ? 'd-add' : x.startsWith('-') ? 'd-del' : 'd-ctx';
+    return `<span class="${c}">${esc(x)}\n</span>`;
+  }).join('');
+}
 const ICONE_COPIAR = '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">' +
   '<rect x="8" y="8" width="12" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/>' +
   '<path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" ' +
@@ -1166,14 +1182,16 @@ function paragrafos(txt, fmt) {
     // ```dgui: KPI, tabela e gráfico desenhados pela tela (dgui.js)
     const ui = window.dgui && window.dgui.blocoParaHtml(partes[i]);
     if (ui) { html += ui; continue; }
+    const lingua = ((/^([A-Za-z0-9_+.-]{1,20})\n/.exec(partes[i]) || [])[1] || '').toLowerCase();
     let cod = partes[i].replace(/^[A-Za-z0-9_+.-]{1,20}\n/, '')
                          .replace(/^\n+/, '').replace(/\s+$/, '');
     // no MarkdownV2, dentro do bloco só a crase e a barra vêm escapadas
     if (fmt === 'markdownv2') cod = cod.replace(/\\([`\\])/g, '$1');
     if (!cod) continue;
-    html += `<div class="cod"><button type="button" class="codcopia" ` +
+    const diff = ehDiff(lingua, cod);
+    html += `<div class="cod${diff ? ' cod-diff' : ''}"><button type="button" class="codcopia" ` +
             `aria-label="Copiar o texto do bloco" title="Copiar o texto do bloco">` +
-            `${ICONE_COPIAR}</button><pre>${esc(cod)}</pre></div>`;
+            `${ICONE_COPIAR}</button><pre>${diff ? htmlDiff(cod) : esc(cod)}</pre></div>`;
   }
   return html;
 }

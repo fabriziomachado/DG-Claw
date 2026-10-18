@@ -214,6 +214,18 @@
             -webkit-user-select:none;user-select:none}
   .codcopia:active{background:var(--dg-superficie)}
   .codcopia.ok{background:var(--accent);color:#fff}
+  /* bloco de código nos dois temas (18/10/2026: no escuro o texto sumia) */
+  .cod{background:var(--dg-superficie-2);border-color:var(--dg-borda)}
+  .cod pre{color:var(--dg-texto)}
+  .codcopia{background:var(--dg-superficie);color:var(--dg-texto-2)}
+  .bub code{background:color-mix(in srgb,var(--dg-texto) 9%,transparent)}
+  /* diff: linhas adicionadas em verde, removidas em vermelho, trecho (@@) em azul */
+  .cod-diff pre{padding-left:0;padding-right:0}
+  .cod-diff pre span{display:block;padding:0 44px 0 11px;min-height:1.45em}
+  .cod-diff .d-add{background:var(--dg-entrega-fundo);color:var(--dg-entrega-texto)}
+  .cod-diff .d-del{background:var(--dg-erro-fundo);color:var(--dg-erro-texto)}
+  .cod-diff .d-hunk{color:var(--dg-azul-forte);background:color-mix(in srgb,var(--dg-azul) 10%,transparent)}
+  .cod-diff .d-meta{color:var(--dg-texto-2);font-weight:600}
 
   /* ── Vídeo: o ▶ diz que não é foto ── */
   .mid .play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:54px;height:54px;

@@ -979,6 +979,7 @@ function estadoOcioso() {
   const est = window.atividadeFoto?.agentes?.[AGENTE.id];
   if (!est) return setEstado('conferindo agente…');
   if (est.alerta === 'permissao') return setEstado('esperando a sua permissão');
+  if (est.estado === 'trabalhando') return setEstado('trabalhando');
   setEstado(est.estado === 'sem_sinal' ? 'agente sem sinal' : 'pronto', est.estado === 'sem_sinal');
 }
 
@@ -987,7 +988,7 @@ function estadoOcioso() {
    porcentagem ("enviando 40%"); os de conexão também têm reticências, por isso
    entram como exceção. Assim o "reconectando…" nunca pisa num estado de trabalho. */
 function telaOciosa() {
-  if (gravando || esperando || falando) return false;
+  if (gravando || falando) return false;   // esperar a resposta não prende o estado (18/10/2026)
   const t = estadoEl.textContent;
   return ESTADOS_CONEXAO.includes(t) || !/(…|%)$/.test(t);
 }
@@ -3880,11 +3881,12 @@ function falaNovas() {
 ouvintesChegada.push(() => { if (!esperando) falaNovas(); });
 
 async function esperaResposta(since) {
+  // Sem "parar de esperar" nem "esperando…" no topo (18/10/2026, pedido do dono): a linha de
+  // andamento perto do campo já mostra o agente trabalhando. A espera segue por baixo, só para ler
+  // a resposta em voz alta quando ela chegar.
   esperando = true;
   pararPedido = false;
-  btnParar.style.display = '';
-  btnParar.textContent = 'parar de esperar';
-  setEstado('esperando a ' + AGENTE.nome + '…');
+  estadoOcioso();
   const limite = Date.now() + LIMITE_ESPERA_MS;
   const temResposta = () => msgs.some(m => ehResposta(m, since));
 
@@ -3897,7 +3899,6 @@ async function esperaResposta(since) {
   if (chegou && !pararPedido) {
     // ela costuma mandar 2 ou 3 balões seguidos: espera até 5 s sem balão
     // novo (no máximo 40 s) antes de começar a ler
-    setEstado('recebendo…');
     const teto = Date.now() + 40000;
     let qtd = -1, quieto = Date.now();
     while (!pararPedido && Date.now() < teto) {
@@ -3909,12 +3910,14 @@ async function esperaResposta(since) {
   }
 
   esperando = false;
-  btnParar.style.display = 'none';
   const respostas = msgs.filter(m => ehResposta(m, since));
   if (pararPedido) {
     setEstado('parei de esperar');
     mostraAviso('Parei de esperar. A mensagem foi entregue: a resposta aparece ' +
                 'aqui sozinha quando ela mandar.');
+  } else if (!respostas.length && (window.atividadeFoto?.agentes?.[AGENTE.id]?.estado === 'trabalhando')) {
+    estadoOcioso();   // ainda trabalhando: a linha de andamento já diz isso, sem aviso de demora
+    if (lerRespostas) escuta = { since: since, ate: Date.now() + ESCUTA_MS };
   } else if (!respostas.length) {
     setEstado('sem resposta ainda');
     mostraAviso('A ' + AGENTE.nome + ' não respondeu em 3 minutos. A mensagem foi ' +

@@ -120,3 +120,14 @@ test('normaliza: painel em formato alternativo (componentes, kpi com itens, dado
   const certo = { tipo: 'kpi', titulo: 'X', valor: '1' };
   assert.deepEqual(D.normaliza(certo), certo, 'o formato certo passa igual');
 });
+
+test('interativo: pontos tocáveis e legenda clicável nos gráficos', () => {
+  const D = require('../public/dgui.js');
+  const g = (forma) => D.blocoParaHtml('dgui\n' + JSON.stringify({ tipo: 'grafico', forma, titulo: 'T', categorias: ['a', 'b'], series: [{ nome: 'S1', valores: [1, 2] }, { nome: 'S2', valores: [3, 4] }] }));
+  for (const f of ['barras', 'colunas', 'linhas']) {
+    const h = g(f);
+    assert.equal((h.match(/data-dgui-ponto="1"/g) || []).length, 4, f);
+    assert.equal((h.match(/data-dgui-serie="/g) || []).length, 2, f);
+    assert.ok(!/ (cx|x)=""/.test(h), f + ': atributo quebrado');
+  }
+});

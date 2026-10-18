@@ -111,10 +111,13 @@
   }
   const un = (c) => (c.unidade ? String(c.unidade).slice(0, 8) : '');
   const rot = (n, c) => (n === null ? '–' : fmt(n) + (un(c) ? (un(c) === '%' ? '%' : ' ' + un(c)) : ''));
+  // Legenda clicável (18/10/2026): tocar numa série esconde ou mostra (classe dgui-sem-N no componente).
   function legenda(ss) {
     if (ss.length < 2) return '';
-    return '<div class="dgui-legenda">' + ss.map((s) => `<span><i class="dgui-c${s.cor}"></i>${txt(s.nome)}</span>`).join('') + '</div>';
+    return '<div class="dgui-legenda">' + ss.map((s) => `<button type="button" class="dgui-leg-item" data-dgui-serie="${s.cor}" aria-pressed="true" title="Mostrar ou esconder ${txt(s.nome)}"><i class="dgui-c${s.cor}"></i>${txt(s.nome)}</button>`).join('') + '</div>';
   }
+  // Tocar num ponto (barra, coluna, ponto da linha, fatia) abre um balão com o valor (18/10/2026)
+  const ponto = (cat, serie, val) => ` data-dgui-ponto="1" data-cat="${txt(cat)}" data-serie="${txt(serie || '')}" data-val="${esc(val)}" tabindex="0"`;
 
   // barras deitadas: o melhor para nomes longos (cursos, produtos)
   function barras(c) {
@@ -125,7 +128,7 @@
       `<div class="dgui-barra-cat" title="${txt(cat)}">${txt(cat)}</div><div class="dgui-barra-vals">` +
       ss.map((s) => {
         const v = s.valores[i]; const w = v === null || max <= 0 ? 0 : Math.max(0.5, (v / max) * 100);
-        return `<div class="dgui-barra-par"><span class="dgui-barra dgui-c${s.cor}" style="width:${w.toFixed(2)}%"` +
+        return `<div class="dgui-barra-par dgui-p${s.cor}"><span class="dgui-barra dgui-c${s.cor}" style="width:${w.toFixed(2)}%"${ponto(cat, s.nome, rot(v, c))}` +
           ` title="${txt(cat)}${s.nome ? ' · ' + txt(s.nome) : ''}: ${esc(rot(v, c))}"></span><b>${esc(rot(v, c))}</b></div>`;
       }).join('') + '</div></div>').join('') + `</div>` + legenda(ss);
   }
@@ -167,7 +170,7 @@
         const v = se.valores[i]; if (v === null) return;
         const x = E + passo * i + passo * 0.15 + larg * k;
         const yy = Math.min(y(v), base), h = Math.abs(base - y(v));
-        s += `<rect class="dgui-c${se.cor}" x="${x.toFixed(1)}" y="${yy.toFixed(1)}" width="${Math.max(1, larg - 2).toFixed(1)}" height="${Math.max(1, h).toFixed(1)}" rx="3"><title>${txt(cat)}${se.nome ? ' · ' + txt(se.nome) : ''}: ${esc(rot(v, c))}</title></rect>`;
+        s += `<rect class="dgui-c${se.cor}"${ponto(cat, se.nome, rot(v, c))} x="${x.toFixed(1)}" y="${yy.toFixed(1)}" width="${Math.max(1, larg - 2).toFixed(1)}" height="${Math.max(1, h).toFixed(1)}" rx="3"><title>${txt(cat)}${se.nome ? ' · ' + txt(se.nome) : ''}: ${esc(rot(v, c))}</title></rect>`;
       }));
       return s;
     });
@@ -176,7 +179,7 @@
     return eixo(c, ({ cats, ss, y, passo, E }) => ss.map((se) => {
       const pts = se.valores.map((v, i) => (v === null ? null : [E + passo * (i + 0.5), y(v), v, cats[i]])).filter(Boolean);
       return `<polyline class="dgui-linha dgui-c${se.cor}" points="${pts.map((p) => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ')}"/>` +
-        pts.map((p) => `<circle class="dgui-ponto dgui-c${se.cor}" cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5"><title>${txt(p[3])}${se.nome ? ' · ' + txt(se.nome) : ''}: ${esc(rot(p[2], c))}</title></circle>`).join('');
+        pts.map((p) => `<circle class="dgui-ponto dgui-c${se.cor}"${ponto(p[3], se.nome, rot(p[2], c))} cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3.5"><title>${txt(p[3])}${se.nome ? ' · ' + txt(se.nome) : ''}: ${esc(rot(p[2], c))}</title></circle>`).join('');
     }).join(''));
   }
   function pizza(c) {
@@ -194,7 +197,7 @@
       const g = a2 - ang > Math.PI ? 1 : 0;
       const d = v === total ? 'M10,100a90,90 0 1,0 180,0a90,90 0 1,0 -180,0M44,100a56,56 0 1,1 112,0a56,56 0 1,1 -112,0'
         : `M${x1},${y1}A90,90 0 ${g} 1 ${x2},${y2}L${x3},${y3}A56,56 0 ${g} 0 ${x4},${y4}Z`;
-      svg += `<path class="dgui-c${i % 6}" d="${d}"><title>${txt(cats[i])}: ${esc(rot(v, c))} (${fmt(Math.round((v / total) * 1000) / 10)}%)</title></path>`;
+      svg += `<path class="dgui-c${i % 6}"${ponto(cats[i], '', rot(v, c) + ' (' + fmt(Math.round((v / total) * 1000) / 10) + '%)')} d="${d}"><title>${txt(cats[i])}: ${esc(rot(v, c))} (${fmt(Math.round((v / total) * 1000) / 10)}%)</title></path>`;
       ang = a2;
     });
     svg += '</svg>';
@@ -491,6 +494,35 @@
       img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
     });
   }
+  function alternaSerie(btn) {
+    const comp = btn.closest('.dgui-comp'); if (!comp) return;
+    const n = btn.dataset.dguiSerie;
+    const esconde = !comp.classList.contains('dgui-sem-' + n);
+    // não deixa esconder todas: sobra pelo menos uma série à vista
+    const todas = comp.querySelectorAll('[data-dgui-serie]').length;
+    if (esconde && comp.querySelectorAll('[data-dgui-serie][aria-pressed="false"]').length >= todas - 1) return;
+    comp.classList.toggle('dgui-sem-' + n, esconde);
+    btn.setAttribute('aria-pressed', esconde ? 'false' : 'true');
+  }
+  function fechaBalao() { const b = raiz.document.querySelector('.dgui-balao'); if (b) b.remove(); }
+  function abreBalao(pt, ev) {
+    fechaBalao();
+    const comp = pt.closest('.dgui-comp'); if (!comp) return;
+    const c = registro.get(comp.dataset.dgui) || {};
+    const cat = pt.dataset.cat || '', serie = pt.dataset.serie || '', val = pt.dataset.val || '';
+    const pergunta = 'Me conte mais sobre ' + cat + (serie ? ' (' + serie + ')' : '') + (c.titulo ? ' no gráfico "' + c.titulo + '"' : '') + '.';
+    const b = raiz.document.createElement('div');
+    b.className = 'dgui-balao'; b.setAttribute('role', 'dialog');
+    b.innerHTML = `<b>${esc(cat)}</b><span>${serie ? esc(serie) + ': ' : ''}${esc(val)}</span>` +
+      `<button type="button" class="dgui-balao-perg" data-dgui-balao-pergunta="${esc(pergunta.slice(0, 300))}" title="Perguntar ao agente sobre este item">${ICO_SETA}<span>Perguntar sobre este</span></button>`;
+    comp.appendChild(b);
+    const rc = comp.getBoundingClientRect(), rp = pt.getBoundingClientRect();
+    const x = ev && ev.clientX ? ev.clientX : rp.left + rp.width / 2, y = ev && ev.clientY ? ev.clientY : rp.top;
+    const bw = b.offsetWidth, bh = b.offsetHeight;
+    let left = x - rc.left - bw / 2; left = Math.max(6, Math.min(left, rc.width - bw - 6));
+    let top = y - rc.top - bh - 12; if (top < 4) top = y - rc.top + 16;
+    b.style.left = left + 'px'; b.style.top = top + 'px';
+  }
   function confirma(btn) {
     const antes = btn.innerHTML; btn.innerHTML = ICO.ok; btn.classList.add('feito');
     setTimeout(() => { btn.innerHTML = antes; btn.classList.remove('feito'); }, 1500);
@@ -573,6 +605,13 @@
       if (th) { ordena(th); return; }
       const acao = ev.target.closest('[data-dgui-acao]');
       if (acao) { age(acao); return; }
+      const leg = ev.target.closest('[data-dgui-serie]');
+      if (leg) { alternaSerie(leg); return; }
+      const pt = ev.target.closest('[data-dgui-ponto]');
+      if (pt) { abreBalao(pt, ev); return; }
+      const perg = ev.target.closest('[data-dgui-balao-pergunta]');
+      if (perg) { raiz.document.dispatchEvent(new CustomEvent('dgui-pergunta', { detail: { texto: perg.dataset.dguiBalaoPergunta } })); fechaBalao(); return; }
+      if (!ev.target.closest('.dgui-balao')) fechaBalao();
       // pergunta sugerida: a conversa (conversa.js) escuta e manda ao agente
       const op = ev.target.closest('[data-dgui-opcao]');
       if (op) {
@@ -594,6 +633,8 @@
       if (sug) raiz.document.dispatchEvent(new CustomEvent('dgui-pergunta', { detail: { texto: sug.dataset.dguiPergunta } }));
     });
     raiz.document.addEventListener('keydown', (ev) => {
+      if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.closest && ev.target.closest('[data-dgui-ponto]')) { ev.preventDefault(); abreBalao(ev.target.closest('[data-dgui-ponto]'), null); return; }
+      if (ev.key === 'Escape' && raiz.document.querySelector('.dgui-balao')) { fechaBalao(); return; }
       if (ev.key !== 'Escape') return;
       const aberto = raiz.document.querySelector('.dgui-comp.dgui-cheio [data-dgui-acao="ampliar"]');
       if (aberto) age(aberto);

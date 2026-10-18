@@ -650,6 +650,48 @@
     raiz.DGTema.escolhe(b.dataset.temaOp);
   });
   document.addEventListener('dgtema', pintaTema);
+
+  /* Ícones do menu (18/10/2026, pedido do dono): os itens nascem com um símbolo de texto (◔ ▦ ⏰...),
+     que destoava do resto (o ⏰ virava emoji colorido). Aqui cada símbolo vira um ícone de traço fino,
+     no estilo dos botões do topo (icones-topo.js). Um observador troca sempre que o menu é redesenhado. */
+  const ico = d => '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+  const ICONES_MENU = {
+    '◔': ico('<path d="M21 12a8.5 8.5 0 0 1-12.4 7.6L4 21l1.4-4.6A8.5 8.5 0 1 1 21 12z"/>'),
+    '▦': ico('<rect x="4" y="4" width="16" height="16" rx="2.5"/><path d="M4 9.5h16M9.5 9.5V20"/>'),
+    '⏰': ico('<path d="M18 16v-5a6 6 0 0 0-12 0v5l-1.5 2h15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>'),
+    '⧉': ico('<path d="M9 7V4M15 7V4M7 7h10v4a5 5 0 0 1-10 0z"/><path d="M12 16v4"/>'),
+    '⤓': ico('<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/>'),
+    '◉': ico('<path d="M3 12h4l2.5-6 5 12 2.5-6h4"/>'),
+    '✦': ico('<path d="M12 3l2.4 5.3 5.6.7-4.1 3.9 1 5.6L12 15.8 7.1 18.5l1-5.6L4 9l5.6-.7z"/>'),
+    '↻': ico('<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/>'),
+    '⚿': ico('<circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/>'),
+    '▢': ico('<path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2.5h7a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/>'),
+    '▤': ico('<path d="M9 4.5a3 3 0 0 0-3 3 3 3 0 0 0-1.5 5.3A3 3 0 0 0 8 18a2.5 2.5 0 0 0 4 1.5V5.5A2.5 2.5 0 0 0 9 4.5zM15 4.5a3 3 0 0 1 3 3 3 3 0 0 1 1.5 5.3A3 3 0 0 1 16 18a2.5 2.5 0 0 1-4 1.5"/>'),
+    '⚙': ico('<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/>'),
+    '◇': ico('<circle cx="12" cy="12" r="8.5"/><path d="M14.8 9.2c-.5-.9-1.6-1.5-2.8-1.5-1.6 0-2.8.9-2.8 2.1 0 2.8 5.6 1.6 5.6 4.4 0 1.2-1.2 2.1-2.8 2.1-1.3 0-2.4-.6-2.9-1.6M12 6v1.7M12 16.3V18"/>'),
+    '◎': ico('<circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6"/><circle cx="12" cy="17" r=".6" fill="currentColor"/>'),
+    '◈': ico('<rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="11" r="2"/><path d="M6 16c.6-1.4 1.7-2 3-2s2.4.6 3 2M14.5 10h3M14.5 13.5h3"/>'),
+    '◐': ico('<circle cx="12" cy="12" r="8.5"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/>'),
+    '▨': ico('<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>'),
+    '✚': ico('<path d="M12 21s-7.5-4.6-7.5-10.3A4.2 4.2 0 0 1 12 8a4.2 4.2 0 0 1 7.5 2.7C19.5 16.4 12 21 12 21z"/><path d="M12 11v4M10 13h4"/>'),
+    '•': ico('<circle cx="12" cy="12" r="2.5"/>'),
+  };
+  // o tema usa ◐ também: lá vira sol e lua, não carinha
+  const ICONE_TEMA = ico('<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/>');
+  function trocaIconesMenu() {
+    document.querySelectorAll('.ml-ico:not([data-svg])').forEach(el => {
+      const g = (el.textContent || '').trim().replace(/️/g, '');
+      const svg = el.closest('.ml-tema') ? ICONE_TEMA : ICONES_MENU[g];
+      if (!svg) return;
+      el.dataset.svg = g; el.innerHTML = svg;
+    });
+  }
+  if (typeof MutationObserver === 'function') {
+    let pend = false;
+    const olha = () => { if (pend) return; pend = true; requestAnimationFrame(() => { pend = false; trocaIconesMenu(); }); };
+    const liga = () => { trocaIconesMenu(); if (document.body) new MutationObserver(olha).observe(document.body, { childList: true, subtree: true }); };
+    if (document.body) liga(); else document.addEventListener('DOMContentLoaded', liga);
+  }
   // o seletor nasce com a casca (que monta depois); pinta assim que ele existir
   (function espera(n) { if (document.querySelector('#mlTema [data-tema-op]')) pintaTema(); else if (n > 0) setTimeout(() => espera(n - 1), 200); })(25);
 

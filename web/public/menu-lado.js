@@ -26,6 +26,8 @@
 
   /* Entrada fixa do menu: a tela de lembretes (vale para qualquer agente). */
   const LINK_LEMBRETES = { nome: 'Lembretes', ico: '⏰', href: '/lembretes' };
+  /* Entrada fixa: as integrações de todos os agentes (conectores, plugins, skills, chaves, canais). */
+  const LINK_INTEGRACOES = { nome: 'Integrações', ico: '⧉', href: '/integracoes' };
 
   /* Páginas fora do painel (Mesa, Lembretes) não têm o agente no caminho: levam ?a=<slug> para a
      tela saber de quem é o menu. */
@@ -42,6 +44,7 @@
     const caminho = h.split(/[?#]/)[0].replace(/\/+$/, '');
     if (caminho === '/mesa') return 'mesa';
     if (caminho === '/lembretes') return 'lembretes';
+    if (caminho === '/integracoes') return 'integracoes';
     if (/^\/a\/[^/]+$/.test(caminho)) return 'conversa';
     return '';
   }
@@ -241,7 +244,9 @@
       `<span class="ml-ico" aria-hidden="true">${l.ico}</span>${esc(l.nome)}</a>`).join('');
     painel.hidden = !links.length;
     $('mlTabs').insertAdjacentHTML('beforeend', `<div data-tour="gm-lembretes"><a class="ml-tab" href="${comAgente(LINK_LEMBRETES.href, ag.id)}">` +
-      `<span class="ml-ico" aria-hidden="true">${LINK_LEMBRETES.ico}</span>${LINK_LEMBRETES.nome}</a></div>`);
+      `<span class="ml-ico" aria-hidden="true">${LINK_LEMBRETES.ico}</span>${LINK_LEMBRETES.nome}</a></div>` +
+      `<div data-tour="gm-integracoes"><a class="ml-tab" href="${comAgente(LINK_INTEGRACOES.href, ag.id)}">` +
+      `<span class="ml-ico" aria-hidden="true">${LINK_INTEGRACOES.ico}</span>${LINK_INTEGRACOES.nome}</a></div>`);
     // a Mesa já está no HTML com href="/mesa": passa a levar o agente junto
     const mesa = document.querySelector('#mlTabs a[href="/mesa"]');
     if (mesa) mesa.setAttribute('href', comAgente('/mesa', ag.id));

@@ -34,6 +34,7 @@ const { criarPush } = require('./lib/push');
 const { criarLembretes } = require('./lib/lembretes');
 const { criarMesa } = require('./lib/mesa');
 const { criarAvisos } = require('./lib/avisos');
+const { criarIntegracoes } = require('./lib/integracoes');
 
 const METODOS_QUE_ESCREVEM = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const TIPOS_ESTATICOS = {
@@ -100,6 +101,7 @@ function criarServidor(opcoes) {
   // O agente fala com a Mesa pelo dgclaw-mesa, que passa pela caixa: a rota precisa estar liberada.
   caixa.permitir('/api/v1/tarefas');
   const avisos = criarAvisos({ config, registro, runner, caixa, log, agora: opcoes.agora });
+  const integracoes = criarIntegracoes({ registro, log });
   caixa.permitir('/api/v1/avisos');
 
   let versaoJsCache = { ts: 0, valor: '0' };
@@ -392,6 +394,9 @@ function criarServidor(opcoes) {
     }
     if (p === '/api/v1/avisos' || p.startsWith('/api/v1/avisos/')) {
       if (await avisos.tratar(req, res, url, sessao)) return undefined;
+    }
+    if (p === '/api/v1/integracoes' || p.startsWith('/api/v1/integracoes/')) {
+      if (await integracoes.tratar(req, res, url, sessao)) return undefined;
     }
     if (p === '/api/v1/push' || p.startsWith('/api/v1/push/')) {
       if (await push.rotas(req, res, url, sessao)) return undefined;
@@ -707,6 +712,15 @@ function criarServidor(opcoes) {
       if (falhaDoRegistro(req, res, false)) return undefined;
       res.writeHead(302, { Location: `/a/${registro.estado().agentes[0].slug}`, 'Cache-Control': 'no-store' });
       return res.end();
+    }
+
+    if (p === '/integracoes' && (m === 'GET' || m === 'HEAD')) {
+      if (!sessao) return semSessaoPagina(req, res, url);
+      if (!servirArquivo(req, res, path.join(config.publicDir, 'integracoes.html'), 'no-store')) {
+        log('erro', `A tela de integrações não está instalada: falta ${path.join(config.publicDir, 'integracoes.html')}.`);
+        H.paginaErro(res, 500, 'Tela não instalada', 'O arquivo da tela de integrações não foi encontrado no servidor. Reinstale o DG Claw Web.');
+      }
+      return undefined;
     }
 
     if (p === '/lembretes' && (m === 'GET' || m === 'HEAD')) {

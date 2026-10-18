@@ -699,3 +699,14 @@ header #btnTutorial{font-size:14px}
 .acoes .hora{display:inline-block;margin:0 0 0 6px}
 .acoes.so-hora .hora{margin-left:4px}
 header #btnMesa,header #btnLembretes,header #btnTutorial,header #btnSigilo{display:none!important}
+
+/* avatares de todos os agentes no topo; o aberto com anel (18/10/2026) */
+#avatares{display:flex;align-items:center;gap:6px;margin:0 6px;flex:0 0 auto}
+#avatares .avt{display:block;border-radius:50%;padding:2px;border:2px solid transparent;line-height:0;
+               transition:border-color .15s,transform .15s;text-decoration:none}
+#avatares .avt:hover{transform:translateY(-1px);border-color:#e3e3e3}
+#avatares .avt.aqui{border-color:var(--accent,#2f9e5e)}
+#avatares .avt-foto{display:flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:50%;
+                    overflow:hidden;color:#fff;font-size:13px;font-weight:600;line-height:1}
+#avatares .avt-foto img{width:100%;height:100%;object-fit:cover;display:block}
+@media(max-width:520px){#avatares{gap:3px;margin:0 2px}#avatares .avt-foto{width:26px;height:26px;font-size:12px}}

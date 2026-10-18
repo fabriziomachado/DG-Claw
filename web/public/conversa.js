@@ -231,6 +231,25 @@ document.documentElement.style.setProperty('--accent', AGENTE.cor || '#2f9e5e');
 document.title = AGENTE.nome + ' - DG Claw';
 $('nomeAgente').textContent = AGENTE.nome;
 pintaAvatar(avEl, AGENTE);
+
+/* Fileira de avatares de todos os agentes no topo (18/10/2026, a pedido do dono): um toque
+   troca de conversa sem abrir o menu. O agente aberto fica com um anel. */
+(function () {
+  if (agentesMenu.length < 2) return;
+  const nav = document.createElement('nav');
+  nav.id = 'avatares';
+  nav.setAttribute('aria-label', 'Trocar de agente');
+  nav.innerHTML = agentesMenu.map(a => {
+    const img = a.avatar_img || (/^https:\/\//i.test(a.avatar || '') ? a.avatar : '');
+    const dentro = img ? `<img src="${esc(img)}" alt="">` : esc(a.avatar || (a.nome || '?').slice(0, 1));
+    const aqui = a.id === AGENTE.id;
+    return `<a class="avt${aqui ? ' aqui' : ''}" href="/a/${encodeURIComponent(a.id)}" data-avt="${esc(a.id)}" ` +
+           `title="${esc(a.nome)}" aria-label="${esc(aqui ? a.nome + ' (aberto)' : 'Conversar com ' + a.nome)}"` +
+           `${aqui ? ' aria-current="page"' : ''}><span class="avt-foto" style="background:${esc(a.cor || '#2f9e5e')}">${dentro}</span></a>`;
+  }).join('');
+  const who = $('who');
+  if (who && who.parentNode) who.parentNode.insertBefore(nav, who.nextSibling);
+})();
 entrada.placeholder = 'Pergunte ao ' + AGENTE.nome;
 if (EH_ADMIN) $('avisoAdmin').hidden = false;
 if (!caps.microfone) document.documentElement.classList.add('sem-mic');

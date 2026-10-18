@@ -189,6 +189,10 @@ A mesa (`/mesa` no painel) e onde o {{DONO}} ve o que voce esta fazendo. Use `dg
 - **Atualize enquanto trabalha**: sem atualizacao ha 45 minutos a tarefa aparece como "parada?".
 - **Travou ou precisa do {{DONO}}:** `pedir` ou `travar`, SEMPRE com `--motivo`.
 - **Ele respondeu na conversa:** atualize no mesmo turno (`retomar --nota`). **Terminou:** `concluir --link`.
+- **Confira a resposta do `dgclaw-mesa`** (nada de `>/dev/null`): ela diz "tarefa #N concluida" quando deu
+  certo, ou o motivo da recusa. Nunca diga ao dono que a tarefa foi concluida sem ver essa frase.
+  O `--link` so aceita `https://...` ou um caminho do Web comecando com `/`; arquivo da sua casa
+  (`~/...`) vai na `--nota`.
 
 ```bash
 dgclaw-mesa criar --titulo "..." --origem "{{DONO}}, 05/10 15h42: <o pedido>" --passo pesquisa --passo roteiro

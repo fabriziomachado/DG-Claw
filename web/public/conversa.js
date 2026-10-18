@@ -46,6 +46,63 @@ function mostraErroTela(titulo, texto, agentes) {
   if (barra) barra.hidden = true;
 }
 
+/* ── Fileira de agentes do cabeçalho ──────────────────────────────────────
+   Montada aqui fora para aparecer JÁ na partida: a lista da última visita fica guardada no
+   aparelho (só nome, cor e foto) e desenha a fileira antes de a API responder. Sem isso, trocar
+   de agente mostrava por um instante o cabeçalho padrão (bolinha e "DG Claw"). iniciaTela troca
+   a provisória pela de verdade, com estado e avisos. */
+const CHAVE_FILEIRA = 'dgclaw-fileira';
+const escF = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function fotoFileira(a) {
+  const img = a.avatar_img || (/^https:\/\//i.test(a.avatar || '') ? a.avatar : '');
+  return img ? `<img src="${escF(img)}" alt="">` : escF(a.avatar || (a.nome || '?').slice(0, 1));
+}
+function ordemFileira(lista) {
+  return lista.filter(a => a.tipo === 'admin').concat(lista.filter(a => a.tipo !== 'admin'));
+}
+function montaFileira(lista, atualId) {
+  const nav = document.createElement('nav');
+  nav.id = 'fileira';
+  nav.setAttribute('aria-label', 'Trocar de agente');
+  const admin = lista.find(a => a.tipo === 'admin');
+  nav.innerHTML = (admin ? `<a class="fil novo" href="/a/${encodeURIComponent(admin.id)}#criar" aria-label="Criar um agente novo">` +
+      `<span class="fil-foto"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>` +
+      `<span class="fil-nome">Novo</span></a>` : '') +
+    lista.map(a => {
+      const atual = a.id === atualId;
+      return `<a class="fil${atual ? ' atual' : ''}" href="/a/${encodeURIComponent(a.id)}" data-avt="${escF(a.id)}"` +
+        `${atual ? ' aria-current="page"' : ''} aria-label="${escF((atual ? 'Conversa aberta: ' : 'Conversar com ') + a.nome)}">` +
+        `<span class="fil-foto" style="background:${escF(a.cor || '#2f9e5e')}">${fotoFileira(a)}</span>` +
+        `<span class="fil-nome">${escF(a.nome)}</span></a>`;
+    }).join('');
+  return nav;
+}
+/** Põe a fileira no cabeçalho, no lugar do avatar e do nome soltos (troca a que já estiver lá). */
+function pregaFileira(nav) {
+  const cab = $('cabecalho'), btnMenu = $('btnMenu');
+  if (!cab || !btnMenu) return false;
+  const velha = $('fileira');
+  if (velha) velha.remove();
+  cab.insertBefore(nav, btnMenu.nextSibling);
+  cab.classList.add('com-fileira');
+  const at = nav.querySelector('.atual');
+  if (at && at.scrollIntoView) at.scrollIntoView({ block: 'nearest', inline: 'center' });
+  return true;
+}
+function guardaFileira(lista) {
+  try {
+    localStorage.setItem(CHAVE_FILEIRA, JSON.stringify(lista.map(a => ({ id: a.id, nome: a.nome, tipo: a.tipo, cor: a.cor, avatar: a.avatar, avatar_img: a.avatar_img }))));
+  } catch (_) { /* sem armazenamento: a fileira só aparece quando a API responder */ }
+}
+(function fileiraProvisoria() {
+  const slug = slugDaUrl();
+  if (!slug) return;
+  let lista = null;
+  try { lista = JSON.parse(localStorage.getItem(CHAVE_FILEIRA) || 'null'); } catch (_) { lista = null; }
+  if (!Array.isArray(lista) || lista.length < 2 || !lista.some(a => a && a.id === slug)) return;
+  pregaFileira(montaFileira(ordemFileira(lista.filter(a => a && a.id)), slug));
+})();
+
 async function boot() {
   let d = null;
   try {
@@ -64,6 +121,7 @@ async function boot() {
     return;
   }
   const lista = Array.isArray(d.agentes) ? d.agentes : [];
+  guardaFileira(lista);
   if (!lista.length) {
     mostraErroTela('Nenhum agente por aqui ainda',
                    'O servidor não devolveu nenhum agente. Peça para cadastrarem um e recarregue.');
@@ -252,29 +310,10 @@ document.addEventListener('dgavatar', ev => {
    ("pronto", "trabalhando") embaixo do nome, um anel e um número quando há aviso não visto, e um "+"
    que leva ao Admin para criar outro. Um toque troca de conversa; no aberto, abre as mídias. */
 (function () {
-  if (agentesMenu.length < 2) return;
-  const nav = document.createElement('nav');
-  nav.id = 'fileira';
-  nav.setAttribute('aria-label', 'Trocar de agente');
-  const foto = a => {
-    const img = a.avatar_img || (/^https:\/\//i.test(a.avatar || '') ? a.avatar : '');
-    return img ? `<img src="${esc(img)}" alt="">` : esc(a.avatar || (a.nome || '?').slice(0, 1));
-  };
-  const admin = agentesMenu.find(a => a.tipo === 'admin');
-  nav.innerHTML = (admin ? `<a class="fil novo" href="/a/${encodeURIComponent(admin.id)}#criar" aria-label="Criar um agente novo">` +
-      `<span class="fil-foto"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>` +
-      `<span class="fil-nome">Novo</span></a>` : '') +
-    agentesMenu.map(a => {
-      const atual = a.id === AGENTE.id;
-      return `<a class="fil${atual ? ' atual' : ''}" href="/a/${encodeURIComponent(a.id)}" data-avt="${esc(a.id)}"` +
-        `${atual ? ' aria-current="page"' : ''} aria-label="${esc((atual ? 'Conversa aberta: ' : 'Conversar com ') + a.nome)}">` +
-        `<span class="fil-foto" style="background:${esc(a.cor || '#2f9e5e')}">${foto(a)}</span>` +
-        `<span class="fil-nome">${esc(a.nome)}</span></a>`;
-    }).join('');
-  const cab = $('cabecalho'), btnMenu = $('btnMenu');
-  if (!cab || !btnMenu) return;
-  cab.insertBefore(nav, btnMenu.nextSibling);
-  cab.classList.add('com-fileira');
+  $('cabecalho').classList.add('pronto');
+  if (agentesMenu.length < 2) { const v = $('fileira'); if (v) v.remove(); $('cabecalho').classList.remove('com-fileira'); return; }
+  const nav = montaFileira(agentesMenu, AGENTE.id);
+  if (!pregaFileira(nav)) return;
   const at = nav.querySelector('.atual');
   if (at) {
     estadoEl.classList.add('fil-estado');
@@ -282,11 +321,10 @@ document.addEventListener('dgavatar', ev => {
     at.title = 'Mídias, links e arquivos desta conversa';
     at.addEventListener('click', ev => { ev.preventDefault(); $('who').click(); });
   }
-  if (at && at.scrollIntoView) at.scrollIntoView({ block: 'nearest', inline: 'center' });
   document.addEventListener('dgavatar', ev => {
     const d = ev.detail || {};
     const el = nav.querySelector('[data-avt="' + CSS.escape(d.id || '') + '"] .fil-foto');
-    if (el) el.innerHTML = foto(Object.assign({}, agentesMenu.find(a => a.id === d.id) || {}, d));
+    if (el) el.innerHTML = fotoFileira(Object.assign({}, agentesMenu.find(a => a.id === d.id) || {}, d));
   });
   // número discreto e anel em cada outro agente: avisos não vistos (amarelo se algum pede decisão)
   const outros = agentesMenu.filter(a => a.id !== AGENTE.id);

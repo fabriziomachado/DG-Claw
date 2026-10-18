@@ -32,7 +32,7 @@ bloco e, se quiser, uma pergunta de seguimento:
 Aqui está a evasão por curso em 2024:
 
 ```dgui
-{"tipo":"painel","titulo":"Evasão por curso · 2024","itens":[
+{"tipo":"painel","titulo":"Evasão por curso · 2024","fonte":"Power BI · DB_Evasão","atualizado":"22/07/2025","itens":[
   {"tipo":"kpi","titulo":"Evasão geral","valor":"10,8%","variacao":"-1,2 p.p. vs 2023","tendencia":"baixa","bom":"baixa"},
   {"tipo":"kpi","titulo":"Maior taxa (ADS EAD)","valor":"65,3%","variacao":"+4,1 p.p.","tendencia":"alta","bom":"baixa"},
   {"tipo":"grafico","forma":"barras","titulo":"Taxa de evasão (%)","unidade":"%",
@@ -40,7 +40,8 @@ Aqui está a evasão por curso em 2024:
    "series":[{"nome":"2024","valores":[65.3,58.6,49.0]}]},
   {"tipo":"tabela","titulo":"Cursos com mais evadidos","colunas":["Curso","Evadidos","Matrículas","%"],
    "linhas":[["Direito",206,2762,"7,5%"],["Psicologia",144,1694,"8,5%"]]}
-]}
+],
+"sugestoes":["Interprete o gráfico","Sugira ações de retenção para os cursos EAD","Compare com 2023"]}
 ```
 
 Quer que eu detalhe algum curso?
@@ -56,7 +57,18 @@ A frase antes do bloco é obrigatória: no Telegram e no WhatsApp o bloco não �
 | `kpi` | `titulo`, `valor` (texto já formatado, ex. `"65,3%"`, `"R$ 12,7 mil"`), `variacao`, `tendencia` (`alta`, `baixa`, `neutra`), `bom` (`alta` ou `baixa`: qual direção é boa), `legenda` | KPIs seguidos ficam lado a lado. Evasão, custo, atraso: `"bom":"baixa"` (subir fica vermelho). |
 | `tabela` | `titulo`, `colunas` (textos, ou `{"nome","alinha":"direita|centro"}`), `linhas` (lista de listas), `ordenavel` (padrão `true`) | Números alinham à direita sozinhos. Até 300 linhas. |
 | `grafico` | `forma` (`barras`, `colunas`, `linhas`, `pizza`), `titulo`, `unidade` (`"%"`, `"R$"`, `"alunos"`), `categorias`, `series` (`[{"nome","valores":[...]}]`) | Até 6 séries e 80 categorias. Pizza usa só a primeira série. |
-| `painel` | `titulo`, `itens` (lista de componentes) | Um painel por resposta costuma bastar. |
+| `painel` | `titulo`, `itens` (lista de componentes), `fonte`, `atualizado`, `sugestoes` | Um painel por resposta costuma bastar. |
+
+## Fonte e perguntas sugeridas
+
+- `fonte` e `atualizado` (no painel ou em cada componente) aparecem discretos no rodapé e saem na
+  imagem que o dono baixa. Sempre que souber de onde vêm os dados, preencha.
+- `sugestoes`: 2 a 4 perguntas curtas que o dono provavelmente faria a seguir, pensadas para
+  **estes** dados (interpretar, explicar uma anomalia, sugerir ação, comparar com outro período,
+  detalhar um item). Viram botões embaixo do painel; um toque manda a pergunta para mim, como se
+  ele tivesse digitado. Escreva na voz do dono ("Sugira ações de retenção para os cursos EAD").
+- Cada gráfico e tabela já ganha sozinho os botões de baixar (PNG ou CSV), copiar, compartilhar
+  e ampliar: não preciso fazer nada para isso.
 
 ## Regras do JSON
 

@@ -60,3 +60,21 @@ test('números brasileiros', () => {
   assert.strictEqual(dgui.numero('R$ 1.234,50'), 1234.5);
   assert.strictEqual(dgui.numero('Direito'), null);
 });
+
+test('perguntas sugeridas viram botões e a fonte aparece no rodapé', () => {
+  const h = dgui.blocoParaHtml(bloco({ tipo: 'painel', titulo: 'P', fonte: 'Power BI', atualizado: '22/07/2025',
+    itens: [{ tipo: 'grafico', forma: 'barras', categorias: ['A'], series: [{ valores: [1] }] }],
+    sugestoes: ['Interprete o gráfico', '<b>x</b>'] }));
+  assert.strictEqual((h.match(/data-dgui-pergunta=/g) || []).length, 2);
+  assert.ok(!h.includes('<b>x</b>'));
+  assert.strictEqual((h.match(/class="dgui-fonte"/g) || []).length, 1);
+  assert.match(h, /Power BI · atualizado em 22\/07\/2025/);
+  assert.match(h, /data-dgui-acao="baixar"/);
+});
+
+test('CSV com ponto e vírgula, BOM e aspas quando precisa', () => {
+  const csv = dgui.csvDe({ colunas: ['Curso', { nome: '%' }], linhas: [['Direito; noturno', '7,5%'], ['Psicologia "EAD"', 8]] });
+  assert.ok(csv.startsWith('﻿Curso;%'));
+  assert.match(csv, /"Direito; noturno";7,5%/);
+  assert.match(csv, /"Psicologia ""EAD""";8/);
+});

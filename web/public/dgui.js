@@ -19,6 +19,31 @@
    inválido vira um aviso discreto com o bloco cru, para o agente (e o dono) verem o erro. */
 (function (raiz) {
   const LIMITE = { itens: 24, linhas: 300, colunas: 12, series: 6, pontos: 80, texto: 300 };
+  // dados de cada gráfico/tabela desenhado, pela chave que vai no HTML (data-dgui): as
+  // ferramentas (baixar, copiar, compartilhar) refazem a partir dos dados, não do desenho
+  const registro = new Map();
+  function chave(c) {
+    const s = JSON.stringify(c); let h = 5381;
+    for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    const k = 'd' + h.toString(36);
+    registro.set(k, c);
+    return k;
+  }
+  const svgIco = (d) => '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+  const ICO = {
+    baixar: svgIco('<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/>'),
+    copiar: svgIco('<rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/>'),
+    compartilhar: svgIco('<path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 12v6.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V12"/>'),
+    ampliar: svgIco('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
+    fechar: svgIco('<path d="M6 6l12 12M18 6L6 18"/>'),
+    ok: svgIco('<path d="M5 12.5l4.5 4.5L19 7.5"/>')
+  };
+  function ferramentas(tipo) {
+    const b = (acao, rotulo) => `<button type="button" class="dgui-acao" data-dgui-acao="${acao}" title="${rotulo}" aria-label="${rotulo}">${ICO[acao]}</button>`;
+    return '<div class="dgui-ferr">' +
+      (tipo === 'grafico' ? b('baixar', 'Baixar imagem (PNG)') + b('compartilhar', 'Compartilhar') : b('baixar', 'Baixar planilha (CSV)') + b('copiar', 'Copiar para o Excel')) +
+      b('ampliar', 'Ampliar') + '</div>';
+  }
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -65,7 +90,7 @@
       return a ? ` style="text-align:${a}"` : '';
     };
     const ordena = c.ordenavel !== false;
-    return `<div class="dgui-tabela">` + (c.titulo ? `<div class="dgui-tit">${txt(c.titulo)}</div>` : '') +
+    return `<div class="dgui-tabela dgui-comp" data-dgui="${chave(c)}">` + ferramentas('tabela') + (c.titulo ? `<div class="dgui-tit">${txt(c.titulo)}</div>` : '') +
       `<div class="dgui-tabela-rola"><table${ordena ? ' data-dgui-ordena="1"' : ''}><thead><tr>` +
       cols.map((col, i) => `<th${alinha(i)}${ordena ? ` data-col="${i}" tabindex="0" aria-sort="none"` : ''}>${txt(col.nome)}${ordena ? '<span class="dgui-ord" aria-hidden="true"></span>' : ''}</th>`).join('') +
       '</tr></thead><tbody>' +
@@ -180,7 +205,21 @@
     const forma = String(c.forma || c.tipo_grafico || 'barras').toLowerCase();
     const corpo = forma.startsWith('linha') ? linhas(c) : forma.startsWith('coluna') ? colunas(c)
       : forma === 'pizza' || forma === 'rosca' ? pizza(c) : barras(c);
-    return `<div class="dgui-grafico">${c.titulo ? `<div class="dgui-tit">${txt(c.titulo)}</div>` : ''}${corpo}</div>`;
+    return `<div class="dgui-grafico dgui-comp" data-dgui="${chave(c)}">${ferramentas('grafico')}${c.titulo ? `<div class="dgui-tit">${txt(c.titulo)}</div>` : ''}${corpo}${rodape(c)}</div>`;
+  }
+
+  // "Power BI · DB_Evasão · atualizado em 22/07/2025"
+  function rodape(c) {
+    if (c._semRodape) return '';
+    const f = [c.fonte, c.atualizado ? 'atualizado em ' + c.atualizado : ''].filter(Boolean).map((x) => txt(x)).join(' · ');
+    return f ? `<div class="dgui-fonte">${f}</div>` : '';
+  }
+  // botões de pergunta pronta embaixo do componente: um toque manda ao agente
+  function sugestoes(lista) {
+    const ok = (Array.isArray(lista) ? lista : []).filter((x) => typeof x === 'string' && x.trim()).slice(0, 4);
+    if (!ok.length) return '';
+    return '<div class="dgui-sugestoes" role="group" aria-label="Perguntas sugeridas">' +
+      ok.map((q) => `<button type="button" class="dgui-sugestao" data-dgui-pergunta="${esc(q.trim().slice(0, 200))}">${txt(q.trim().slice(0, 200))}</button>`).join('') + '</div>';
   }
 
   function aviso(m) { return `<div class="dgui-aviso">Não consegui desenhar este componente: ${esc(m)}.</div>`; }
@@ -191,7 +230,12 @@
     if (c.tipo === 'kpi') return kpi(c);
     if (c.tipo === 'tabela') return tabela(c);
     if (c.tipo === 'grafico' || c.tipo === 'gráfico') return grafico(c);
-    if (c.tipo === 'painel') return `<div class="dgui-painel">${c.titulo ? `<div class="dgui-painel-tit">${txt(c.titulo)}</div>` : ''}${grade(c.itens || [], fundo)}</div>`;
+    if (c.tipo === 'painel') {
+      // a fonte do painel vale para os gráficos de dentro (sai na imagem baixada), sem repetir na tela
+      const herda = (Array.isArray(c.itens) ? c.itens : []).map((it) => (it && typeof it === 'object' && !Array.isArray(it) && !it.fonte && c.fonte
+        ? Object.assign({}, it, { fonte: c.fonte, atualizado: it.atualizado || c.atualizado, _semRodape: true }) : it));
+      return `<div class="dgui-painel">${c.titulo ? `<div class="dgui-painel-tit">${txt(c.titulo)}</div>` : ''}${grade(herda, fundo)}${rodape(c)}</div>`;
+    }
     return aviso('tipo "' + String(c.tipo || '').slice(0, 20) + '" desconhecido (use kpi, tabela, grafico ou painel)');
   }
   // KPIs seguidos ficam lado a lado numa fileira; o resto ocupa a largura toda
@@ -214,7 +258,147 @@
     try { dados = JSON.parse(m[1]); } catch (e) {
       return `<div class="dgui">${aviso('o JSON do bloco está inválido (' + String(e.message).slice(0, 120) + ')')}<pre class="dgui-cru">${esc(m[1].slice(0, 2000))}</pre></div>`;
     }
-    return `<div class="dgui">${componente(dados, 0)}</div>`;
+    const sug = dados && !Array.isArray(dados) ? sugestoes(dados.sugestoes) : '';
+    return `<div class="dgui">${componente(dados, 0)}${sug}</div>`;
+  }
+
+  /* ── Ferramentas: baixar, copiar, compartilhar, ampliar ── */
+  const formaDe = (c) => {
+    const f = String(c.forma || c.tipo_grafico || 'barras').toLowerCase();
+    return f.startsWith('linha') ? 'linhas' : f.startsWith('coluna') ? 'colunas' : (f === 'pizza' || f === 'rosca') ? 'pizza' : 'barras';
+  };
+  const nomeArquivo = (c, ext) => (String(c.titulo || 'dados').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase().slice(0, 60) || 'dados') + '.' + ext;
+  const celTexto = (v) => (v == null ? '' : String(v));
+
+  // CSV com ponto e vírgula e BOM: é o que o Excel em português abre certo com dois cliques
+  function csvDe(c) {
+    const q = (v) => { const t = celTexto(v); return /[";\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    const cab = (c.colunas || []).map((x) => (x && typeof x === 'object' ? x.nome : x));
+    return '﻿' + [cab].concat(c.linhas || []).map((l) => l.map(q).join(';')).join('\r\n');
+  }
+  const tsvDe = (c) => [(c.colunas || []).map((x) => (x && typeof x === 'object' ? x.nome : x))].concat(c.linhas || [])
+    .map((l) => l.map((v) => celTexto(v).replace(/[\t\n]/g, ' ')).join('\t')).join('\n');
+
+  function baixa(blob, nome) {
+    const url = URL.createObjectURL(blob);
+    const a = raiz.document.createElement('a');
+    a.href = url; a.download = nome; raiz.document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  // O gráfico vira um SVG sozinho, com as cores do tema atual escritas por extenso (fora da
+  // página as variáveis do CSS não existem), e depois PNG no dobro do tamanho.
+  function svgParaImagem(c) {
+    const css = getComputedStyle(raiz.document.documentElement);
+    const v = (n, pad) => css.getPropertyValue(n).trim() || pad;
+    const P = { fundo: v('--dg-superficie', '#fff'), txt: v('--dg-texto', '#111'), t2: v('--dg-texto-2', '#555'),
+      t3: v('--dg-texto-3', '#999'), borda: v('--dg-borda', '#e5e5e5'), s: [0, 1, 2, 3, 4, 5].map((i) => v('--dg-serie-' + i, '#3b82f6')) };
+    const F = 'font-family="Segoe UI, Roboto, Helvetica, Arial, sans-serif"';
+    const W = 960, M = 32;
+    const { cats, ss } = series(c);
+    const forma = formaDe(c);
+    let y = M, corpo = '';
+    if (c.titulo) { corpo += `<text x="${M}" y="${y + 20}" ${F} font-size="22" font-weight="700" fill="${P.txt}">${txt(c.titulo)}</text>`; y += 44; }
+    if (forma === 'barras') {
+      const max = Math.max(0, ...ss.flatMap((s) => s.valores.filter((x) => x !== null)));
+      const rot0 = 300, area = W - M * 2 - rot0 - 90, alt = 22;
+      cats.forEach((cat, i) => {
+        const y0 = y;
+        corpo += `<text x="${M}" y="${y0 + 16 + (ss.length - 1) * 13}" ${F} font-size="15" fill="${P.txt}">${txt(cat.length > 38 ? cat.slice(0, 37) + '…' : cat)}</text>`;
+        ss.forEach((se, k) => {
+          const val = se.valores[i]; const w = val === null || max <= 0 ? 0 : Math.max(2, (val / max) * area);
+          const yy = y0 + k * (alt + 4);
+          corpo += `<rect x="${M + rot0}" y="${yy}" width="${w.toFixed(1)}" height="${alt}" rx="4" fill="${P.s[se.cor]}"/>` +
+                   `<text x="${M + rot0 + w + 8}" y="${yy + 16}" ${F} font-size="14" font-weight="600" fill="${P.t2}">${esc(rot(val, c))}</text>`;
+        });
+        y += ss.length * (alt + 4) + 12;
+      });
+    } else {
+      const html = forma === 'linhas' ? linhas(c) : forma === 'colunas' ? colunas(c) : pizza(c);
+      const m = /<svg[^>]*viewBox="0 0 (\d+) (\d+)"[^>]*>([\s\S]*?)<\/svg>/.exec(html);
+      if (m) {
+        const vw = +m[1], vh = +m[2];
+        const larg = forma === 'pizza' ? 340 : W - M * 2, alt = larg * vh / vw;
+        const estilo = `<style>.dgui-grade{stroke:${P.borda}}.dgui-eixo{fill:${P.t3};font:11px Segoe UI,Roboto,Arial,sans-serif}` +
+          P.s.map((cor, i) => `.dgui-c${i}{fill:${cor}}.dgui-linha.dgui-c${i}{fill:none;stroke:${cor};stroke-width:2.5}.dgui-ponto.dgui-c${i}{fill:${P.fundo};stroke:${cor};stroke-width:2}`).join('') + '</style>';
+        corpo += `<svg x="${M}" y="${y}" width="${larg}" height="${alt.toFixed(0)}" viewBox="0 0 ${vw} ${vh}">${estilo}${m[3]}</svg>`;
+        if (forma === 'pizza') {
+          const vals = ss[0].valores.map((x) => (x !== null && x > 0 ? x : 0)); const tot = vals.reduce((a, b) => a + b, 0) || 1;
+          cats.forEach((cat, i) => {
+            if (!vals[i]) return;
+            const ly = y + 30 + i * 30;
+            corpo += `<rect x="${M + larg + 40}" y="${ly - 12}" width="14" height="14" rx="3" fill="${P.s[i % 6]}"/>` +
+                     `<text x="${M + larg + 62}" y="${ly}" ${F} font-size="15" fill="${P.txt}">${txt(cat)}  ${esc(fmt(Math.round(vals[i] / tot * 1000) / 10))}%</text>`;
+          });
+          y += Math.max(alt, cats.length * 30 + 30) + 16;
+        } else y += alt + 16;
+      }
+    }
+    if (forma !== 'pizza' && ss.length > 1) {
+      let x = M;
+      ss.forEach((se) => {
+        corpo += `<rect x="${x}" y="${y}" width="14" height="14" rx="3" fill="${P.s[se.cor]}"/><text x="${x + 20}" y="${y + 12}" ${F} font-size="14" fill="${P.t2}">${txt(se.nome)}</text>`;
+        x += 40 + se.nome.length * 8;
+      });
+      y += 30;
+    }
+    const f = [c.fonte, c.atualizado ? 'atualizado em ' + c.atualizado : ''].filter(Boolean).join(' · ');
+    if (f) { corpo += `<text x="${M}" y="${y + 12}" ${F} font-size="12" fill="${P.t3}">${txt(f)}</text>`; y += 24; }
+    const H = Math.ceil(y + M / 2);
+    return { svg: `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="100%" height="100%" fill="${P.fundo}"/>${corpo}</svg>`, W, H };
+  }
+  function pngDe(c) {
+    const { svg, W, H } = svgParaImagem(c);
+    return new Promise((ok, falha) => {
+      const img = new Image();
+      img.onload = () => {
+        const cv = raiz.document.createElement('canvas'); cv.width = W * 2; cv.height = H * 2;
+        const g = cv.getContext('2d'); g.scale(2, 2); g.drawImage(img, 0, 0);
+        cv.toBlob((b) => (b ? ok(b) : falha(new Error('o navegador não gerou a imagem'))), 'image/png');
+      };
+      img.onerror = () => falha(new Error('não consegui montar a imagem do gráfico'));
+      img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    });
+  }
+  function confirma(btn) {
+    const antes = btn.innerHTML; btn.innerHTML = ICO.ok; btn.classList.add('feito');
+    setTimeout(() => { btn.innerHTML = antes; btn.classList.remove('feito'); }, 1500);
+  }
+  async function age(btn) {
+    const comp = btn.closest('.dgui-comp'); if (!comp) return;
+    const c = registro.get(comp.dataset.dgui); const acao = btn.dataset.dguiAcao;
+    if (acao === 'ampliar') {
+      const aberto = comp.classList.toggle('dgui-cheio');
+      raiz.document.documentElement.classList.toggle('dgui-tem-cheio', aberto);
+      btn.innerHTML = aberto ? ICO.fechar : ICO.ampliar;
+      btn.title = btn.ariaLabel = aberto ? 'Fechar' : 'Ampliar';
+      return;
+    }
+    if (!c) return;
+    try {
+      if (c.tipo === 'tabela') {
+        if (acao === 'baixar') { baixa(new Blob([csvDe(c)], { type: 'text/csv;charset=utf-8' }), nomeArquivo(c, 'csv')); confirma(btn); }
+        if (acao === 'copiar') { await raiz.navigator.clipboard.writeText(tsvDe(c)); confirma(btn); }
+        return;
+      }
+      const png = await pngDe(c);
+      if (acao === 'baixar') { baixa(png, nomeArquivo(c, 'png')); confirma(btn); return; }
+      if (acao === 'compartilhar') {
+        const arq = new File([png], nomeArquivo(c, 'png'), { type: 'image/png' });
+        if (raiz.navigator.canShare && raiz.navigator.canShare({ files: [arq] })) {
+          await raiz.navigator.share({ files: [arq], title: String(c.titulo || 'Gráfico') });
+        } else if (raiz.ClipboardItem && raiz.navigator.clipboard && raiz.navigator.clipboard.write) {
+          await raiz.navigator.clipboard.write([new raiz.ClipboardItem({ 'image/png': png })]);
+          btn.title = 'Imagem copiada: cole onde quiser compartilhar';
+          confirma(btn);
+        } else { baixa(png, nomeArquivo(c, 'png')); confirma(btn); }
+      }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;   // a pessoa fechou o menu de compartilhar
+      btn.title = 'Não deu certo: ' + (e && e.message ? e.message : 'erro');
+      btn.classList.add('erro'); setTimeout(() => btn.classList.remove('erro'), 2500);
+    }
   }
 
   /* Ordenar a tabela tocando no título (clique ou Enter). */
@@ -237,8 +421,19 @@
   }
   if (raiz.document) {
     raiz.document.addEventListener('click', (ev) => {
-      const th = ev.target.closest && ev.target.closest('table[data-dgui-ordena] th[data-col]');
-      if (th) ordena(th);
+      if (!ev.target.closest) return;
+      const th = ev.target.closest('table[data-dgui-ordena] th[data-col]');
+      if (th) { ordena(th); return; }
+      const acao = ev.target.closest('[data-dgui-acao]');
+      if (acao) { age(acao); return; }
+      // pergunta sugerida: a conversa (conversa.js) escuta e manda ao agente
+      const sug = ev.target.closest('[data-dgui-pergunta]');
+      if (sug) raiz.document.dispatchEvent(new CustomEvent('dgui-pergunta', { detail: { texto: sug.dataset.dguiPergunta } }));
+    });
+    raiz.document.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Escape') return;
+      const aberto = raiz.document.querySelector('.dgui-comp.dgui-cheio [data-dgui-acao="ampliar"]');
+      if (aberto) age(aberto);
     });
     raiz.document.addEventListener('keydown', (ev) => {
       if (ev.key !== 'Enter' && ev.key !== ' ') return;
@@ -247,7 +442,7 @@
     });
   }
 
-  const api = { blocoParaHtml, numero };
+  const api = { blocoParaHtml, numero, csvDe, tsvDe, pngDe, svgParaImagem, registro };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   raiz.dgui = api;
 })(typeof window !== 'undefined' ? window : globalThis);

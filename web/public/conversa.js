@@ -247,9 +247,10 @@ document.addEventListener('dgavatar', ev => {
   }
 });
 
-/* Fileira de agentes abaixo do cabeçalho (18/10/2026, pedido do dono, no lugar do grupo sobreposto):
-   todos lado a lado, com o nome embaixo, o aberto sublinhado, um anel e um número quando há aviso não
-   visto, e um "+" que leva ao Admin para criar outro. Um toque troca de conversa. */
+/* Fileira de agentes no cabeçalho (18/10/2026, pedido do dono, no lugar do grupo sobreposto e do
+   nome do agente): todos lado a lado, com o nome embaixo, o aberto sublinhado e com o estado
+   ("pronto", "trabalhando") embaixo do nome, um anel e um número quando há aviso não visto, e um "+"
+   que leva ao Admin para criar outro. Um toque troca de conversa; no aberto, abre as mídias. */
 (function () {
   if (agentesMenu.length < 2) return;
   const nav = document.createElement('nav');
@@ -270,9 +271,17 @@ document.addEventListener('dgavatar', ev => {
         `<span class="fil-foto" style="background:${esc(a.cor || '#2f9e5e')}">${foto(a)}</span>` +
         `<span class="fil-nome">${esc(a.nome)}</span></a>`;
     }).join('');
-  const cab = $('cabecalho');
-  if (cab && cab.parentNode) cab.parentNode.insertBefore(nav, cab.nextSibling);
+  const cab = $('cabecalho'), btnMenu = $('btnMenu');
+  if (!cab || !btnMenu) return;
+  cab.insertBefore(nav, btnMenu.nextSibling);
+  cab.classList.add('com-fileira');
   const at = nav.querySelector('.atual');
+  if (at) {
+    estadoEl.classList.add('fil-estado');
+    at.appendChild(estadoEl);
+    at.title = 'Mídias, links e arquivos desta conversa';
+    at.addEventListener('click', ev => { ev.preventDefault(); $('who').click(); });
+  }
   if (at && at.scrollIntoView) at.scrollIntoView({ block: 'nearest', inline: 'center' });
   document.addEventListener('dgavatar', ev => {
     const d = ev.detail || {};

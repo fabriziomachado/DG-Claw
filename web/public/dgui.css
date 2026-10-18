@@ -104,3 +104,22 @@ th[aria-sort="descending"] .dgui-ord::after{content:"▼";color:var(--dg-azul)}
 .dgui-cheio .dgui-svg{max-height:calc(100vh - 160px)}
 .dgui-cheio .dgui-barra{height:20px}
 .dgui-tabela th,.dgui-tabela td,.tabela-md th,.tabela-md td{overflow-wrap:normal;word-break:normal}
+
+/* leitura do especialista: destaques à vista, análise completa recolhida (18/10/2026) */
+.dgui-leitura{border:1px solid var(--dg-borda);border-radius:14px;padding:12px 14px;background:var(--dg-superficie)}
+.dgui-painel .dgui-leitura{background:var(--dg-fundo)}
+.dgui-leitura-tit{font-size:13px;font-weight:700;color:var(--dg-texto-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
+.dgui-destaques{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.dgui-destaques li{display:flex;gap:10px;align-items:baseline;font-size:14.5px;line-height:1.45}
+.dgui-destaques li > span:first-child{flex:0 0 1.2em;text-align:center}
+.dgui-destaques li.alerta > span:first-child{color:var(--dg-pedido-texto)}
+.dgui-destaques li.ok > span:first-child{color:var(--dg-entrega-texto)}
+.dgui-leitura-det{margin-top:10px;border-top:1px solid var(--dg-borda);padding-top:8px}
+.dgui-leitura-det summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--dg-azul-forte);list-style:none;display:inline-flex;align-items:center;gap:6px}
+.dgui-leitura-det summary::-webkit-details-marker{display:none}
+.dgui-leitura-det summary::after{content:"▾";transition:transform .15s}
+.dgui-leitura-det[open] summary::after{transform:rotate(180deg)}
+.dgui-leitura-det[open] summary{margin-bottom:6px}
+.dgui-leitura-txt{font-size:14px;line-height:1.55;color:var(--dg-texto)}
+.dgui-leitura-txt p{margin:0 0 8px}
+.dgui-leitura-txt ul{margin:0 0 8px;padding-left:20px}

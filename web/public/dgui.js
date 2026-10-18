@@ -234,6 +234,35 @@
       ok.map((q) => `<button type="button" class="dgui-sugestao" data-dgui-pergunta="${esc(q.trim().slice(0, 200))}"><span>${txt(q.trim().slice(0, 200))}</span>${ICO_SETA}</button>`).join('') + '</div>';
   }
 
+  /* ── Leitura (insights): destaques sempre à vista e a análise completa recolhida ── */
+  // **negrito** dentro do texto, já escapado; quebra dupla vira parágrafo, linha "- " vira item
+  function textoSimples(t) {
+    const bold = (x) => esc(x).replace(/\*\*([^*]{1,200})\*\*/g, '<b>$1</b>');
+    const RX_ITEM = /^\s*([-•]|\d+[.)])\s+/;
+    return String(t || '').slice(0, 6000).split(/\n{2,}/).map((p) => {
+      // dentro do parágrafo, linhas "- " seguidas viram lista; o resto, texto com quebra de linha
+      let html = '', texto = [], itens = [];
+      const soltaTexto = () => { if (texto.length) html += '<p>' + texto.map(bold).join('<br>') + '</p>'; texto = []; };
+      const soltaItens = () => { if (itens.length) html += '<ul>' + itens.map((l) => '<li>' + bold(l.replace(RX_ITEM, '')) + '</li>').join('') + '</ul>'; itens = []; };
+      for (const l of p.split('\n')) {
+        if (RX_ITEM.test(l)) { soltaTexto(); itens.push(l); } else { soltaItens(); texto.push(l); }
+      }
+      soltaTexto(); soltaItens();
+      return html;
+    }).join('');
+  }
+  const ICO_LEITURA = { alerta: '⚠', queda: '📉', alta: '📈', ideia: '💡', ok: '✓', info: '•' };
+  function leitura(c) {
+    const dest = (Array.isArray(c.destaques) ? c.destaques : []).slice(0, 5).map((d) => (typeof d === 'string' ? { texto: d } : d || {}))
+      .filter((d) => d.texto);
+    const ico = (d) => ICO_LEITURA[d.tipo] || ICO_LEITURA.info;
+    return `<div class="dgui-leitura">` +
+      `<div class="dgui-leitura-tit">${txt(c.titulo || 'Leitura do especialista')}</div>` +
+      (dest.length ? '<ul class="dgui-destaques">' + dest.map((d) => `<li class="${esc(d.tipo || 'info')}"><span aria-hidden="true">${ico(d)}</span><span>${txt(d.texto)}</span></li>`).join('') + '</ul>' : '') +
+      (c.detalhe ? `<details class="dgui-leitura-det"><summary>Ver análise completa</summary><div class="dgui-leitura-txt">${textoSimples(c.detalhe)}</div></details>` : '') +
+      '</div>';
+  }
+
   function aviso(m) { return `<div class="dgui-aviso">Não consegui desenhar este componente: ${esc(m)}.</div>`; }
 
   function componente(c, fundo) {
@@ -242,6 +271,7 @@
     if (c.tipo === 'kpi') return kpi(c);
     if (c.tipo === 'tabela') return tabela(c);
     if (c.tipo === 'grafico' || c.tipo === 'gráfico') return grafico(c);
+    if (c.tipo === 'leitura') return leitura(c);
     if (c.tipo === 'painel') {
       // a fonte do painel vale para os gráficos de dentro (sai na imagem baixada), sem repetir na tela
       const herda = (Array.isArray(c.itens) ? c.itens : []).map((it) => (it && typeof it === 'object' && !Array.isArray(it) && !it.fonte && c.fonte

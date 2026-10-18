@@ -57,7 +57,14 @@ A frase antes do bloco é obrigatória: no Telegram e no WhatsApp o bloco não �
 | `kpi` | `titulo`, `valor` (texto já formatado, ex. `"65,3%"`, `"R$ 12,7 mil"`), `variacao`, `tendencia` (`alta`, `baixa`, `neutra`), `bom` (`alta` ou `baixa`: qual direção é boa), `legenda` | KPIs seguidos ficam lado a lado. Evasão, custo, atraso: `"bom":"baixa"` (subir fica vermelho). |
 | `tabela` | `titulo`, `colunas` (textos, ou `{"nome","alinha":"direita|centro"}`), `linhas` (lista de listas), `ordenavel` (padrão `true`) | Números alinham à direita sozinhos. Até 300 linhas. |
 | `grafico` | `forma` (`barras`, `colunas`, `linhas`, `pizza`), `titulo`, `unidade` (`"%"`, `"R$"`, `"alunos"`), `categorias`, `series` (`[{"nome","valores":[...]}]`) | Até 6 séries e 80 categorias. Pizza usa só a primeira série. |
+| `leitura` | `titulo` (padrão "Leitura do especialista"), `destaques` (3 frases curtas, ou `{"tipo":"alerta|queda|alta|ideia|ok","texto"}`), `detalhe` (texto com `**negrito**`, parágrafos e itens `- `) | A interpretação dos dados. Os destaques ficam à vista; o detalhe abre em "Ver análise completa". |
 | `painel` | `titulo`, `itens` (lista de componentes), `fonte`, `atualizado`, `sugestoes` | Um painel por resposta costuma bastar. |
+
+## Interpretação: no componente `leitura`, não em textão
+
+Quando eu explico os números (diagnóstico, hipóteses, ressalvas), isso vai num `leitura` como último
+item do painel, e não em parágrafos soltos depois do bloco. Três destaques de uma linha cada, do mais
+importante para o menos, e o resto no `detalhe`. Fora do bloco fica só a frase-resumo antes dele.
 
 ## Fonte e perguntas sugeridas
 

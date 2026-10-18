@@ -87,3 +87,48 @@ importante para o menos, e o resto no `detalhe`. Fora do bloco fica só a frase-
 - Em `kpi.valor` e nas células da tabela, texto já no formato brasileiro (`"2.762"`, `"7,5%"`).
 - Nomes curtos nas categorias (abrevie: "ADS (EAD)"); o nome inteiro pode ir na tabela.
 - Diga de onde vêm os dados na frase (fonte, período), como faria num relatório.
+
+## Interatividade que a tela já dá (18/10/2026)
+
+Sem fazer nada a mais: tocar numa barra, coluna, ponto ou fatia mostra o valor e um "Perguntar
+sobre este" (chega a mim como pergunta); tocar numa série da legenda esconde ou mostra a série;
+a tabela ordena ao tocar no título. Por isso, nos gráficos, use nomes de categoria que façam
+sentido sozinhos numa pergunta ("Diploma MEC v1.05", não "Item 1").
+
+## Filtros no painel
+
+Quando o dono vai querer olhar o mesmo painel por ano, área, curso etc., mande os dados já
+separados e deixe a tela trocar na hora, sem me perguntar de novo:
+
+```json
+{"tipo":"painel","titulo":"Portfólio PMO",
+ "filtros":[{"nome":"Ano","opcoes":["2024","2025"],"padrao":"2025"},
+            {"nome":"Área","opcoes":["Todas","Proen","Proad"]}],
+ "variantes":{
+   "2025|Todas":[ ...itens do painel (kpi, grafico, tabela)... ],
+   "2025|Proen":[ ... ], "2024|Todas":[ ... ]
+ },
+ "fonte":"Power BI · bi-kanbanize3","atualizado":"09/10/2026"}
+```
+
+- A chave de `variantes` é a opção de cada filtro, na ordem dos filtros, unida por `|`.
+- Até 3 filtros. Até 5 opções viram botõezinhos; mais que isso, uma lista.
+- Combinação que faltar aparece como "Sem dados para ...": mande todas as que fizerem sentido.
+- Cuidado com o tamanho: cada variante é um painel inteiro. Se passar de umas 30 combinações,
+  prefira um filtro só.
+
+## Painel que se atualiza sozinho
+
+Para números que mudam ao longo do dia (chamados, filas, vendas), o painel pode se atualizar:
+
+1. Crie `~/.dgclaw/paineis/<id>.sh` (bash) ou `<id>.py` (python3) que **imprime** o painel
+   atualizado (o mesmo JSON do bloco dgui, `"tipo":"painel"`) e nada mais na saída padrão.
+   `<id>`: minúsculas, números e hífen, até 40 caracteres. O script roda na sua caixa, como você,
+   com até 180 s; chaves vêm do ambiente, como sempre.
+2. Rode o script uma vez e confira que a saída é um JSON válido.
+3. Mande o painel com `"vivo":{"id":"<id>","a_cada_min":15}`.
+
+A tela mostra "atualizado há X min" e um ícone de atualizar; quando passa do intervalo e o dono
+está olhando, ela roda o script de novo e redesenha. Escolha o intervalo pelo custo da consulta
+(respeite limites de API, como os 60 por minuto do SoftDesk) e não use isso para dado que muda
+uma vez por mês.

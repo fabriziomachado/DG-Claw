@@ -176,3 +176,16 @@ th[aria-sort="descending"] .dgui-ord::after{content:"▼";color:var(--dg-azul)}
 .dgui-fsel select{font:inherit;font-size:12.5px;padding:5px 26px 5px 10px;border-radius:999px;border:1px solid var(--dg-borda);background:transparent;color:var(--dg-texto);-webkit-appearance:none;appearance:none;
   background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 13px) 50%,calc(100% - 9px) 50%;background-size:4px 4px;background-repeat:no-repeat}
 .dgui-sem-dados{margin:8px 0}
+
+/* painel que se atualiza (18/10/2026): uma linha discreta com a hora e o ícone de atualizar */
+.dgui-vivo{position:relative}
+.dgui-vivo-meta{position:absolute;top:12px;right:14px;z-index:3;display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--dg-texto-3)}
+.dgui-vivo-meta::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--dg-entrega-texto);opacity:.8}
+.dgui-vivo-atu{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--dg-texto-3);cursor:pointer}
+.dgui-vivo-atu:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
+.dgui-vivo-atu svg{width:14px;height:14px}
+.dgui-vivo-atu.girando svg{animation:dgui-gira .9s linear infinite}
+@keyframes dgui-gira{to{transform:rotate(360deg)}}
+.dgui-vivo .dgui-painel-tit{padding-right:140px}
+@media (max-width:520px){.dgui-vivo-meta{top:10px;right:8px}.dgui-vivo .dgui-painel-tit{padding-right:118px}}
+@media (prefers-reduced-motion:reduce){.dgui-vivo-atu.girando svg{animation:none}}

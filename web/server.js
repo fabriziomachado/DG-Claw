@@ -22,6 +22,7 @@ const { abrirStream } = require('./lib/sse');
 const { criarProxy } = require('./lib/proxy');
 const { criarCofreAgente } = require('./lib/cofre-agente');
 const { criarCofreRotas } = require('./lib/cofre-rotas');
+const { criarPaineisVivos } = require('./lib/paineis-vivos');
 const { criarAlertas } = require('./lib/alertas');
 const { criarFoco } = require('./lib/foco');
 const { criarVoz } = require('./lib/voz');
@@ -109,6 +110,7 @@ function criarServidor(opcoes) {
   // A conversa como a tela vê: depois do último /clear (o antes fica em Histórico > Arquivadas).
   const threadTela = async (agente) => arquivoConversa.visivel(agente.slug, await conversa.thread(agente));
   const historico = criarHistorico({ registro, log, conversa, arquivoConversa });
+  const paineisVivos = opcoes.paineisVivos || criarPaineisVivos({ registro, log });
   // Foto trocada pelo dono no menu: vale por cima da foto da criação e do avatar do registro.
   const avatares = criarAvatares({ dataDir: config.dataDir, registro, log });
   caixa.permitir('/api/v1/avisos');
@@ -424,6 +426,9 @@ function criarServidor(opcoes) {
     }
     if (p === '/api/v1/integracoes' || p.startsWith('/api/v1/integracoes/')) {
       if (await integracoes.tratar(req, res, url, sessao)) return undefined;
+    }
+    if (p.startsWith('/api/v1/paineis/')) {
+      if (await paineisVivos.tratar(req, res, url, sessao)) return undefined;
     }
     if (p === '/api/v1/historico' || p.startsWith('/api/v1/historico/')) {
       if (await historico.tratar(req, res, url, sessao)) return undefined;

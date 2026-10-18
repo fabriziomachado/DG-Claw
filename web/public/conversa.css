@@ -226,6 +226,20 @@
   .cod-diff .d-del{background:var(--dg-erro-fundo);color:var(--dg-erro-texto)}
   .cod-diff .d-hunk{color:var(--dg-azul-forte);background:color-mix(in srgb,var(--dg-azul) 10%,transparent)}
   .cod-diff .d-meta{color:var(--dg-texto-2);font-weight:600}
+  /* nome da língua no topo do bloco e cores de sintaxe (highlight.js), nos dois temas */
+  .cod-lingua{padding:6px 11px 0;font:600 11px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    letter-spacing:.04em;text-transform:uppercase;color:var(--dg-texto-3)}
+  .cod.com-lingua pre{padding-top:4px}
+  .cod{--sx-kw:#a626a4;--sx-str:#2e7d32;--sx-num:#b45309;--sx-com:#8a8f98;--sx-fn:#1d4ed8;--sx-var:#b91c1c;--sx-tipo:#0e7490;--sx-meta:#6b7280}
+  html[data-tema="escuro"] .cod{--sx-kw:#d19af0;--sx-str:#9fdc8a;--sx-num:#f5b56b;--sx-com:#8b929c;--sx-fn:#7fb6ff;--sx-var:#ff9b8f;--sx-tipo:#6fd3e3;--sx-meta:#a3a9b3}
+  .cod .hljs-keyword,.cod .hljs-selector-tag,.cod .hljs-literal,.cod .hljs-doctag,.cod .hljs-section{color:var(--sx-kw)}
+  .cod .hljs-string,.cod .hljs-regexp,.cod .hljs-addition,.cod .hljs-attribute,.cod .hljs-meta .hljs-string{color:var(--sx-str)}
+  .cod .hljs-number,.cod .hljs-symbol,.cod .hljs-bullet,.cod .hljs-link{color:var(--sx-num)}
+  .cod .hljs-comment,.cod .hljs-quote{color:var(--sx-com);font-style:italic}
+  .cod .hljs-title,.cod .hljs-title.function_,.cod .hljs-built_in,.cod .hljs-name{color:var(--sx-fn)}
+  .cod .hljs-variable,.cod .hljs-template-variable,.cod .hljs-params,.cod .hljs-deletion,.cod .hljs-attr{color:var(--sx-var)}
+  .cod .hljs-type,.cod .hljs-title.class_,.cod .hljs-selector-class,.cod .hljs-selector-id{color:var(--sx-tipo)}
+  .cod .hljs-meta,.cod .hljs-subst,.cod .hljs-property{color:var(--sx-meta)}
 
   /* ── Vídeo: o ▶ diz que não é foto ── */
   .mid .play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:54px;height:54px;

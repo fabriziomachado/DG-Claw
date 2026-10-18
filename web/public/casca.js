@@ -73,6 +73,7 @@
     '<div id="mlPainel" data-tour="gm-painel" hidden></div></nav>' +
     '<section class="ml-config" id="mlConfig" data-tour="gm-config" aria-label="Configurações"><h3>Configurações</h3>' +
     '<button type="button" class="ml-tab" id="mlInstalar"><span class="ml-ico" aria-hidden="true">⤓</span><span class="ml-tx">Instalar o app<small id="mlInstalarSub"></small></span></button>' +
+    '<button type="button" class="ml-tab" id="mlTema"><span class="ml-ico" aria-hidden="true">◐</span><span class="ml-tx">Tema<small id="mlTemaSub"></small></span></button>' +
     '<p class="ml-ajuda" id="mlInstalarAjuda" role="status" hidden></p></section>' +
     '<div class="pe"><div class="conta"><form method="post" action="/sair" id="formSair"><button type="submit" class="sair">Sair</button></form></div></div>' +
     '</aside>';

@@ -68,3 +68,33 @@ th[aria-sort="descending"] .dgui-ord::after{content:"▼";color:var(--dg-azul)}
 @media (max-width:520px){.dgui-kpi-valor{font-size:22px}.dgui-barra-lin{grid-template-columns:minmax(80px,38%) 1fr}}
 /* o balão que traz componentes usa a largura toda da coluna */
 .bub:has(.dgui){width:100%}
+
+/* ferramentas discretas no canto de cada gráfico e tabela (18/10/2026) */
+.dgui-comp{position:relative}
+.dgui-ferr{position:absolute;top:6px;right:6px;display:flex;gap:2px;opacity:0;transition:opacity .15s;z-index:2}
+.dgui-comp:hover .dgui-ferr,.dgui-comp:focus-within .dgui-ferr,.dgui-cheio .dgui-ferr{opacity:1}
+@media (hover:none){.dgui-ferr{opacity:.85}}
+.dgui-acao{width:30px;height:30px;border:0;border-radius:8px;background:transparent;color:var(--dg-texto-2);
+           display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.dgui-acao:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
+.dgui-acao:focus-visible{outline:2px solid var(--dg-azul);outline-offset:1px}
+.dgui-acao.feito{color:var(--dg-entrega-texto)}
+.dgui-acao.erro{color:var(--dg-erro-texto)}
+.dgui-comp > .dgui-tit{padding-right:110px}
+
+/* fonte e data embaixo */
+.dgui-fonte{font-size:12px;color:var(--dg-texto-3);margin-top:8px}
+
+/* perguntas sugeridas */
+.dgui-sugestoes{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.dgui-sugestao{font:inherit;font-size:13.5px;line-height:1.3;text-align:left;padding:8px 14px;border-radius:18px;
+               border:1px solid var(--dg-borda);background:var(--dg-superficie);color:var(--dg-texto);cursor:pointer;
+               max-width:100%}
+.dgui-sugestao:hover{background:var(--dg-superficie-2)}
+.dgui-sugestao:focus-visible{outline:2px solid var(--dg-azul);outline-offset:1px}
+
+/* ampliar: o componente ocupa a tela */
+.dgui-cheio{position:fixed!important;inset:16px;z-index:95;overflow:auto;background:var(--dg-superficie);
+            border:1px solid var(--dg-borda);border-radius:16px;padding:20px!important;box-shadow:0 0 0 100vmax var(--dg-sobreposicao)}
+.dgui-cheio .dgui-svg{max-height:calc(100vh - 160px)}
+.dgui-cheio .dgui-barra{height:20px}

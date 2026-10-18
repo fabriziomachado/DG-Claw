@@ -3740,6 +3740,13 @@ function enviarDoCampo() {
   if (lcInterceptaLogin(t)) return;   // /login abre o cartão e não vai ao agente
   enviarTexto(t);
 }
+// pergunta sugerida embaixo de um painel (dgui.js): vai ao agente como se a pessoa tivesse digitado
+document.addEventListener('dgui-pergunta', ev => {
+  const t = ev.detail && String(ev.detail.texto || '').trim();
+  if (!t) return;
+  destravarAudio();
+  enviarTexto(t);
+});
 btnEnviar.onclick = () => {
   destravarAudio();
   if (gravando) { paraEEnvia(true); return; }

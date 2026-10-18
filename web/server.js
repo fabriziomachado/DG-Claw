@@ -35,6 +35,7 @@ const { criarLembretes } = require('./lib/lembretes');
 const { criarMesa } = require('./lib/mesa');
 const { criarAvisos } = require('./lib/avisos');
 const { criarIntegracoes } = require('./lib/integracoes');
+const { criarHistorico } = require('./lib/historico');
 
 const METODOS_QUE_ESCREVEM = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const TIPOS_ESTATICOS = {
@@ -102,6 +103,7 @@ function criarServidor(opcoes) {
   caixa.permitir('/api/v1/tarefas');
   const avisos = criarAvisos({ config, registro, runner, caixa, log, agora: opcoes.agora });
   const integracoes = criarIntegracoes({ registro, log });
+  const historico = criarHistorico({ registro, log });
   caixa.permitir('/api/v1/avisos');
 
   let versaoJsCache = { ts: 0, valor: '0' };
@@ -397,6 +399,9 @@ function criarServidor(opcoes) {
     }
     if (p === '/api/v1/integracoes' || p.startsWith('/api/v1/integracoes/')) {
       if (await integracoes.tratar(req, res, url, sessao)) return undefined;
+    }
+    if (p === '/api/v1/historico' || p.startsWith('/api/v1/historico/')) {
+      if (await historico.tratar(req, res, url, sessao)) return undefined;
     }
     if (p === '/api/v1/push' || p.startsWith('/api/v1/push/')) {
       if (await push.rotas(req, res, url, sessao)) return undefined;

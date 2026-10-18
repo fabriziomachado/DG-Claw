@@ -356,7 +356,7 @@
   width:var(--pct,0%);background:#2f9e5e;border-radius:0 2px 2px 0;transition:width .3s}
 
 /* ── Conversa vazia: avatar do agente, pergunta curta e sugestões (padrão de estado vazio) ── */
-.vazio{max-width:30em;margin:0 auto;padding:12vh 20px 24px;text-align:center;color:var(--dg-texto-2);
+.vazio{max-width:30em;margin:0 auto;padding:clamp(20px,8vh,96px) 20px 24px;text-align:center;color:var(--dg-texto-2);
   display:flex;flex-direction:column;align-items:center;animation:vz-entra .3s ease-out}
 @keyframes vz-entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.vazio{animation:none}}

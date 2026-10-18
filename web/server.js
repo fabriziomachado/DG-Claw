@@ -90,7 +90,7 @@ function criarServidor(opcoes) {
   const cofreAgente = criarCofreAgente({ config, log, reiniciar: opcoes.reiniciarCofre });
   const voz = opcoes.voz || criarVoz({ env: config.env, log });
   const sigilo = opcoes.sigilo || criarSigilo({ env: config.env, registro, dataDir: config.dataDir, log, timeoutMs: opcoes.timeoutSigiloMs });
-  const cofreRotas = criarCofreRotas({ config, runner, cofre: cofreAgente, voz, log });
+  const cofreRotas = criarCofreRotas({ config, runner, cofre: cofreAgente, voz, log, registro });
   const proxy = criarProxy({ config, registro, log, cofreRotas });
   const caixa = criarCaixaAgente({ config, registro, log, porta: () => servidor.address().port, agora: opcoes.agora });
   const push = criarPush({ dataDir: config.dataDir, log, agora: opcoes.agora, enviarHttp: opcoes.enviarPush });

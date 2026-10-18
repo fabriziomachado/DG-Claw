@@ -43,17 +43,21 @@ async function cenario(opcoes) {
   const casa = path.join(raiz, 'casa-ana');
   fs.mkdirSync(path.join(casa, 'cofre'), { recursive: true }); fs.mkdirSync(path.join(casa, 'config'));
   fs.chmodSync(casa, 0o711); fs.chmodSync(path.join(casa, 'cofre'), 0o700); fs.chmodSync(path.join(casa, 'config'), 0o755);
+  const casaBia = path.join(raiz, 'casa-bia');
+  fs.mkdirSync(path.join(casaBia, 'cofre'), { recursive: true }); fs.mkdirSync(path.join(casaBia, 'config'));
+  fs.chmodSync(casaBia, 0o711); fs.chmodSync(path.join(casaBia, 'cofre'), 0o700); fs.chmodSync(path.join(casaBia, 'config'), 0o755);
   const segredo = path.join(raiz, 'proxy.txt'); fs.writeFileSync(segredo, 'segredo-do-proxy\n');
   const reinicios = [];
   const agentes = [
     { slug: 'admin', nome: 'Admin', tipo: 'admin', runner: 'http://127.0.0.1:1', agente_id: 'a0' },
     { slug: 'ana', nome: 'Ana', runner: `http://127.0.0.1:${pRunner}`, agente_id: 'a1', porta_painel: pPainel, proxy_segredo_arquivo: segredo, cofre_arquivo: path.join(casa, 'cofre', 'cofre.env') },
+    { slug: 'bia', nome: 'Bia', runner: `http://127.0.0.1:${pRunner}`, agente_id: 'a3', porta_painel: pPainel, proxy_segredo_arquivo: segredo, cofre_arquivo: path.join(casaBia, 'cofre', 'cofre.env') },
     { slug: 'velha', nome: 'Velha', runner: `http://127.0.0.1:${pRunner}`, agente_id: 'a2', porta_painel: pPainel, proxy_segredo_arquivo: segredo },
   ];
   const t = await subirWeb({ agentes, reiniciarCofre: o.reiniciar || (async (a) => { reinicios.push(a.slug); }), opcoesServidor: o.voz ? { voz: o.voz } : undefined });
   await t.login();
   return {
-    t, painel, runner, casa, reinicios, cofreEnv: path.join(casa, 'cofre', 'cofre.env'),
+    t, painel, runner, casa, reinicios, cofreEnv: path.join(casa, 'cofre', 'cofre.env'), cofreBia: path.join(casaBia, 'cofre', 'cofre.env'),
     tudo: () => JSON.stringify(painel.visto) + JSON.stringify(runner.visto),
     fechar: async () => { await t.fechar(); await painel.fechar(); await runner.fechar(); fs.rmSync(raiz, { recursive: true, force: true }); },
   };
@@ -248,5 +252,29 @@ test('agente sem cofre_arquivo continua tendo o transcrever encaminhado ao paine
     await s.t.c.post('/p/velha/api/chat/transcrever', { corpo: Buffer.alloc(4096, 1), headers: { 'Content-Type': 'audio/webm' } });
     assert.equal(s.painel.visto.length, 1); assert.equal(s.painel.visto[0].url, '/p/velha/api/chat/transcrever');
     assert.equal(voz.chamadas.length, 0);
+  } finally { await s.fechar(); }
+});
+
+test('copiar de outro agente: GET mostra só os nomes dos outros; POST copia, reinicia e o valor não sai', async () => {
+  const s = await cenario();
+  try {
+    const p = await s.t.c.post('/p/bia/api/cofre', { json: { envName: 'GROQ_API_KEY', valor: CHAVE, provedor: 'groq' } });
+    assert.equal(p.status, 200, p.texto);
+    const g = await s.t.c.get('/p/ana/api/cofre');
+    assert.equal(g.status, 200);
+    assert.deepEqual(g.json.outros.map((o) => [o.de, o.envName, o.ultimos4]), [['bia', 'GROQ_API_KEY', 'aaaa']]);
+    assert.ok(!g.texto.includes(CHAVE));
+    const c = await s.t.c.post('/p/ana/api/cofre/copiar', { json: { de: 'bia', envName: 'GROQ_API_KEY', aplicar: true } });
+    assert.equal(c.status, 200, c.texto); assert.equal(c.json.ok, true); assert.equal(c.json.copiadaDe, 'bia');
+    assert.ok(!c.texto.includes(CHAVE));
+    assert.equal(fs.readFileSync(s.cofreEnv, 'utf8'), `GROQ_API_KEY='${CHAVE}'\n`);
+    assert.deepEqual(s.reinicios, ['ana']);
+    const g2 = await s.t.c.get('/p/ana/api/cofre');
+    assert.match(g2.json.chaves[0].cadastradaPor, /copiada de Bia/);
+    const nada = await s.t.c.post('/p/ana/api/cofre/copiar', { json: { de: 'bia', envName: 'NAO_EXISTE' } });
+    assert.equal(nada.status, 404);
+    const semDe = await s.t.c.post('/p/ana/api/cofre/copiar', { json: { de: 'velha', envName: 'GROQ_API_KEY' } });
+    assert.equal(semDe.status, 404);
+    assert.ok(!s.tudo().includes(CHAVE), 'nada chega ao painel nem ao runner');
   } finally { await s.fechar(); }
 });

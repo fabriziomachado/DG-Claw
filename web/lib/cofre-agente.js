@@ -293,6 +293,37 @@ function criarCofreAgente({ config, log, reiniciar }) {
     });
   }
 
+  /** As chaves ativas de um agente, só nome, serviço e 4 últimos: para "usar chave de outro agente". */
+  function ativas(agente) {
+    if (!agente.cofre_arquivo) return [];
+    const env = lerCofreEnv(agente); if (env.erro) return [];
+    const meta = lerMeta(agente); if (meta.erro) return [];
+    return juntar(env.itens, meta.chaves).filter((c) => !c.revogadaEm)
+      .map((c) => ({ envName: c.envName, provedor: c.provedor, provedorNome: nomeDoProvedor(c.provedor), ultimos4: c.ultimos4 }));
+  }
+
+  /**
+   * Copia uma chave do cofre de `de` para o de `para` (pedido do dono, 18/10/2026: as mesmas chaves
+   * servem a vários agentes). O valor é lido e gravado aqui dentro e não sai deste módulo. Só a tela
+   * do dono chama isto; o agente não pede a chave de outro.
+   */
+  function copiar(de, para, envNameBruto, quem) {
+    if (!de || !de.cofre_arquivo) return recusa('O agente de origem não tem cofre, então não há chave para copiar.', 404);
+    if (!para.cofre_arquivo) return semV1(para);
+    if (de.slug === para.slug) return recusa('A chave já está no cofre deste agente.', 409);
+    const nome = String(envNameBruto || '').trim().toUpperCase();
+    if (!NOME_FORMA_OK.test(nome)) return recusa('Nome de variável inválido, então não copiei nada.', 400);
+    const env = lerCofreEnv(de); if (env.erro) return env.erro;
+    const item = env.itens.filter((i) => i.tipo === 'chave' && i.nome === nome).pop();
+    if (!item) return recusa(`${de.nome} não tem a chave "${nome}" no cofre.`, 404);
+    const meta = lerMeta(de);
+    const m = !meta.erro && meta.chaves.find((x) => x.envName === nome);
+    const por = `${String(quem || 'Dono').slice(0, 40)} (copiada de ${String(de.nome || de.slug).slice(0, 30)})`;
+    const r = guardar(para, { envName: nome, valor: item.valor, provedor: (m && m.provedor) || 'outro', quem: por, origem: 'tela' });
+    if (r.ok) r.copiadaDe = de.slug;
+    return r;
+  }
+
   function revogar(agente, envNameBruto, quem) {
     if (!agente.cofre_arquivo) return semV1(agente);
     const nome = String(envNameBruto || '').trim().toUpperCase();
@@ -364,7 +395,7 @@ function criarCofreAgente({ config, log, reiniciar }) {
     return { ok: true, unidade: UNIDADE, chaves: n, falhas: [], feito: `O agente foi reiniciado e leu o cofre. ${quanto}` };
   }
 
-  return { estado, guardar, revogar, aplicar, listar };
+  return { estado, guardar, revogar, aplicar, listar, ativas, copiar };
 }
 
 module.exports = { criarCofreAgente, gravaArquivoSeguro, ErroGravacao };

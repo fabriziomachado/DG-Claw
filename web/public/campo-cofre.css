@@ -15,3 +15,10 @@
 .dgc-ok{font-size:14px;font-weight:600;color:var(--accent);overflow-wrap:anywhere}
 .dgc-ok code{font-family:ui-monospace,Menlo,monospace}
 .dgc-aviso{margin-top:6px;font-size:13px;overflow-wrap:anywhere}
+.dgc-outros{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;font-size:13px}
+.dgc-outros[hidden]{display:none}
+.dgc-ou{color:var(--dg-texto-2);margin-right:2px}
+.dgc-usar{min-height:32px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--dg-superficie);
+  color:var(--txt);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.dgc-usar:hover{border-color:var(--accent)}
+.dgc-usar:disabled{opacity:.6;cursor:default}

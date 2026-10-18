@@ -12,6 +12,16 @@
    Quem é o agente: o caminho (/p/<slug>/), senão ?a=<slug>, senão o último aberto (localStorage
    'dgclaw:agente', gravado pela Conversa), senão o primeiro agente que não é o Admin.
    O visual mora em casca.css (não depende do chat.css nem do conversa.css); o menu, em menu-lado.js/css. */
+/* Tema escolhido no botão de tema do painel do agente (localStorage "dgclaw-tema", mesma origem):
+   vale também para as outras telas da casca (Mesa, Lembretes, Avisos), não só para o painel.
+   Roda já no carregamento do script, antes de montar a casca. Sem escolha, segue o sistema. */
+(function () {
+  if (typeof document === 'undefined') return;
+  let t = null;
+  try { t = localStorage.getItem('dgclaw-tema'); } catch (_) { /* sem storage: segue o sistema */ }
+  if (t === 'claro' || t === 'escuro') document.documentElement.dataset.tema = t;
+})();
+
 (function (raiz, fabrica) {
   const m = fabrica(raiz);
   if (typeof module === 'object' && module.exports) module.exports = m;

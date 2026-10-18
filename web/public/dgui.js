@@ -268,7 +268,9 @@
     return `<div class="dgui-leitura">` +
       `<div class="dgui-leitura-tit">${txt(c.titulo || 'Leitura do especialista')}</div>` +
       (dest.length ? '<ul class="dgui-destaques">' + dest.map((d) => `<li>${ico(d)}<span>${txt(d.texto)}</span></li>`).join('') + '</ul>' : '') +
-      (c.detalhe ? `<details class="dgui-leitura-det"><summary>Ver análise completa</summary><div class="dgui-leitura-txt">${textoSimples(c.detalhe)}</div></details>` : '') +
+      (c.detalhe ? (dest.length
+        ? `<details class="dgui-leitura-det"><summary>Ver análise completa</summary><div class="dgui-leitura-txt">${textoSimples(c.detalhe)}</div></details>`
+        : `<div class="dgui-leitura-txt">${textoSimples(c.detalhe)}</div>`) : '') +
       '</div>';
   }
 
@@ -325,6 +327,57 @@
     return html;
   }
 
+  /* Tolerância (18/10/2026): agentes às vezes escrevem o painel de outro jeito ("componentes" no lugar
+     de "itens", KPI com lista de "itens", gráfico com "formato" e "dados":[{rotulo,valor}], leitura com
+     "texto", sugestões como componente). Em vez de mostrar "Não consegui desenhar", traduz para o
+     formato da skill ui-generativa. O que já está no formato certo passa sem mudança. */
+  function normaliza(d, fundo) {
+    if (!d || typeof d !== 'object' || (fundo || 0) > 4) return d;
+    if (Array.isArray(d)) return d.map((x) => normaliza(x, (fundo || 0) + 1));
+    let c = Object.assign({}, d);
+    if (!c.tipo && (Array.isArray(c.componentes) || Array.isArray(c.itens))) c.tipo = 'painel';
+    if (c.tipo === 'gráfico') c.tipo = 'grafico';
+    if (c.tipo === 'painel') {
+      let sugs = Array.isArray(c.sugestoes) ? c.sugestoes : [];
+      const fonte = Array.isArray(c.itens) ? c.itens : Array.isArray(c.componentes) ? c.componentes : [];
+      const itens = [];
+      for (const bruto of fonte) {
+        const it = normaliza(bruto, (fundo || 0) + 1);
+        if (!it || typeof it !== 'object') continue;
+        if (it.tipo === 'sugestoes') { const l = it.itens || it.lista || it.perguntas || []; if (Array.isArray(l)) sugs = sugs.concat(l); continue; }
+        if (it.tipo === 'kpis' || (it.tipo === 'kpi' && Array.isArray(it.itens) && it.valor == null)) {
+          for (const k of it.itens) itens.push(normaliza(Object.assign({ tipo: 'kpi' }, k), (fundo || 0) + 1));
+          continue;
+        }
+        itens.push(it);
+      }
+      c.itens = itens; delete c.componentes;
+      if (sugs.length) c.sugestoes = sugs.filter((x) => typeof x === 'string');
+      return c;
+    }
+    if (c.tipo === 'kpi') {
+      const tit = c.rotulo || c.label || c.nome, leg = c.detalhe || c.descricao || c.subtitulo;
+      if (c.titulo == null && tit) c.titulo = tit;
+      if (c.legenda == null && leg) c.legenda = leg;
+      return c;
+    }
+    if (c.tipo === 'grafico') {
+      if (!c.forma && (c.formato || c.estilo)) c.forma = c.formato || c.estilo;
+      if (!Array.isArray(c.categorias) && Array.isArray(c.dados) && c.dados.length && typeof c.dados[0] === 'object') {
+        c.categorias = c.dados.map((x) => String(x.rotulo ?? x.categoria ?? x.nome ?? x.label ?? ''));
+        c.series = [{ nome: c.serie || c.unidade || c.titulo || 'valor', valores: c.dados.map((x) => Number(x.valor ?? x.value ?? x.y)) }];
+      }
+      if (!Array.isArray(c.series) && Array.isArray(c.valores)) c.series = [{ nome: c.titulo || 'valor', valores: c.valores }];
+      return c;
+    }
+    if (c.tipo === 'leitura') {
+      if (!c.detalhe && typeof c.texto === 'string') c.detalhe = c.texto;
+      return c;
+    }
+    if (c.tipo === 'tabela' && !Array.isArray(c.linhas) && Array.isArray(c.dados)) c.linhas = c.dados;
+    return c;
+  }
+
   /* Corpo do bloco (o que vem depois de ```): HTML seguro, ou null quando não é dgui. */
   function blocoParaHtml(bloco) {
     const m = /^dgui[ \t]*\r?\n([\s\S]*)$/.exec(String(bloco));
@@ -333,6 +386,7 @@
     try { dados = JSON.parse(m[1]); } catch (e) {
       return `<div class="dgui">${aviso('o JSON do bloco está inválido (' + String(e.message).slice(0, 120) + ')')}<pre class="dgui-cru">${esc(m[1].slice(0, 2000))}</pre></div>`;
     }
+    dados = normaliza(dados, 0);
     const analitico = dados && !Array.isArray(dados) && ['painel', 'grafico', 'gráfico', 'tabela'].includes(dados.tipo);  // escolha não leva sugestões
     const sug = analitico ? sugestoes(Array.isArray(dados.sugestoes) && dados.sugestoes.length ? dados.sugestoes : sugestoesPadrao(dados)) : '';
     return `<div class="dgui">${componente(dados, 0)}${sug}</div>`;
@@ -560,7 +614,7 @@
       for (const b of cx.querySelectorAll('[data-dgui-opcao]')) if (b.dataset.dguiOpcao === v) b.classList.add('escolhida');
     }
   }
-  const api = { restauraEscolhas, blocoParaHtml, numero, csvDe, tsvDe, pngDe, svgParaImagem, registro };
+  const api = { normaliza, restauraEscolhas, blocoParaHtml, numero, csvDe, tsvDe, pngDe, svgParaImagem, registro };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   raiz.dgui = api;
 })(typeof window !== 'undefined' ? window : globalThis);

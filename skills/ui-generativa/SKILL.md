@@ -63,10 +63,11 @@ A frase antes do bloco é obrigatória: no Telegram e no WhatsApp o bloco não �
 
 - `fonte` e `atualizado` (no painel ou em cada componente) aparecem discretos no rodapé e saem na
   imagem que o dono baixa. Sempre que souber de onde vêm os dados, preencha.
-- `sugestoes`: 2 a 4 perguntas curtas que o dono provavelmente faria a seguir, pensadas para
+- `sugestoes` (sempre que houver gráfico ou tabela): 3 a 4 perguntas curtas que o dono provavelmente faria a seguir, pensadas para
   **estes** dados (interpretar, explicar uma anomalia, sugerir ação, comparar com outro período,
   detalhar um item). Viram botões embaixo do painel; um toque manda a pergunta para mim, como se
   ele tivesse digitado. Escreva na voz do dono ("Sugira ações de retenção para os cursos EAD").
+  Se eu não mandar, a conversa coloca perguntas genéricas no lugar; as minhas, específicas, são melhores.
 - Cada gráfico e tabela já ganha sozinho os botões de baixar (PNG ou CSV), copiar, compartilhar
   e ampliar: não preciso fazer nada para isso.
 

@@ -78,3 +78,11 @@ test('CSV com ponto e vírgula, BOM e aspas quando precisa', () => {
   assert.match(csv, /"Direito; noturno";7,5%/);
   assert.match(csv, /"Psicologia ""EAD""";8/);
 });
+
+test('painel sem sugestões do agente ganha perguntas de análise padrão', () => {
+  const h = dgui.blocoParaHtml(bloco({ tipo: 'painel', itens: [{ tipo: 'grafico', categorias: ['A'], series: [{ nome: '1', valores: [1] }, { nome: '2', valores: [2] }] }] }));
+  assert.strictEqual((h.match(/data-dgui-pergunta=/g) || []).length, 4);
+  assert.match(h, /Interprete este painel/);
+  assert.match(h, /maiores variações/);
+  assert.ok(!dgui.blocoParaHtml(bloco({ tipo: 'kpi', valor: '1' })).includes('data-dgui-pergunta'));
+});

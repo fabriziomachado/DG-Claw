@@ -1,0 +1,70 @@
+/* dgui.css: componentes de UI generativa na conversa (KPI, tabela, gráfico), dgui.js.
+   Só cores da paleta (tema.css), então valem nos dois temas. */
+.dgui{margin:8px 0 12px;max-width:100%;color:var(--dg-texto)}
+.dgui-tit{font-size:14px;font-weight:600;color:var(--dg-texto);margin:0 0 8px}
+.dgui-painel{border:1px solid var(--dg-borda);border-radius:16px;padding:14px;background:var(--dg-superficie);display:flex;flex-direction:column;gap:14px}
+.dgui-painel-tit{font-size:15.5px;font-weight:700}
+.dgui > .dgui-tabela,.dgui > .dgui-grafico{border:1px solid var(--dg-borda);border-radius:14px;padding:12px;background:var(--dg-superficie)}
+.dgui-aviso{font-size:13px;color:var(--dg-erro-texto);background:var(--dg-erro-fundo);border-radius:10px;padding:8px 10px}
+.dgui-cru{font-size:12px;white-space:pre-wrap;overflow-x:auto;max-height:200px;color:var(--dg-texto-2)}
+
+/* KPI */
+.dgui-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.dgui-kpi{border:1px solid var(--dg-borda);border-radius:14px;padding:12px 14px;background:var(--dg-superficie);min-width:0}
+.dgui-painel .dgui-kpi{background:var(--dg-fundo)}
+.dgui-kpi-tit{font-size:12.5px;color:var(--dg-texto-2);margin-bottom:4px;overflow-wrap:anywhere}
+.dgui-kpi-valor{font-size:26px;font-weight:700;line-height:1.15;letter-spacing:-.01em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.dgui-kpi-var{font-size:13px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
+.dgui-kpi-var.bom{color:var(--dg-entrega-texto)}
+.dgui-kpi-var.ruim{color:var(--dg-erro-texto)}
+.dgui-kpi-var.neutro{color:var(--dg-texto-2)}
+.dgui-kpi-leg{font-size:12px;color:var(--dg-texto-3);margin-top:4px}
+
+/* Tabela */
+.dgui-tabela-rola{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--dg-borda);border-radius:10px}
+.dgui-tabela table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.4;font-variant-numeric:tabular-nums}
+.dgui-tabela th,.dgui-tabela td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--dg-borda);white-space:nowrap}
+.dgui-tabela td:first-child,.dgui-tabela th:first-child{white-space:normal;min-width:8em}
+.dgui-tabela th{font-weight:600;background:var(--dg-superficie-2);position:relative;user-select:none}
+.dgui-tabela tbody tr:last-child td{border-bottom:0}
+.dgui-tabela tbody tr:hover td{background:color-mix(in srgb,var(--dg-superficie-2) 60%,transparent)}
+table[data-dgui-ordena] th{cursor:pointer}
+table[data-dgui-ordena] th:focus-visible{outline:2px solid var(--dg-azul);outline-offset:-2px}
+.dgui-ord{display:inline-block;width:1em;margin-left:4px;color:var(--dg-texto-3);font-size:11px}
+th[aria-sort="none"] .dgui-ord::after{content:"↕"}
+th[aria-sort="ascending"] .dgui-ord::after{content:"▲";color:var(--dg-azul)}
+th[aria-sort="descending"] .dgui-ord::after{content:"▼";color:var(--dg-azul)}
+
+/* cores das séries */
+.dgui-c0{--c:var(--dg-serie-0)}.dgui-c1{--c:var(--dg-serie-1)}.dgui-c2{--c:var(--dg-serie-2)}
+.dgui-c3{--c:var(--dg-serie-3)}.dgui-c4{--c:var(--dg-serie-4)}.dgui-c5{--c:var(--dg-serie-5)}
+
+/* Barras deitadas */
+.dgui-barras{display:flex;flex-direction:column;gap:8px}
+.dgui-barra-lin{display:grid;grid-template-columns:minmax(90px,34%) 1fr;gap:10px;align-items:center}
+.dgui-barra-cat{font-size:13.5px;color:var(--dg-texto);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dgui-barra-vals{display:flex;flex-direction:column;gap:3px;min-width:0}
+.dgui-barra-par{display:flex;align-items:center;gap:8px;min-width:0}
+.dgui-barra{display:block;height:14px;border-radius:4px;background:var(--c);min-width:2px;
+            animation:dguiCresce .5s ease-out both;transform-origin:left}
+.dgui-barra-par b{font-size:12.5px;font-weight:600;color:var(--dg-texto-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+@keyframes dguiCresce{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+/* Colunas, linhas, pizza (SVG) */
+.dgui-svg{display:block;width:100%;height:auto;overflow:visible}
+.dgui-svg rect,.dgui-svg path{fill:var(--c)}
+.dgui-svg rect:hover,.dgui-svg path:hover{opacity:.82}
+.dgui-grade{stroke:var(--dg-borda);stroke-width:1}
+.dgui-eixo{fill:var(--dg-texto-3);font-size:11px;font-family:inherit}
+.dgui-linha{fill:none;stroke:var(--c);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.dgui-ponto{fill:var(--dg-superficie);stroke:var(--c);stroke-width:2}
+.dgui-pizza-caixa{display:flex;flex-wrap:wrap;align-items:center;gap:16px}
+.dgui-pizza{width:min(200px,60%);flex:0 0 auto}
+.dgui-legenda{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:12.5px;color:var(--dg-texto-2)}
+.dgui-legenda-col{flex-direction:column;flex:1;min-width:140px;margin-top:0}
+.dgui-legenda i{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--c);margin-right:6px;vertical-align:-1px}
+.dgui-legenda b{color:var(--dg-texto);font-weight:600;margin-left:4px}
+@media (prefers-reduced-motion:reduce){.dgui-barra{animation:none}}
+@media (max-width:520px){.dgui-kpi-valor{font-size:22px}.dgui-barra-lin{grid-template-columns:minmax(80px,38%) 1fr}}
+/* o balão que traz componentes usa a largura toda da coluna */
+.bub:has(.dgui){width:100%}

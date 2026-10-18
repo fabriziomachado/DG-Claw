@@ -378,10 +378,14 @@ function pintaAtividade() {
     // observador de rolagem (acima) mantém quem estava no fim no fim e quem lia lá em cima parado
     atividadeEl.hidden = !mostra;
   }
-  if (!mostra) { atvBase = null; return; }
+  if (!mostra) { atvBase = null; pgFecha(); return; }
   const f = atvFrase(est);
-  atividadeEl.className = f.classe;
+  // trabalhando sem alerta: a linha de passos (spinner, o comando de agora, quantos passos e o tempo)
+  const trab = est.estado === 'trabalhando' && !est.alerta;
+  atividadeEl.className = (f.classe || '') + (trab ? ' trab' : '') + (trab && pgAberto ? ' aberto' : '');
   atividadeEl.title = f.titulo;
+  if (trab) { pintaPassos(est); return; }
+  pgFecha();
   if (Date.now() < atvDetalheAte) {
     // toque: o detalhe (ex.: "Bash: npm test, há 40 s") no lugar da linha
     const d = Date.parse(est.desde || '');
@@ -405,10 +409,97 @@ function pintaAtividade() {
   atvBase = base;
   atvAcaoEl.textContent = f.acao;
 }
+/* ── Passos do pedido (18/10/2026, proposta aprovada pelo dono) ─────────────────
+   Trabalhando, a linha colada no campo mostra o spinner, o comando (ou arquivo, busca, página) de
+   agora, quantos passos já foram e o tempo desde o pedido. Um toque abre a lista para cima: os passos
+   feitos (✓, com o tempo de cada um) e o de agora. Os feitos vêm da trilha da conversa (itens
+   "trilha" depois da última fala do dono); o de agora vem da foto de atividade (est.passo). */
+let pgAberto = false;
+let pgTimer = null;
+const pgListaEl = $('pgLista'), pgMetaEl = $('pgMeta');
+const ICONE_PASSO = {
+  terminal: '<path d="m4 17 6-6-6-6M12 19h8"/>',
+  ler: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+  editar: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  buscar: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  web: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+  skill: '<path d="m12 3 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/>',
+  ajuda: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18.5 20a6.5 6.5 0 0 0-2.5-5.1"/>',
+  outro: '<circle cx="12" cy="12" r="3"/>',
+};
+const icPasso = tipo => `<svg class="pg-tipo" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONE_PASSO[tipo] || ICONE_PASSO.outro}</svg>`;
+const IC_FEITO = '<svg class="pg-ok" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+const IC_FALHOU = '<svg class="pg-erro" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+const SETA_BAIXO = '<svg class="pg-seta" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+/* Uma linha de passo: ✓ (ou ✕), ícone do tipo, o comando/alvo e o tempo. Com detalhe, um toque mostra o
+   comando inteiro e a saída (o que a trilha antiga mostrava). */
+function htmlPasso(i, seg) {
+  const t = i.trilha;
+  const rot = TR.rotuloPasso(t);
+  const tipo = TR.tipoPasso(t.ferramenta);
+  const cab = `${t.erro ? IC_FALHOU : IC_FEITO}${icPasso(tipo)}<span class="pg-rot${tipo === 'terminal' ? ' mono' : ''}">${esc(rot)}</span>` +
+    (seg != null ? `<span class="pg-q">${esc(TR.duracao(seg))}</span>` : '');
+  const temDetalhe = !t.leitura || t.erro;
+  if (!temDetalhe) return `<li class="pg-passo" title="${esc(t.titulo)}">${cab}</li>`;
+  const saida = t.saida ? `<pre class="tl-saida${t.erro ? ' erro' : ''}">${esc(t.saida)}${t.cortado ? '\n…' : ''}</pre>`
+    : `<div class="tl-vazio">${t.erro ? 'falhou, sem texto de saída' : 'sem saída'}</div>`;
+  return `<li class="pg-passo"><details data-tl="${esc(i.id)}"${trilhaAbertas.has(i.id) ? ' open' : ''}><summary title="${esc(t.titulo)}">${cab}</summary>` +
+    `<pre class="tl-cmdtxt">${esc(t.comando)}</pre>${saida}</details></li>`;
+}
+/* Os passos feitos, cada um com o tempo até o próximo (o último, até `fimEp`). */
+function htmlPassos(itens, fimEp) {
+  return itens.map((i, k) => htmlPasso(i, (k + 1 < itens.length ? itens[k + 1].ep : fimEp) - i.ep)).join('');
+}
+const ultimaFalaDono = () => msgs.reduce((a, m) => (ehDono(m) && typeof m.ep === 'number' && m.ep > a ? m.ep : a), 0);
+const mmss = seg => { const s = Math.max(0, Math.round(seg)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+function pintaPassos(est) {
+  const desde = ultimaFalaDono();
+  const feitos = msgs.filter(m => TR.ehTrilha(m) && m.ep > desde);
+  const agoraSeg = atvAgoraMs() / 1000;
+  const p = est.passo;
+  const rot = p ? TR.rotuloPasso(p) : (est.acao === 'pensando' ? 'pensando…' : acaoAmigavel(est.acao));
+  atvNomeEl.textContent = '';
+  atvSepEl.hidden = true;
+  atvAcaoEl.className = 'atv-acao' + (p && p.ferramenta === 'Bash' ? ' mono' : '');
+  atvAcaoEl.textContent = rot;
+  atvAcaoEl.title = p ? p.titulo : '';
+  const n = feitos.length + (p ? 1 : 0);
+  const ini = desde || (Date.parse(est.desde || '') / 1000) || agoraSeg;
+  pgMetaEl.textContent = (n ? (n === 1 ? '1 passo · ' : n + ' passos · ') : '') + mmss(agoraSeg - ini);
+  pgListaEl.hidden = !pgAberto;
+  if (pgAberto) {
+    const inicioAgora = p ? (Date.parse(est.desde || '') / 1000 || agoraSeg) : agoraSeg;
+    const agoraLi = p ? `<li class="pg-passo agora"><i class="pg-gira" aria-hidden="true"></i>${icPasso(TR.tipoPasso(p.ferramenta))}` +
+      `<span class="pg-rot${p.ferramenta === 'Bash' ? ' mono' : ''}">${esc(rot)}</span><span class="pg-q">${esc(TR.duracao(agoraSeg - inicioAgora))}</span></li>` : '';
+    const html = '<ul class="pg-passos">' + (feitos.length || agoraLi ? htmlPassos(feitos, inicioAgora) + agoraLi
+      : `<li class="pg-passo vazio">${esc(AGENTE.nome)} ainda não rodou nenhum passo neste pedido.</li>`) + '</ul>';
+    if (pgListaEl.innerHTML !== html) pgListaEl.innerHTML = html;
+  }
+  if (!pgTimer) pgTimer = setInterval(() => {
+    if (document.visibilityState === 'visible' && atividadeEl.classList.contains('trab')) pintaAtividade();
+  }, 1000);
+}
+if (pgListaEl) pgListaEl.addEventListener('toggle', ev => {
+  const d = ev.target;
+  if (!d || !d.dataset || !d.dataset.tl) return;
+  if (d.open) trilhaAbertas.add(d.dataset.tl); else trilhaAbertas.delete(d.dataset.tl);
+}, true);
+function pgFecha() {
+  if (pgTimer) { clearInterval(pgTimer); pgTimer = null; }
+  if (pgListaEl) pgListaEl.hidden = true;
+  if (pgMetaEl) pgMetaEl.textContent = '';
+  if (atvAcaoEl) { atvAcaoEl.className = 'atv-acao'; atvAcaoEl.title = ''; }
+}
+
+let trabalhavaAntes = false;
 function integraAtividade(d) {
   if (!d || !d.agentes) return;
   if (typeof d.agora === 'number') atvDeslocaMs = d.agora * 1000 - Date.now();
   window.atividadeFoto = d;
+  // começou ou terminou de trabalhar: o resumo "Fez N passos" do último pedido some ou aparece
+  const est = d.agentes[AGENTE.id];
+  const trabalha = !!(est && est.estado === 'trabalhando');
+  if (trabalha !== trabalhavaAntes) { trabalhavaAntes = trabalha; if (carregouUmaVez) render({ semRolar: true }); }
   if (telaOciosa()) estadoOcioso();
   else pintaAtividade();
   lcSincroniza();
@@ -418,6 +509,12 @@ function integraAtividade(d) {
 if (atividadeEl) {
   atividadeEl.addEventListener('click', ev => {
     ev.stopPropagation();           // o #who em volta abre as mídias
+    if (atividadeEl.classList.contains('trab')) {
+      if (ev.target.closest('.pg-lista')) return;   // dentro da lista vale o toque de cada passo
+      pgAberto = !pgAberto;
+      pintaAtividade();
+      return;
+    }
     atvDetalheAte = Date.now() + 4000;
     pintaAtividade();
     setTimeout(pintaAtividade, 4100);
@@ -1296,28 +1393,28 @@ function htmlCorpo(m) {
   return htmlSelo(m) + cita + midia + corpo + reac + meta;
 }
 
-/* Trilha de comandos: uma linha discreta e recolhível por sequência de comandos entre duas mensagens.
-   Fechada por padrão; o que a pessoa abriu continua aberto quando o grupo cresce (trilhaAbertas).
-   O texto vem do servidor já mascarado e cortado, e entra sempre escapado. */
+/* Trilha de comandos: o que a pessoa abriu (resumo ou passo) continua aberto quando a lista cresce
+   (trilhaAbertas). O texto vem do servidor já mascarado e cortado, e entra sempre escapado. */
 const trilhaAbertas = new Set();
-function htmlComando(i, aberto) {
-  const t = i.trilha;
-  const saida = t.saida ? `<pre class="tl-saida${t.erro ? ' erro' : ''}">${esc(t.saida)}${t.cortado ? '\n…' : ''}</pre>`
-    : `<div class="tl-vazio">${t.erro ? 'falhou, sem texto de saída' : 'sem saída'}</div>`;
-  return `<details class="tl-cmd${t.erro ? ' erro' : ''}" data-tl="${esc(i.id)}"${aberto ? ' open' : ''}>` +
-    `<summary>${t.erro ? 'falhou: ' : 'rodou: '}${esc(t.titulo)}<span class="tl-hora">${esc(i.hhmm)}</span></summary>` +
-    `<pre class="tl-cmdtxt">${esc(t.comando)}</pre>${saida}</details>`;
-}
-function htmlTrilha(itens) {
+/* "Fez 5 passos em 2 min": os passos de um pedido, recolhidos (abre com um toque). O tempo vai da fala
+   do dono até a última coisa do agente naquele pedido. */
+function htmlResumoPassos(itens, todas) {
   const id = itens[0].id;
-  if (itens.length === 1) {
-    return `<div class="row her trilha" data-msg="${esc(id)}">${htmlComando(itens[0], trilhaAbertas.has(itens[0].id))}</div>`;
+  const iniDono = todas.reduce((a, x) => (ehDono(x) && typeof x.ep === 'number' && x.ep <= itens[0].ep && x.ep > a ? x.ep : a), 0);
+  const ultimo = itens[itens.length - 1];
+  let fim = ultimo.ep;
+  for (const x of todas) {
+    if (typeof x.ep !== 'number' || x.ep <= ultimo.ep) continue;
+    if (ehDono(x)) break;
+    fim = x.ep;
   }
-  const erros = itens.some(i => i.trilha.erro);
-  const aberto = trilhaAbertas.has(id);
-  return `<div class="row her trilha" data-msg="${esc(id)}"><details class="tl-grupo${erros ? ' erro' : ''}" data-tl="${esc(id)}"${aberto ? ' open' : ''}>` +
-    `<summary>${esc(TR.rotuloGrupo(itens))}</summary>` +
-    itens.map(i => htmlComando(i, trilhaAbertas.has(i.id))).join('') + '</details></div>';
+  const ini = iniDono || itens[0].ep;
+  const erros = itens.filter(i => i.trilha.erro).length;
+  const rot = `Fez ${itens.length === 1 ? '1 passo' : itens.length + ' passos'}${fim - ini >= 1 ? ' em ' + TR.duracao(fim - ini) : ''}` +
+    (erros ? ` · ${erros === 1 ? '1 falhou' : erros + ' falharam'}` : '');
+  return `<div class="row her trilha" data-msg="${esc(id)}"><details class="pg-resumo${erros ? ' erro' : ''}" data-tl="${esc(id)}"${trilhaAbertas.has(id) ? ' open' : ''}>` +
+    `<summary>${erros ? IC_FALHOU : IC_FEITO}<span>${esc(rot)}</span>${SETA_BAIXO}</summary>` +
+    `<ul class="pg-passos">${htmlPassos(itens, fim)}</ul></details></div>`;
 }
 /* Resultado de um comando de barra (/context, /cost...): o que o terminal respondeu, num bloco fechado
    do lado do agente. O texto vem do servidor e entra sempre escapado. */
@@ -1489,7 +1586,11 @@ function render(opt) {
   let dia = '', anterior = null;
   lidoAteEp = 0;
   for (const x of todas) if (!x.pendente && !x.cartaoNasc && !ehDono(x) && typeof x.ep === 'number' && x.ep > lidoAteEp) lidoAteEp = x.ep;
-  const blocos = TR ? TR.agrupa(todas) : todas.map(x => ({ msg: x }));
+  const blocos = TR ? TR.agrupaPorTurno(todas) : todas.map(x => ({ msg: x }));
+  // enquanto ele trabalha no último pedido, os passos dele ficam na linha do campo, não aqui
+  const fotoAtv = window.atividadeFoto && window.atividadeFoto.agentes ? window.atividadeFoto.agentes[AGENTE.id] : null;
+  const trabalhandoAgora = !!(fotoAtv && fotoAtv.estado === 'trabalhando' && streamAberto);
+  const ultDono = todas.reduce((a, x) => (ehDono(x) && typeof x.ep === 'number' && x.ep > a ? x.ep : a), 0);
   for (let bi = 0; bi < blocos.length; bi++) {
     const bloco = blocos[bi];
     const m = bloco.msg || bloco.trilha[0];
@@ -1499,7 +1600,8 @@ function render(opt) {
       anterior = null;
     }
     if (bloco.trilha) {
-      itens.push(['trilha:' + m.id, htmlTrilha(bloco.trilha)]);
+      if (trabalhandoAgora && m.ep > ultDono) continue;
+      itens.push(['trilha:' + m.id, htmlResumoPassos(bloco.trilha, todas)]);
       continue;
     }
     if (m.origin === 'comando') { itens.push([m.id, htmlResultadoComando(m)]); continue; }

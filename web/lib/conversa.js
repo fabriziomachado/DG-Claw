@@ -270,6 +270,8 @@ function criarConversa({ config, runner, leitor, leitorRollout, midia, log, agor
       const ultimo = typeof e.updatedAt === 'number' ? iso(e.updatedAt) : null;
       if (e.status === 'working') {
         est = { estado: 'trabalhando', acao: e.currentTool || 'pensando', detalhe: null, ultimo_sinal: ultimo, alerta: null, motivo: null };
+        // o passo de agora, com o comando ou o arquivo de verdade (a linha "trabalhando" mostra ele no lugar do nome da ferramenta)
+        if (e.currentTool) est.passo = await pendenteDe(agente);
       } else if (e.status === 'waiting_input') {
         // O que ele quer fazer é o último comando do transcript que ainda não tem resultado.
         const pend = await pendenteDe(agente);

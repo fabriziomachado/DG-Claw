@@ -3,10 +3,13 @@
    O agente responde com um bloco ```dgcofre\nNOME_DA_VARIAVEL\nrótulo opcional```. A tela
    troca esse bloco por um cartão com um campo de senha; o valor vai direto para
    POST /p/<agente>/api/cofre e NUNCA passa pelo chat, pelo transcript, por log ou
-   por localStorage (guardamos só o marcador "salvo", com o valor ausente). */
+   por localStorage (guardamos só o marcador "salvo", com o valor ausente).
+   Na conversa do Admin a primeira linha pode ser `slug:NOME` (por exemplo `help:SOFTDESK_HASH_API`):
+   o valor vai para o cofre DESSE agente. Fora do Admin esse formato cai no bloco normal. */
 (function (raiz) {
   const NOME_OK = /^[A-Z_][A-Z0-9_]{1,63}$/;
-  let cfg = { agente: '', enviar: null };
+  const SLUG_OK = /^[a-z0-9][a-z0-9-]{0,62}$/;
+  let cfg = { agente: '', enviar: null, outrosAgentes: false };
 
   function esc(s) {
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -20,10 +23,16 @@
     if (!m) return null;
     const linhas = m[1].split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     if (!linhas.length) return null;
-    const envName = linhas[0].replace(/\\([_\\`])/g, '$1');
+    let envName = linhas[0].replace(/\\([_\\`])/g, '$1');
+    let alvo = '';
+    const comAlvo = /^([^:\s]+):(.+)$/.exec(envName);
+    if (comAlvo) {
+      if (!SLUG_OK.test(comAlvo[1])) return null;
+      alvo = comAlvo[1]; envName = comAlvo[2];
+    }
     if (!NOME_OK.test(envName)) return null;
     const rotulo = (linhas[1] || '').replace(/\\([_\\`])/g, '$1').slice(0, 80);
-    return { envName, rotulo };
+    return alvo ? { envName, rotulo, alvo } : { envName, rotulo };
   }
 
   function hash(s) {
@@ -41,16 +50,16 @@
     catch (_) { /* sem localStorage: o cartão só não lembra após recarregar */ }
   }
 
-  function htmlSalvo(envName) {
-    return `<span class="dgc-ok" role="status">✓ <code>${esc(envName)}</code> salva no cofre</span>`;
+  function htmlSalvo(envName, alvo) {
+    return `<span class="dgc-ok" role="status">✓ <code>${esc(envName)}</code> salva no cofre${alvo ? ' de ' + esc(alvo) : ''}</span>`;
   }
 
   /* HTML do cartão. `id` identifica o cartão (hash da mensagem) para o marcador. */
-  function html(envName, rotulo, id) {
+  function html(envName, rotulo, id, alvo) {
     const salvo = !!(id && jaSalvo(cfg.agente, id));
-    return `<div class="dgcofre" data-env="${esc(envName)}" data-id="${esc(id || '')}">` +
-      (salvo ? htmlSalvo(envName) :
-        `<div class="dgc-tit">${esc(rotulo || 'Chave segura')}</div>` +
+    return `<div class="dgcofre" data-env="${esc(envName)}" data-id="${esc(id || '')}"${alvo ? ` data-alvo="${esc(alvo)}"` : ''}>` +
+      (salvo ? htmlSalvo(envName, alvo) :
+        `<div class="dgc-tit">${esc(rotulo || 'Chave segura')}${alvo ? ` <small>· cofre de ${esc(alvo)}</small>` : ''}</div>` +
         `<code class="dgc-nome">${esc(envName)}</code>` +
         `<div class="dgc-linha"><input type="password" class="dgc-valor" autocomplete="off" ` +
         `spellcheck="false" autocapitalize="off" aria-label="Valor de ${esc(envName)}" placeholder="Cole a chave aqui">` +
@@ -62,7 +71,8 @@
   /* Para conversa.js: se o bloco é dgcofre válido devolve o HTML, senão null. */
   function blocoParaHtml(bloco, textoMsg) {
     const a = analisa(bloco);
-    return a ? html(a.envName, a.rotulo, hash(String(textoMsg || '') + '|' + a.envName)) : null;
+    if (!a || (a.alvo && !cfg.outrosAgentes)) return null;
+    return html(a.envName, a.rotulo, hash(String(textoMsg || '') + '|' + (a.alvo ? a.alvo + ':' : '') + a.envName), a.alvo);
   }
 
   const espera = ms => new Promise(r => setTimeout(r, ms));
@@ -96,7 +106,7 @@
     const msg = card.querySelector('.dgc-msg'); if (msg) msg.hidden = true;
     let corpo = null, status = 0, falhaRede = '';
     try {
-      const r = await fetch('/p/' + encodeURIComponent(cfg.agente) + '/api/cofre', {
+      const r = await fetch('/p/' + encodeURIComponent(card.dataset.alvo || cfg.agente) + '/api/cofre', {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'same-origin',
         body: JSON.stringify({ envName, valor, aplicar: true }),
       });
@@ -116,10 +126,12 @@
     inp.value = '';
     const naoAplicou = !(status >= 200 && status < 300);
     if (card.dataset.id) marcaSalvo(cfg.agente, card.dataset.id);
-    card.innerHTML = htmlSalvo(envName) + (naoAplicou
+    const alvo = card.dataset.alvo || '';
+    card.innerHTML = htmlSalvo(envName, alvo) + (naoAplicou
       ? `<div class="dgc-aviso">O agente ainda não reiniciou para usar a chave${corpo && corpo.howToFix ? ': ' + esc(corpo.howToFix) : ''}.</div>` : '');
-    avisaAgente(naoAplicou ? envName + ' salva no cofre (o agente ainda não reiniciou para usar).'
-                           : envName + ' salva no cofre.');
+    const onde = alvo ? ' no cofre de ' + alvo : ' no cofre';
+    avisaAgente(naoAplicou ? envName + ' salva' + onde + ' (o agente ainda não reiniciou para usar).'
+                           : envName + ' salva' + onde + '.');
   }
 
   function configurar(c) { cfg = Object.assign({}, cfg, c || {}); }

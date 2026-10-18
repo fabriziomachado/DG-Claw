@@ -929,6 +929,9 @@ function paragrafos(txt, fmt) {
     // ```dgcofre: campo de senha (campo-cofre.js); nome inválido cai no bloco normal
     const cofre = window.campoCofre && window.campoCofre.blocoParaHtml(partes[i], txt);
     if (cofre) { html += cofre; continue; }
+    // ```dgui: KPI, tabela e gráfico desenhados pela tela (dgui.js)
+    const ui = window.dgui && window.dgui.blocoParaHtml(partes[i]);
+    if (ui) { html += ui; continue; }
     let cod = partes[i].replace(/^[A-Za-z0-9_+.-]{1,20}\n/, '')
                          .replace(/^\n+/, '').replace(/\s+$/, '');
     // no MarkdownV2, dentro do bloco só a crase e a barra vêm escapadas

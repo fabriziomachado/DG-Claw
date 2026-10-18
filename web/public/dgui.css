@@ -143,3 +143,25 @@ th[aria-sort="descending"] .dgui-ord::after{content:"▼";color:var(--dg-azul)}
 .dgui-escolha.respondida .dgui-op-outra{display:none}
 .dgui-op-rec{display:inline-block;margin-left:6px;padding:0 7px;border-radius:8px;font-size:11px;font-weight:600;vertical-align:1px;
   color:var(--dg-azul-forte);border:1px solid var(--dg-azul-suave)}
+
+/* legenda clicável e balão do ponto (18/10/2026) */
+.dgui-leg-item{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:inherit;color:inherit;background:none;border:0;padding:2px 4px;border-radius:6px;cursor:pointer}
+.dgui-leg-item:hover{background:var(--dg-superficie-2)}
+.dgui-leg-item[aria-pressed="false"]{opacity:.45;text-decoration:line-through}
+[data-dgui-ponto]{cursor:pointer}
+[data-dgui-ponto]:focus-visible{outline:2px solid var(--dg-azul);outline-offset:1px}
+.dgui-comp{position:relative}
+.dgui-balao{position:absolute;z-index:5;display:flex;flex-direction:column;gap:2px;min-width:140px;max-width:240px;padding:8px 10px;border-radius:10px;
+  background:var(--dg-texto);color:var(--dg-fundo);font-size:12.5px;line-height:1.35;box-shadow:0 8px 24px rgba(0,0,0,.22);animation:dgui-balao .12s ease-out}
+.dgui-balao b{font-size:13.5px;font-weight:650}
+.dgui-balao-perg{display:inline-flex;align-items:center;gap:4px;margin-top:4px;padding:0;border:0;background:none;color:inherit;font:inherit;font-size:12px;opacity:.85;cursor:pointer}
+.dgui-balao-perg:hover{opacity:1;text-decoration:underline}
+.dgui-balao-perg svg{width:13px;height:13px}
+@keyframes dgui-balao{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.dgui-balao{animation:none}}
+.dgui-sem-0 svg .dgui-c0,.dgui-sem-0 .dgui-barra-par.dgui-p0{display:none}
+.dgui-sem-1 svg .dgui-c1,.dgui-sem-1 .dgui-barra-par.dgui-p1{display:none}
+.dgui-sem-2 svg .dgui-c2,.dgui-sem-2 .dgui-barra-par.dgui-p2{display:none}
+.dgui-sem-3 svg .dgui-c3,.dgui-sem-3 .dgui-barra-par.dgui-p3{display:none}
+.dgui-sem-4 svg .dgui-c4,.dgui-sem-4 .dgui-barra-par.dgui-p4{display:none}
+.dgui-sem-5 svg .dgui-c5,.dgui-sem-5 .dgui-barra-par.dgui-p5{display:none}

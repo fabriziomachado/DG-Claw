@@ -1125,6 +1125,27 @@ function ehDiff(lingua, cod) {
   const l = cod.split('\n');
   return l.some(x => /^@@ .* @@/.test(x)) || (l.some(x => x.startsWith('--- ')) && l.some(x => x.startsWith('+++ ')));
 }
+/* Cores de sintaxe (18/10/2026, pedido do dono): bloco com a língua no cabeçalho (```php, ```bash...)
+   passa pelo highlight.js (vendor/, sem rede), que já devolve o texto escapado. Sem língua ou com
+   língua que ele não conhece, fica o texto puro. O render redesenha a conversa toda hora: guarda. */
+const SINTAXE_NOME = { bash: 'Bash', sh: 'Shell', shell: 'Shell', zsh: 'Shell', js: 'JavaScript', javascript: 'JavaScript',
+  ts: 'TypeScript', typescript: 'TypeScript', py: 'Python', python: 'Python', php: 'PHP', sql: 'SQL', json: 'JSON',
+  yaml: 'YAML', yml: 'YAML', html: 'HTML', xml: 'XML', css: 'CSS', scss: 'SCSS', go: 'Go', rust: 'Rust', java: 'Java',
+  kotlin: 'Kotlin', csharp: 'C#', cs: 'C#', cpp: 'C++', c: 'C', ruby: 'Ruby', rb: 'Ruby', ini: 'INI', toml: 'TOML',
+  markdown: 'Markdown', md: 'Markdown', dockerfile: 'Dockerfile', nginx: 'Nginx', graphql: 'GraphQL', lua: 'Lua', r: 'R', swift: 'Swift' };
+const sintaxeCache = new Map();
+function htmlSintaxe(lingua, cod) {
+  const h = window.hljs;
+  const l = lingua === 'toml' ? 'ini' : lingua === 'zsh' ? 'bash' : lingua;
+  if (!h || !l || !h.getLanguage(l)) return null;
+  const k = l + '\u0000' + cod;
+  if (sintaxeCache.has(k)) return sintaxeCache.get(k);
+  let v = null;
+  try { v = h.highlight(cod, { language: l, ignoreIllegals: true }).value; } catch (_) { v = null; }
+  if (sintaxeCache.size > 200) sintaxeCache.clear();
+  sintaxeCache.set(k, v);
+  return v;
+}
 function htmlDiff(cod) {
   return cod.split('\n').map(x => {
     const c = /^(\+\+\+ |--- |diff --git|index )/.test(x) ? 'd-meta' : x.startsWith('@@') ? 'd-hunk'
@@ -1210,9 +1231,12 @@ function paragrafos(txt, fmt) {
     if (fmt === 'markdownv2') cod = cod.replace(/\\([`\\])/g, '$1');
     if (!cod) continue;
     const diff = ehDiff(lingua, cod);
-    html += `<div class="cod${diff ? ' cod-diff' : ''}"><button type="button" class="codcopia" ` +
+    const cor = diff ? null : htmlSintaxe(lingua, cod);
+    const rotulo = !diff && lingua && lingua !== 'text' && lingua !== 'plaintext'
+      ? `<div class="cod-lingua">${esc(SINTAXE_NOME[lingua] || lingua)}</div>` : '';
+    html += `<div class="cod${diff ? ' cod-diff' : ''}${rotulo ? ' com-lingua' : ''}">${rotulo}<button type="button" class="codcopia" ` +
             `aria-label="Copiar o texto do bloco" title="Copiar o texto do bloco">` +
-            `${ICONE_COPIAR}</button><pre>${diff ? htmlDiff(cod) : esc(cod)}</pre></div>`;
+            `${ICONE_COPIAR}</button><pre${cor != null ? ' class="hljs"' : ''}>${diff ? htmlDiff(cod) : (cor != null ? cor : esc(cod))}</pre></div>`;
   }
   return html;
 }

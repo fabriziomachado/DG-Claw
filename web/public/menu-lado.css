@@ -155,3 +155,24 @@ aside#menu .pe{margin-top:auto;padding-top:6px}
 .ml-fs-esp{flex:1}
 @media (max-width:380px){ .ml-fs-remover{flex:1 0 100%} }
 .ml-fs:focus{outline:none}
+
+/* enquadramento da foto (18/10/2026): o quadro é o quadrado do círculo; fora dele, véu */
+.ml-fs-previa[hidden],.ml-fs-corte[hidden],.ml-fs-ajuste[hidden],.ml-fs-zoom[hidden],.ml-fs-dica[hidden]{display:none}
+.ml-fs-corte{position:relative;width:min(248px,68vw);aspect-ratio:1;flex:0 0 auto;overflow:hidden;border-radius:14px;
+  background:var(--dg-superficie-2);touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;
+  margin:2px 0 0;outline:none}
+.ml-fs-corte.arrastando{cursor:grabbing}
+.ml-fs-corte:focus-visible{box-shadow:0 0 0 2px var(--dg-superficie),0 0 0 4px var(--dg-azul)}
+.ml-fs-tela{position:absolute;left:0;top:0;transform-origin:0 0;display:block;pointer-events:none;max-width:none}
+.ml-fs-mascara{position:absolute;inset:0;border-radius:50%;pointer-events:none;
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--dg-superficie) 85%,transparent),
+             0 0 0 200px color-mix(in srgb,var(--dg-superficie) 72%,transparent)}
+.ml-fs-ajuste{margin:-2px 0 0;font-size:12.5px;color:var(--dg-texto-2);text-align:center;line-height:1.4}
+.ml-fs-ajuste b{font-weight:600;color:var(--dg-texto)}
+.ml-fs-zoom{display:flex;align-items:center;gap:10px;width:min(280px,100%);color:var(--dg-texto-2)}
+.ml-fs-zoom > svg{width:16px;height:16px;flex:0 0 auto}
+.ml-fs-zoom > svg:nth-of-type(2){width:20px;height:20px}
+.ml-fs-zoom input[type=range]{flex:1;min-width:0;height:28px;margin:0;accent-color:var(--dg-texto);cursor:pointer;background:none}
+.ml-fs-centro{margin:0 -6px 0 2px;width:32px;height:32px}
+.ml-fs-centro svg{width:17px;height:17px}
+.ml-fs-oculto{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}

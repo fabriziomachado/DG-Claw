@@ -756,15 +756,35 @@ html:not([data-tema="x"]) body .row.alerta-pedido .bub b{color:var(--dg-texto)}
 #atividade{max-width:780px;width:100%;margin:0 auto}
 #atividade .atv-nome{color:var(--dg-texto);font-weight:600}
 
-/* avisos de entrega e pedido sem pintar o balão inteiro (18/10/2026): fundo normal da conversa,
-   uma linha fina colorida na lateral e uma etiqueta pequena no topo. Painéis dentro ficam limpos. */
+/* entrega e pedido (18/10/2026, opção 3 do dono): sem linha lateral nem fundo; uma etiqueta
+   pequena ao lado da hora. "Precisa da sua decisão" só enquanto o aviso não foi visto. */
 html:not([data-tema="x"]) body .row.alerta-entrega .bub,
-html:not([data-tema="x"]) body .row.alerta-pedido .bub{
-  background:transparent;border:0;border-left:3px solid var(--dg-entrega-texto);border-radius:0;
-  padding:2px 0 2px 14px;box-shadow:none}
-html:not([data-tema="x"]) body .row.alerta-pedido .bub{border-left-color:var(--dg-pedido-texto)}
-.row.alerta-entrega .bub::before,.row.alerta-pedido .bub::before{
-  display:inline-flex;align-items:center;gap:6px;margin:2px 0 8px;padding:2px 10px;border-radius:10px;
-  font-size:11.5px;font-weight:600;letter-spacing:.2px}
-.row.alerta-entrega .bub::before{content:"✓ Entrega";background:var(--dg-entrega-fundo);color:var(--dg-entrega-texto)}
-.row.alerta-pedido .bub::before{content:"● Precisa da sua decisão";background:var(--dg-pedido-fundo);color:var(--dg-pedido-texto)}
+html:not([data-tema="x"]) body .row.alerta-pedido .bub{background:transparent;border:0;border-radius:0;padding:4px 2px;box-shadow:none}
+.row.alerta-entrega .acoes::after,.row.alerta-pedido .acoes::after{
+  margin-left:8px;padding:1px 8px;border-radius:9px;font-size:11px;font-weight:600;border:1px solid var(--dg-borda);color:var(--dg-texto-2);white-space:nowrap}
+.row.alerta-entrega .acoes::after{content:"✓ Entrega"}
+.row.alerta-pedido .acoes::after{content:"Pedido"}
+.row.alerta-pedido.alerta-pendente .acoes::after{content:"● Precisa da sua decisão";color:var(--dg-pedido-texto);border-color:var(--dg-pedido-borda)}
+.row.alerta-entrega.alerta-pendente .acoes::after{content:"● Nova entrega";color:var(--dg-azul-forte);border-color:var(--dg-azul-suave)}
+
+/* filtros no topo, como as abas do WhatsApp */
+.filtros{display:flex;gap:6px;padding:6px 16px 8px;overflow-x:auto;scrollbar-width:none;background:var(--dg-fundo);
+  max-width:812px;width:100%;margin:0 auto;box-sizing:border-box;flex:0 0 auto}
+.filtros::-webkit-scrollbar{display:none}
+.filtros[hidden]{display:none}
+.filtro{font:inherit;font-size:13px;white-space:nowrap;min-height:32px;padding:0 12px;border-radius:16px;border:1px solid var(--dg-borda);
+  background:transparent;color:var(--dg-texto-2);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.filtro b{font-size:11.5px;font-weight:700;min-width:18px;height:18px;border-radius:9px;padding:0 5px;display:inline-flex;align-items:center;justify-content:center;
+  background:var(--dg-superficie-2);color:var(--dg-texto)}
+.filtro.tem-pedido b{background:var(--dg-pedido-fundo);color:var(--dg-pedido-texto)}
+.filtro.on{background:var(--dg-texto);border-color:var(--dg-texto);color:var(--dg-fundo);font-weight:600}
+.filtro.on b{background:var(--dg-fundo);color:var(--dg-texto)}
+@media (hover:hover){.filtro:not(.on):hover{border-color:var(--dg-texto-3);color:var(--dg-texto)}}
+#wrap.filtrando > .fora-do-filtro{display:none}
+.filtro-vazio{margin:24px auto;text-align:center;color:var(--dg-texto-3);font-size:14px}
+.filtro-vazio[hidden]{display:none}
+#alertasMensagem{display:none!important}
+/* número de avisos no avatar dos outros agentes */
+#avatares .avt-badge{position:absolute;top:-4px;right:-5px;min-width:16px;height:16px;border-radius:8px;padding:0 4px;
+  background:var(--dg-azul);color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;box-shadow:0 0 0 2px var(--dg-fundo);z-index:4}
+#avatares .avt-badge.pede{background:var(--dg-pedido-borda);color:#1a1300}

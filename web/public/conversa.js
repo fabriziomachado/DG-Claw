@@ -217,6 +217,7 @@ let religaTimer = null, religaEspera = 3000;
 let avisoThread = null;             // último aviso da THREAD posto na faixa amarela
 const ouvintesChegada = [];         // chamados no fim de cada integra()
 let anexos = [];                    // arquivos colados/arrastados/escolhidos esperando o Enter
+let filtrosProntos = false;         // os filtros do topo (mais abaixo) já existem?
 let carregouUmaVez = false;         // a primeira página já chegou (ou falhou)
 let demoAtividade = false;         // o tutorial mostra um exemplo da faixa de atividade
 
@@ -249,6 +250,28 @@ pintaAvatar(avEl, AGENTE);
            `<span class="avt-nome" aria-hidden="true">${esc(a.nome)}</span></a>`;
   }).join('');
   if (avEl && avEl.parentNode) avEl.parentNode.insertBefore(nav, avEl);
+  // número discreto no avatar de cada outro agente: avisos não vistos (amarelo se algum pede decisão)
+  async function badges() {
+    if (document.hidden) return;
+    for (const a of outros) {
+      let lista = [];
+      try {
+        const r = await fetch('/api/v1/agents/' + encodeURIComponent(a.id) + '/alertas', { credentials: 'same-origin', cache: 'no-store' });
+        if (!r.ok) continue;
+        lista = ((await r.json()) || {}).alertas || [];
+      } catch (_) { continue; }
+      const el = nav.querySelector('[data-avt="' + CSS.escape(a.id) + '"]');
+      if (!el) continue;
+      let b = el.querySelector('.avt-badge');
+      if (!lista.length) { if (b) b.remove(); continue; }
+      if (!b) { b = document.createElement('span'); b.className = 'avt-badge'; el.appendChild(b); }
+      b.textContent = lista.length > 9 ? '9+' : String(lista.length);
+      b.classList.toggle('pede', lista.some(x => x.tipo === 'pedido'));
+      el.setAttribute('aria-label', 'Conversar com ' + a.nome + ' (' + lista.length + ' aviso' + (lista.length > 1 ? 's' : '') + ' não visto' + (lista.length > 1 ? 's' : '') + ')');
+    }
+  }
+  badges(); setInterval(badges, 30000);
+  document.addEventListener('visibilitychange', badges);
 })();
 entrada.placeholder = 'Pergunte ao ' + AGENTE.nome;
 if (EH_ADMIN) $('avisoAdmin').hidden = false;
@@ -1477,6 +1500,8 @@ function render(opt) {
   // fica por conta do observador de rolagem (no fim acompanha, lendo mais acima não mexe).
   aplicaNos(nos);
   humanizaHoras();
+  // os filtros nascem mais abaixo (alertas): antes disso, um render do cache não pode tocá-los
+  if (filtrosProntos) { aplicaFiltro(); observaVistos(); }
   visuaisAposRender();
   respiroDasFaixas();
   guardaCache();
@@ -3427,6 +3452,7 @@ function entregue(p, d) {
    (visuais) é chamado assim que o /send responde, sem esperar a agente. */
 async function enviarTexto(texto, anexosMsg, opts) {
   texto = (texto || '').trim();
+  if (texto && filtrosProntos) respondePedidos();
   const comAnexos = !!(anexosMsg && anexosMsg.length);
   if (!texto && !comAnexos) return;
   mostraErro('');
@@ -4089,38 +4115,109 @@ const alertasEmCurso = new Set();
 function posicionaAlertas() {
   alertasCaixa.style.bottom = Math.round(fundoLivre() + 74) + 'px';
 }
+/* ── Filtros no topo (18/10/2026, opção 3 do dono) ─────────────────────────────
+   No lugar da pilha de bolinhas ✅/⚠️ na lateral: chips Tudo · Não vistas · Pedem ação ·
+   Entregas, que filtram a conversa, e uma etiqueta pequena ao lado da hora. O aviso some
+   sozinho quando a mensagem fica à vista por um instante (como o "lido" do WhatsApp). */
+const filtrosEl = $('filtros'), filtroVazioEl = $('filtroVazio');
+let filtro = 'tudo';
+const vistosEnviados = new Set();
+function contagensFiltro() {
+  return { nv: alertasLista.length, pedidos: alertasLista.filter(a => a.tipo === 'pedido').length,
+           entregas: msgs.filter(m => m.alerta === 'entrega').length };
+}
 function desenhaAlertas() {
-  alertasPilha.replaceChildren();
-  for (const a of alertasLista) {
-    if (alertasEmCurso.has(a.id)) continue;
-    const b = document.createElement('button');
-    b.type = 'button'; b.textContent = a.tipo === 'entrega' ? '✅' : '⚠️';
-    b.title = (a.tipo === 'entrega' ? 'Entrega pronta' : 'Pedido esperando sua decisão') + ': ir até a mensagem e retirar o aviso';
-    b.setAttribute('aria-label', b.title);
-    b.onclick = async () => {
-      alertasRevisao++; alertasEmCurso.add(a.id); desenhaAlertas();
+  alertasCaixa.hidden = true;   // a pilha lateral antiga não aparece mais
+  const c = contagensFiltro();
+  filtrosEl.hidden = !(c.nv || c.entregas || filtro !== 'tudo');
+  const chip = (k, rot, n, cls) => `<button type="button" class="filtro${filtro === k ? ' on' : ''}${cls ? ' ' + cls : ''}" data-filtro="${k}" aria-pressed="${filtro === k}">` +
+    `${rot}${n ? ` <b>${n}</b>` : ''}</button>`;
+  filtrosEl.innerHTML = chip('tudo', 'Tudo', 0) + chip('nao-vistas', 'Não vistas', c.nv) +
+    chip('pedidos', 'Pedem ação', c.pedidos, c.pedidos ? 'tem-pedido' : '') + chip('entregas', 'Entregas', c.entregas);
+  aplicaFiltro();
+}
+function idsDoFiltro() {
+  if (filtro === 'nao-vistas') return new Set(alertasLista.map(a => a.mensagem_id));
+  if (filtro === 'pedidos') return new Set(alertasLista.filter(a => a.tipo === 'pedido').map(a => a.mensagem_id));
+  if (filtro === 'entregas') return new Set(msgs.filter(m => m.alerta === 'entrega').map(m => m.id));
+  return null;
+}
+function aplicaFiltro() {
+  const ids = idsDoFiltro();
+  const pendentes = new Set(alertasLista.map(a => a.mensagem_id));
+  let visiveis = 0;
+  for (const el of wrap.children) {
+    const id = el.dataset ? el.dataset.msg : '';
+    const dentro = !ids || (id && ids.has(id));
+    el.classList.toggle('fora-do-filtro', !dentro);
+    if (id) el.classList.toggle('alerta-pendente', pendentes.has(id));
+    if (dentro && id) visiveis++;
+  }
+  wrap.classList.toggle('filtrando', !!ids);
+  filtroVazioEl.hidden = !ids || visiveis > 0;
+  if (ids && !visiveis) filtroVazioEl.textContent = filtro === 'entregas' ? 'Nenhuma entrega nesta conversa.' : 'Tudo em dia: nada esperando você aqui.';
+}
+// mensagem de um aviso que ainda não está na tela (mais antiga): busca e junta ao histórico
+async function garanteMensagemDoAlerta(a) {
+  if (msgs.some(m => m.id === a.mensagem_id)) return;
+  const d = await api(API + '/alertas/' + encodeURIComponent(a.id) + '/mensagem');
+  const porId = new Map([...(d.msgs || []), ...msgs].map(m => [m.id, m]));
+  porId.set(d.mensagem.id, d.mensagem);
+  msgs = Array.from(porId.values()).sort((x, y) => x.ep - y.ep);
+  maisAntigas = !!d.mais_antigas;
+}
+filtrosEl.addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-filtro]'); if (!b) return;
+  filtro = b.dataset.filtro;
+  try {
+    if (filtro === 'nao-vistas' || filtro === 'pedidos') {
+      for (const a of alertasLista) await garanteMensagemDoAlerta(a);
+      render({ semRolar: true });
+    }
+  } catch (e) { mostraErro('Não consegui trazer todas as mensagens do filtro: ' + e.message); }
+  desenhaAlertas();
+  const primeira = Array.from(wrap.children).find(el => el.dataset && el.dataset.msg && !el.classList.contains('fora-do-filtro'));
+  if (filtro !== 'tudo' && primeira) rolagem.mostra(primeira, { block: 'start' });
+  if (filtro === 'tudo') rolagem.mostra(wrap.lastElementChild || wrap, { block: 'end' });
+});
+// "visto": a mensagem de um aviso ficou à vista por 1,2 s com a tela aberta
+const olhoVisto = 'IntersectionObserver' in window ? new IntersectionObserver(entradas => {
+  for (const en of entradas) {
+    const el = en.target;
+    clearTimeout(el._vistoT);
+    if (!en.isIntersecting || en.intersectionRatio < 0.5) continue;
+    el._vistoT = setTimeout(async () => {
+      const a = alertasLista.find(x => x.mensagem_id === el.dataset.msg);
+      if (!a || document.hidden || vistosEnviados.has(a.id)) return;
+      vistosEnviados.add(a.id);
       try {
-        const d = await api(API + '/alertas/' + encodeURIComponent(a.id) + '/mensagem');
-        // Mescla também o que chegou pelo SSE enquanto a origem era carregada.
-        const porId = new Map([...(d.msgs || []), ...msgs].map(m => [m.id, m]));
-        porId.set(d.mensagem.id, d.mensagem);
-        msgs = Array.from(porId.values()).sort((a, b) => a.ep - b.ep);
-        maisAntigas = !!d.mais_antigas;
-        render({ semRolar: true });
-        const el = wrap.querySelector('[data-msg="' + CSS.escape(d.mensagem.id) + '"]');
-        if (!el) throw new Error('A mensagem não foi encontrada na tela. Tente novamente.');
-        el.classList.add('alerta-destaque');
-        rolagem.mostra(el, { block: 'center' });
-        setTimeout(() => el.classList.remove('alerta-destaque'), 3000);
         await api(API + '/alertas/' + encodeURIComponent(a.id) + '/visto', { method: 'POST', body: {} });
         alertasLista = alertasLista.filter(x => x.id !== a.id);
-      } catch (e) { mostraErro('O alerta foi mantido: ' + e.message); }
-      finally { alertasRevisao++; alertasEmCurso.delete(a.id); desenhaAlertas(); }
-    };
-    alertasPilha.append(b);
+        alertasRevisao++;
+        desenhaAlertas();
+      } catch (e) { vistosEnviados.delete(a.id); console.warn('visto:', e.message); }
+    }, 1200);
   }
-  alertasCaixa.hidden = !alertasPilha.childElementCount;
-  posicionaAlertas();
+}, { root: chat, threshold: [0, 0.5, 1] }) : null;
+filtrosProntos = true;
+function observaVistos() {
+  if (!olhoVisto) return;
+  olhoVisto.disconnect();
+  // só entrega some ao ser vista; pedido espera a sua resposta (respondePedidos)
+  const pend = new Set(alertasLista.filter(a => a.tipo !== 'pedido').map(a => a.mensagem_id));
+  for (const el of wrap.querySelectorAll('[data-msg]')) if (pend.has(el.dataset.msg)) olhoVisto.observe(el);
+}
+/* Você escreveu depois de um pedido: ele foi respondido e sai de "Pedem ação". */
+async function respondePedidos() {
+  const pedidos = alertasLista.filter(a => a.tipo === 'pedido' && !vistosEnviados.has(a.id));
+  for (const a of pedidos) {
+    vistosEnviados.add(a.id);
+    try {
+      await api(API + '/alertas/' + encodeURIComponent(a.id) + '/visto', { method: 'POST', body: {} });
+      alertasLista = alertasLista.filter(x => x.id !== a.id);
+    } catch (e) { vistosEnviados.delete(a.id); console.warn('pedido respondido:', e.message); }
+  }
+  if (pedidos.length) { alertasRevisao++; desenhaAlertas(); }
 }
 function passoAlertas() {
   return { alvo: '[data-tour="alertas"]', titulo: 'Entregas e pedidos',
@@ -4135,7 +4232,7 @@ async function consultaAlertas() {
   const revisao = alertasRevisao;
   try {
     const d = await api(API + '/alertas');
-    if (revisao === alertasRevisao) { alertasLista = d.alertas || []; desenhaAlertas(); }
+    if (revisao === alertasRevisao) { alertasLista = d.alertas || []; desenhaAlertas(); observaVistos(); }
     if (d.avisos && d.avisos.length) mostraAviso(d.avisos.join(' '));
   } catch (e) { mostraErro('Não consegui atualizar os alertas: ' + e.message); }
   finally { alertasLendo = false; }

@@ -715,25 +715,38 @@ header #btnTutorial{font-size:14px}
 .acoes.so-hora .hora{margin-left:4px}
 header #btnMesa,header #btnLembretes,header #btnTutorial,header #btnSigilo{display:none!important}
 
-/* grupo de avatares dos outros agentes, sobrepostos à esquerda do agente aberto (18/10/2026) */
-#avatares{display:flex;align-items:center;flex:0 0 auto;margin:0 2px 0 4px;padding-right:2px}
-#avatares .avt{position:relative;display:block;line-height:0;text-decoration:none;margin-left:-10px;
-               transition:margin .2s ease,transform .2s ease;z-index:1}
-#avatares .avt:first-child{margin-left:0}
-#avatares:hover .avt,#avatares:focus-within .avt{margin-left:4px}
-#avatares:hover .avt:first-child,#avatares:focus-within .avt:first-child{margin-left:0}
-#avatares .avt:hover,#avatares .avt:focus-visible{transform:translateY(-2px);z-index:3;outline:none}
-#avatares .avt-foto{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;
-                    overflow:hidden;color:#fff;font-size:13px;font-weight:600;line-height:1;
-                    box-shadow:0 0 0 2px var(--dg-fundo)}
-#avatares .avt-foto img{width:100%;height:100%;object-fit:cover;display:block}
-#avatares .avt:focus-visible .avt-foto{box-shadow:0 0 0 2px var(--dg-fundo),0 0 0 4px var(--dg-azul)}
-#avatares .avt-nome{position:absolute;top:calc(100% + 6px);left:50%;transform:translateX(-50%);
-                    background:var(--dg-texto);color:var(--dg-fundo);font-size:12px;font-weight:500;line-height:1.2;white-space:nowrap;
-                    padding:4px 8px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .15s}
-#avatares .avt:hover .avt-nome,#avatares .avt:focus-visible .avt-nome{opacity:1}
-@media(prefers-reduced-motion:reduce){#avatares .avt{transition:none}}
-@media(max-width:520px){#avatares .avt-foto{width:28px;height:28px;font-size:12px}#avatares .avt{margin-left:-8px}}
+/* fileira de agentes abaixo do cabeçalho (18/10/2026): nome embaixo, o aberto sublinhado */
+#fileira{display:flex;gap:2px;flex:0 0 auto;overflow-x:auto;scrollbar-width:none;padding:6px 10px 0;
+  background:var(--dg-fundo);border-bottom:1px solid var(--dg-borda);-webkit-overflow-scrolling:touch}
+#fileira::-webkit-scrollbar{display:none}
+#fileira .fil{position:relative;flex:0 0 76px;display:flex;flex-direction:column;align-items:center;gap:5px;
+  padding:4px 0 10px;text-decoration:none;color:var(--dg-texto-2);border-radius:12px;-webkit-tap-highlight-color:transparent}
+#fileira .fil:hover{background:var(--dg-superficie-2)}
+#fileira .fil:focus-visible{outline:2px solid var(--dg-azul);outline-offset:-2px}
+#fileira .fil-foto{display:flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:50%;
+  overflow:hidden;color:#fff;font-size:22px;font-weight:600;line-height:1;
+  box-shadow:0 0 0 2px var(--dg-fundo),0 0 0 3.5px var(--dg-borda);transition:transform .15s ease}
+#fileira .fil-foto img{width:100%;height:100%;object-fit:cover;display:block}
+#fileira .fil:active .fil-foto{transform:scale(.95)}
+#fileira .fil.aviso .fil-foto{box-shadow:0 0 0 2px var(--dg-fundo),0 0 0 4.5px var(--dg-azul)}
+#fileira .fil.pede .fil-foto{box-shadow:0 0 0 2px var(--dg-fundo),0 0 0 4.5px var(--dg-pedido-borda)}
+#fileira .fil-nome{max-width:70px;font-size:12.5px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#fileira .fil.atual .fil-nome{color:var(--dg-texto);font-weight:650}
+#fileira .fil.atual::after{content:"";position:absolute;bottom:2px;left:50%;width:22px;height:3px;margin-left:-11px;
+  border-radius:2px;background:var(--accent)}
+#fileira .fil.novo .fil-foto{background:transparent;color:var(--dg-texto-3);box-shadow:none;border:1.5px dashed var(--dg-texto-3)}
+#fileira .fil.novo .fil-nome{color:var(--dg-texto-3)}
+#fileira .fil-badge{position:absolute;top:0;left:calc(50% + 12px);min-width:18px;height:18px;border-radius:9px;padding:0 5px;
+  background:var(--dg-azul);color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center;box-shadow:0 0 0 2px var(--dg-fundo)}
+#fileira .fil.pede .fil-badge{background:var(--dg-pedido-borda);color:#1a1300}
+@media(max-width:520px){
+  #fileira{padding:4px 6px 0}
+  #fileira .fil{flex-basis:66px;gap:4px;padding-bottom:9px}
+  #fileira .fil-foto{width:44px;height:44px;font-size:19px}
+  #fileira .fil-nome{max-width:62px;font-size:12px}
+  #fileira .fil-badge{left:calc(50% + 9px)}
+}
+@media(prefers-reduced-motion:reduce){#fileira .fil-foto{transition:none}}
 
 /* avisos de entrega e pedido como cartões claros e suaves, no tom do resto da conversa
    (18/10/2026). As cores vêm da paleta (tema.css), então valem nos dois temas. */
@@ -795,10 +808,6 @@ html:not([data-tema="x"]) body .row.alerta-pedido .bub{background:transparent;bo
 .filtro-vazio{margin:24px auto;text-align:center;color:var(--dg-texto-3);font-size:14px}
 .filtro-vazio[hidden]{display:none}
 #alertasMensagem{display:none!important}
-/* número de avisos no avatar dos outros agentes */
-#avatares .avt-badge{position:absolute;top:-4px;right:-5px;min-width:16px;height:16px;border-radius:8px;padding:0 4px;
-  background:var(--dg-azul);color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;box-shadow:0 0 0 2px var(--dg-fundo);z-index:4}
-#avatares .avt-badge.pede{background:var(--dg-pedido-borda);color:#1a1300}
 
 /* cartão de arquivo refinado, nos dois temas (18/10/2026): selo do tipo, nome, tamanho e o
    botão de baixar contornado com ícone de traço, no lugar do emoji e do fundo verde-claro */

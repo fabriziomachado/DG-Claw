@@ -247,24 +247,40 @@ document.addEventListener('dgavatar', ev => {
   }
 });
 
-/* Grupo de avatares dos outros agentes no topo, à esquerda do agente aberto (18/10/2026, a
-   pedido do dono, no estilo do "avatar group" do shadcn): sobrepostos com borda branca, o
-   grupo se abre no hover e um toque troca de conversa sem abrir o menu. */
+/* Fileira de agentes abaixo do cabeçalho (18/10/2026, pedido do dono, no lugar do grupo sobreposto):
+   todos lado a lado, com o nome embaixo, o aberto sublinhado, um anel e um número quando há aviso não
+   visto, e um "+" que leva ao Admin para criar outro. Um toque troca de conversa. */
 (function () {
-  const outros = agentesMenu.filter(a => a.id !== AGENTE.id);
-  if (!outros.length) return;
+  if (agentesMenu.length < 2) return;
   const nav = document.createElement('nav');
-  nav.id = 'avatares';
+  nav.id = 'fileira';
   nav.setAttribute('aria-label', 'Trocar de agente');
-  nav.innerHTML = outros.map(a => {
+  const foto = a => {
     const img = a.avatar_img || (/^https:\/\//i.test(a.avatar || '') ? a.avatar : '');
-    const dentro = img ? `<img src="${esc(img)}" alt="">` : esc(a.avatar || (a.nome || '?').slice(0, 1));
-    return `<a class="avt" href="/a/${encodeURIComponent(a.id)}" data-avt="${esc(a.id)}" ` +
-           `aria-label="${esc('Conversar com ' + a.nome)}"><span class="avt-foto" style="background:${esc(a.cor || '#2f9e5e')}">${dentro}</span>` +
-           `<span class="avt-nome" aria-hidden="true">${esc(a.nome)}</span></a>`;
-  }).join('');
-  if (avEl && avEl.parentNode) avEl.parentNode.insertBefore(nav, avEl);
-  // número discreto no avatar de cada outro agente: avisos não vistos (amarelo se algum pede decisão)
+    return img ? `<img src="${esc(img)}" alt="">` : esc(a.avatar || (a.nome || '?').slice(0, 1));
+  };
+  const admin = agentesMenu.find(a => a.tipo === 'admin');
+  nav.innerHTML = (admin ? `<a class="fil novo" href="/a/${encodeURIComponent(admin.id)}#criar" aria-label="Criar um agente novo">` +
+      `<span class="fil-foto"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>` +
+      `<span class="fil-nome">Novo</span></a>` : '') +
+    agentesMenu.map(a => {
+      const atual = a.id === AGENTE.id;
+      return `<a class="fil${atual ? ' atual' : ''}" href="/a/${encodeURIComponent(a.id)}" data-avt="${esc(a.id)}"` +
+        `${atual ? ' aria-current="page"' : ''} aria-label="${esc((atual ? 'Conversa aberta: ' : 'Conversar com ') + a.nome)}">` +
+        `<span class="fil-foto" style="background:${esc(a.cor || '#2f9e5e')}">${foto(a)}</span>` +
+        `<span class="fil-nome">${esc(a.nome)}</span></a>`;
+    }).join('');
+  const cab = $('cabecalho');
+  if (cab && cab.parentNode) cab.parentNode.insertBefore(nav, cab.nextSibling);
+  const at = nav.querySelector('.atual');
+  if (at && at.scrollIntoView) at.scrollIntoView({ block: 'nearest', inline: 'center' });
+  document.addEventListener('dgavatar', ev => {
+    const d = ev.detail || {};
+    const el = nav.querySelector('[data-avt="' + CSS.escape(d.id || '') + '"] .fil-foto');
+    if (el) el.innerHTML = foto(Object.assign({}, agentesMenu.find(a => a.id === d.id) || {}, d));
+  });
+  // número discreto e anel em cada outro agente: avisos não vistos (amarelo se algum pede decisão)
+  const outros = agentesMenu.filter(a => a.id !== AGENTE.id);
   async function badges() {
     if (document.hidden) return;
     for (const a of outros) {
@@ -276,17 +292,24 @@ document.addEventListener('dgavatar', ev => {
       } catch (_) { continue; }
       const el = nav.querySelector('[data-avt="' + CSS.escape(a.id) + '"]');
       if (!el) continue;
-      let b = el.querySelector('.avt-badge');
-      if (!lista.length) { if (b) b.remove(); continue; }
-      if (!b) { b = document.createElement('span'); b.className = 'avt-badge'; el.appendChild(b); }
+      let b = el.querySelector('.fil-badge');
+      el.classList.toggle('aviso', lista.length > 0);
+      el.classList.toggle('pede', lista.some(x => x.tipo === 'pedido'));
+      if (!lista.length) { if (b) b.remove(); el.setAttribute('aria-label', 'Conversar com ' + a.nome); continue; }
+      if (!b) { b = document.createElement('span'); b.className = 'fil-badge'; el.appendChild(b); }
       b.textContent = lista.length > 9 ? '9+' : String(lista.length);
-      b.classList.toggle('pede', lista.some(x => x.tipo === 'pedido'));
       el.setAttribute('aria-label', 'Conversar com ' + a.nome + ' (' + lista.length + ' aviso' + (lista.length > 1 ? 's' : '') + ' não visto' + (lista.length > 1 ? 's' : '') + ')');
     }
   }
   badges(); setInterval(badges, 30000);
   document.addEventListener('visibilitychange', badges);
 })();
+/* O "+" da fileira abre o Admin com o pedido de criar um agente já escrito. */
+if (EH_ADMIN && location.hash === '#criar') {
+  history.replaceState(null, '', location.pathname + location.search);
+  if (!entrada.value.trim()) entrada.value = 'Quero criar um agente novo';
+  setTimeout(() => { try { entrada.focus(); entrada.dispatchEvent(new Event('input')); } catch (_) {} }, 300);
+}
 entrada.placeholder = 'Pergunte ao ' + AGENTE.nome;
 if (EH_ADMIN) $('avisoAdmin').hidden = false;
 if (!caps.microfone) document.documentElement.classList.add('sem-mic');

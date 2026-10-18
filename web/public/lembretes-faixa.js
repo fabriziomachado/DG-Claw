@@ -59,7 +59,7 @@
     faixa.setAttribute('aria-live', 'polite');
     faixa.setAttribute('aria-label', 'Lembretes tocando agora');
     faixa.hidden = true;
-    faixa.innerHTML = '<div class="lf-topo"><span class="lf-tit">⏰ Lembretes</span>' +
+    faixa.innerHTML = '<div class="lf-topo"><span class="lf-tit"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="vertical-align:-3px;margin-right:6px"><path d="M18 16v-5a6 6 0 0 0-12 0v5l-1.5 2h15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg>Lembretes</span>' +
       '<a class="lf-ver" href="/lembretes">ver todos</a>' +
       '<button type="button" class="lf-ajuda" id="faixaLembretesAjuda" aria-label="Tutorial da faixa de lembretes" ' +
       'title="O que é esta faixa">?</button></div><ul class="lf-lista" id="faixaLembretesLista"></ul>' +

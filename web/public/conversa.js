@@ -70,7 +70,7 @@ function montaFileira(lista, atualId) {
       `<span class="fil-nome">Novo</span></a>` : '') +
     lista.map(a => {
       const atual = a.id === atualId;
-      return `<a class="fil${atual ? ' atual' : ''}" href="/a/${encodeURIComponent(a.id)}" data-avt="${escF(a.id)}"` +
+      return `<a class="fil${atual ? ' atual' : ''}" href="/a/${encodeURIComponent(a.id)}" data-avt="${escF(a.id)}" style="--arco:${escF(a.cor || '#2f9e5e')}"` +
         `${atual ? ' aria-current="page"' : ''} aria-label="${escF((atual ? 'Conversa aberta: ' : 'Conversar com ') + a.nome)}">` +
         `<span class="fil-foto" style="background:${escF(a.cor || '#2f9e5e')}">${fotoFileira(a)}</span>` +
         `<span class="fil-nome">${escF(a.nome)}</span></a>`;
@@ -350,7 +350,27 @@ document.addEventListener('dgavatar', ev => {
   }
   badges(); setInterval(badges, 30000);
   document.addEventListener('visibilitychange', badges);
+  // borda girando em quem está trabalhando: o aberto vem do stream (integraAtividade), os outros daqui
+  async function quemTrabalha() {
+    if (document.hidden) return;
+    let d = null;
+    try {
+      const r = await fetch('/api/v1/atividade', { credentials: 'same-origin', cache: 'no-store' });
+      if (r.ok) d = await r.json();
+    } catch (_) { return; }
+    if (!d || !d.agentes) return;
+    for (const a of outros) marcaTrabalhando(a.id, (d.agentes[a.id] || {}).estado === 'trabalhando');
+  }
+  quemTrabalha(); setInterval(quemTrabalha, 6000);
+  document.addEventListener('visibilitychange', quemTrabalha);
 })();
+function marcaTrabalhando(id, sim) {
+  const el = document.querySelector('#fileira [data-avt="' + CSS.escape(id) + '"]');
+  if (!el || el.classList.contains('trab') === sim) return;
+  el.classList.toggle('trab', sim);
+  const nome = (agentesMenu.find(a => a.id === id) || {}).nome || id;
+  if (id !== AGENTE.id) el.title = sim ? nome + ' está trabalhando' : '';
+}
 /* O "+" da fileira abre o cartão "criar um agente novo" do Admin (onboarding.js). Já na conversa do
    Admin o toque abre direto; de outro agente, o link leva ao Admin com #criar e ele abre ao carregar. */
 function abreCriacao() {
@@ -590,6 +610,7 @@ function integraAtividade(d) {
   if (!d || !d.agentes) return;
   if (typeof d.agora === 'number') atvDeslocaMs = d.agora * 1000 - Date.now();
   window.atividadeFoto = d;
+  if (d.agentes[AGENTE.id]) marcaTrabalhando(AGENTE.id, d.agentes[AGENTE.id].estado === 'trabalhando');
   // começou ou terminou de trabalhar: o resumo "Fez N passos" do último pedido some ou aparece
   const est = d.agentes[AGENTE.id];
   const trabalha = !!(est && est.estado === 'trabalhando');

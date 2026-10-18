@@ -329,6 +329,19 @@ function criarServidor(opcoes) {
 
     if (p === '/api/v1/eu' && m === 'GET') return H.enviaJson(res, 200, { ok: true, usuario: sessao.usuario });
 
+    // Quem está trabalhando agora, todos de uma vez (18/10/2026): a borda que gira na fileira de agentes.
+    // Só o estado, sem passo nem detalhe; a caixa do agente não lê isto.
+    if (p === '/api/v1/atividade' && m === 'GET') {
+      if (sessao.via === 'caixa') return H.erroJson(res, 403, 'A atividade dos agentes só é vista pelo dono, no navegador.');
+      if (falhaDoRegistro(req, res, true)) return undefined;
+      const agentes = {};
+      await Promise.all(registro.estado().agentes.map(async (a) => {
+        try { const e = await conversa.atividade(a); agentes[a.slug] = { estado: e.estado }; }
+        catch (_) { agentes[a.slug] = { estado: 'sem_sinal' }; }
+      }));
+      return H.enviaJson(res, 200, { ok: true, agentes });
+    }
+
     if (p === '/api/v1/agents' && m === 'GET') {
       if (falhaDoRegistro(req, res, true)) return undefined;
       const lista = await Promise.all(registro.estado().agentes.map(agentePublico));

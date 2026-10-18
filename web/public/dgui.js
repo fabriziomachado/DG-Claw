@@ -306,6 +306,7 @@
     if (c.tipo === 'grafico' || c.tipo === 'gráfico') return grafico(c);
     if (c.tipo === 'leitura') return leitura(c);
     if (c.tipo === 'escolha') return escolha(c);
+    if (c.tipo === 'painel' && Array.isArray(c.filtros) && c.filtros.length && c.variantes && typeof c.variantes === 'object') return painelComFiltros(c, fundo);
     if (c.tipo === 'painel') {
       // a fonte do painel vale para os gráficos de dentro (sai na imagem baixada), sem repetir na tela
       const herda = (Array.isArray(c.itens) ? c.itens : []).map((it) => (it && typeof it === 'object' && !Array.isArray(it) && !it.fonte && c.fonte
@@ -313,11 +314,48 @@
       // a leitura do especialista sai do cartão e fica logo abaixo dele, como bloco próprio
       const leituras = herda.filter((it) => it && it.tipo === 'leitura');
       const resto = herda.filter((it) => !(it && it.tipo === 'leitura'));
+      if (c._semTitulo) return grade(resto, fundo) + leituras.map(leitura).join('');
       return `<div class="dgui-painel">${c.titulo ? `<div class="dgui-painel-tit">${txt(c.titulo)}</div>` : ''}${grade(resto, fundo)}${rodape(c)}</div>` +
         leituras.map(leitura).join('');
     }
     return aviso('tipo "' + String(c.tipo || '').slice(0, 20) + '" desconhecido (use kpi, tabela, grafico ou painel)');
   }
+  /* Filtros no painel (18/10/2026, ideia 3): o agente manda "filtros" ([{nome, opcoes, padrao}]) e
+     "variantes" ({"2025|Proen": [itens]}, a chave é a escolha de cada filtro na ordem, unida por "|").
+     Trocar o filtro só troca os itens desenhados, com os dados que já vieram; a escolha fica guardada
+     por painel (selecoes) para sobreviver ao redesenho da conversa. */
+  const selecoes = new Map();
+  const filtrosDe = (c) => c.filtros.slice(0, 3).map((f) => ({ nome: String(f.nome || ''), opcoes: (Array.isArray(f.opcoes) ? f.opcoes : []).map(String).slice(0, 40), padrao: f.padrao != null ? String(f.padrao) : null }))
+    .filter((f) => f.opcoes.length);
+  function corpoFiltrado(c, sel, fundo) {
+    const itens = c.variantes[sel.join('|')];
+    if (!Array.isArray(itens)) return `<div class="dgui-aviso dgui-sem-dados">Sem dados para ${esc(sel.join(' · '))}.</div>`;
+    return componente(normaliza({ tipo: 'painel', itens, fonte: c.fonte, atualizado: c.atualizado, _semTitulo: true }, 1), fundo + 1);
+  }
+  function painelComFiltros(c, fundo) {
+    const fs = filtrosDe(c);
+    const k = chave({ f: c.filtros, t: c.titulo, v: Object.keys(c.variantes) });
+    registro.set(k, c);
+    let sel = selecoes.get(k);
+    if (!sel) { sel = fs.map((f) => (f.padrao && f.opcoes.includes(f.padrao) ? f.padrao : f.opcoes[0])); selecoes.set(k, sel); }
+    const barra = fs.map((f, i) => (f.opcoes.length <= 5
+      ? `<div class="dgui-filtro" role="group" aria-label="${txt(f.nome)}">` + f.opcoes.map((o) => `<button type="button" class="dgui-fchip" data-dgui-filtro="${k}" data-fi="${i}" data-fv="${txt(o)}" aria-pressed="${o === sel[i]}">${txt(o)}</button>`).join('') + '</div>'
+      : `<label class="dgui-filtro dgui-fsel"><span>${txt(f.nome)}</span><select data-dgui-filtro="${k}" data-fi="${i}">` + f.opcoes.map((o) => `<option${o === sel[i] ? ' selected' : ''}>${txt(o)}</option>`).join('') + '</select></label>')).join('');
+    return `<div class="dgui-painel dgui-painel-filtros" data-dgui-painel="${k}">${c.titulo ? `<div class="dgui-painel-tit">${txt(c.titulo)}</div>` : ''}` +
+      `<div class="dgui-filtros">${barra}</div><div class="dgui-painel-corpo">${corpoFiltrado(c, sel, fundo)}</div>${rodape(c)}</div>`;
+  }
+  function trocaFiltro(el, valor) {
+    const k = el.dataset.dguiFiltro, i = Number(el.dataset.fi);
+    const c = registro.get(k), sel = selecoes.get(k);
+    if (!c || !sel) return;
+    sel[i] = valor;
+    for (const caixa of raiz.document.querySelectorAll('[data-dgui-painel="' + k + '"]')) {
+      caixa.querySelectorAll('.dgui-fchip[data-fi="' + i + '"]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.fv === valor)));
+      const corpo = caixa.querySelector('.dgui-painel-corpo');
+      if (corpo) corpo.innerHTML = corpoFiltrado(c, sel, 0);
+    }
+  }
+
   // KPIs seguidos ficam lado a lado numa fileira; o resto ocupa a largura toda
   function grade(itens, fundo) {
     if (fundo > 3) return '';
@@ -605,6 +643,8 @@
       if (th) { ordena(th); return; }
       const acao = ev.target.closest('[data-dgui-acao]');
       if (acao) { age(acao); return; }
+      const fchip = ev.target.closest('.dgui-fchip[data-dgui-filtro]');
+      if (fchip) { trocaFiltro(fchip, fchip.dataset.fv); return; }
       const leg = ev.target.closest('[data-dgui-serie]');
       if (leg) { alternaSerie(leg); return; }
       const pt = ev.target.closest('[data-dgui-ponto]');
@@ -631,6 +671,10 @@
       }
       const sug = ev.target.closest('[data-dgui-pergunta]');
       if (sug) raiz.document.dispatchEvent(new CustomEvent('dgui-pergunta', { detail: { texto: sug.dataset.dguiPergunta } }));
+    });
+    raiz.document.addEventListener('change', (ev) => {
+      const sel = ev.target.closest && ev.target.closest('select[data-dgui-filtro]');
+      if (sel) trocaFiltro(sel, sel.value);
     });
     raiz.document.addEventListener('keydown', (ev) => {
       if ((ev.key === 'Enter' || ev.key === ' ') && ev.target.closest && ev.target.closest('[data-dgui-ponto]')) { ev.preventDefault(); abreBalao(ev.target.closest('[data-dgui-ponto]'), null); return; }

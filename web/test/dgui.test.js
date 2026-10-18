@@ -131,3 +131,14 @@ test('interativo: pontos tocáveis e legenda clicável nos gráficos', () => {
     assert.ok(!/ (cx|x)=""/.test(h), f + ': atributo quebrado');
   }
 });
+
+test('filtros no painel: desenha a variante padrão e avisa quando falta a combinação', () => {
+  const D = require('../public/dgui.js');
+  const kpi = (v) => [{ tipo: 'kpi', titulo: 'N', valor: v }];
+  const h = D.blocoParaHtml('dgui\n' + JSON.stringify({ tipo: 'painel', titulo: 'P',
+    filtros: [{ nome: 'Ano', opcoes: ['2024', '2025'], padrao: '2025' }], variantes: { 2024: kpi('7'), 2025: kpi('9') } }));
+  assert.ok(h.includes('data-dgui-filtro') && h.includes('aria-pressed="true">2025<'));
+  assert.ok(/dgui-kpi-valor">9</.test(h) && !/dgui-kpi-valor">7</.test(h));
+  const falta = D.blocoParaHtml('dgui\n' + JSON.stringify({ tipo: 'painel', filtros: [{ nome: 'Ano', opcoes: ['2023'] }], variantes: { 2025: kpi('9') } }));
+  assert.ok(falta.includes('Sem dados para 2023'));
+});

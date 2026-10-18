@@ -1452,6 +1452,8 @@ const VIS_PRONTO_MS = 12000;
 const VIS_ALT_MIN = 40;
 const visuais = new Map();          // contentWindow -> estado (balão e tela cheia)
 const visEstados = new Set();       // estados dos balões na conversa
+// trocou o tema (tema.js): os visuais abertos acompanham na hora
+document.addEventListener('dgtema', () => { for (const est of visEstados) enviaAoVisual(est, { tipo: 'tema', valor: temaApp() }); });
 const visPorCaixa = new WeakMap();  // .visq -> estado
 const visAlturas = new Map();       // id da mídia -> última altura (sobrevive ao nó refeito)
 

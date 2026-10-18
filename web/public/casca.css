@@ -1,3 +1,4 @@
+@import url('/tema.css');
 /* casca.css: o cabeçalho e a gaveta do menu da tela de Conversa, para as outras telas (Mesa, Lembretes,
    Avisos e o painel do agente). Montados pelo casca.js. Carregue este arquivo ANTES do menu-lado.css:
    as regras da gaveta aqui têm a mesma força das do computador (barra fixa) lá, e a última vence. O visual do cabeçalho e da gaveta é copiado do
@@ -13,7 +14,7 @@ html.casca #cabecalho,html.casca #cabecalho *,aside#menu,aside#menu *,#overlayMe
 html.casca #cabecalho,aside#menu{
   --line:rgba(0,0,0,.08);--muted:#6c8172;--txt:#0f1c14;
   font:15.5px/1.46 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;color:var(--txt)}
-html.casca #cabecalho{position:sticky;top:0;z-index:20;min-height:58px;background:#fff;
+html.casca #cabecalho{position:sticky;top:0;z-index:20;min-height:58px;background:var(--dg-superficie);
   border-bottom:1px solid var(--line);box-shadow:0 1px 4px rgba(0,0,0,.08);
   display:flex;align-items:center;gap:10px;padding:4px 12px;padding-top:calc(4px + env(safe-area-inset-top))}
 html.casca #cabecalho .av{width:40px;height:40px;border-radius:50%;flex:0 0 40px;display:flex;align-items:center;
@@ -24,7 +25,7 @@ html.casca #cabecalho .who b{display:block;font-size:15.5px;font-weight:600;whit
 html.casca #cabecalho .who span{display:block;font-size:12.5px;color:var(--accent,#2f9e5e);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 html.casca #cabecalho .btn{border:1px solid var(--line);border-radius:18px;padding:8px 12px;font:inherit;font-size:13px;
-  font-weight:600;cursor:pointer;background:#f2f6f2;color:#38523f;white-space:nowrap;min-height:44px;min-width:44px}
+  font-weight:600;cursor:pointer;background:var(--dg-superficie-2);color:var(--dg-texto-2);white-space:nowrap;min-height:44px;min-width:44px}
 html.casca #cabecalho .btn:active{opacity:.7}
 html.casca #cabecalho .btn.ghost{background:transparent;border-color:transparent;color:var(--muted);padding:8px;font-size:20px}
 @media (max-width:700px){
@@ -35,7 +36,7 @@ html.casca #cabecalho .btn.ghost{background:transparent;border-color:transparent
 /* gaveta do menu (celular) e véu */
 #overlayMenu{position:fixed;inset:0;background:rgba(10,24,16,.45);z-index:40;display:none}
 #overlayMenu.abre{display:block}
-aside#menu{position:fixed;top:0;bottom:0;left:0;width:min(84vw,310px);background:#fff;z-index:41;
+aside#menu{position:fixed;top:0;bottom:0;left:0;width:min(84vw,310px);background:var(--dg-superficie);z-index:41;
   display:flex;flex-direction:column;box-shadow:2px 0 14px rgba(0,0,0,.2);
   transform:translateX(-102%);transition:transform .22s ease}
 aside#menu.abre{transform:translateX(0)}
@@ -43,12 +44,12 @@ aside#menu .pe{flex:0 0 auto;border-top:1px solid var(--line);padding:4px 8px 2p
 aside#menu .pe .conta{display:flex;align-items:center;justify-content:space-between;gap:8px;
   min-height:36px;padding:0 4px 0 8px}
 aside#menu .pe form{margin:0;margin-left:auto}
-aside#menu .pe .sair{min-height:36px;padding:0 16px;font:inherit;font-size:13px;font-weight:600;color:#38523f;
-  border:1px solid var(--line);background:#fff;border-radius:18px;cursor:pointer}
+aside#menu .pe .sair{min-height:36px;padding:0 16px;font:inherit;font-size:13px;font-weight:600;color:var(--dg-texto-2);
+  border:1px solid var(--line);background:var(--dg-superficie);border-radius:18px;cursor:pointer}
 aside#menu .fechar{position:absolute;top:calc(8px + env(safe-area-inset-top));right:8px;
   border:0;background:transparent;font-size:20px;color:var(--muted);min-width:44px;min-height:44px;cursor:pointer}
 aside#menu .gm-tut{min-height:36px;padding:0 12px;border-radius:18px;border:1px solid var(--line);
-  background:#fff;color:#38523f;font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+  background:var(--dg-superficie);color:var(--dg-texto-2);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
 
 /* computador: barra fixa, sem ☰ (o body ganha padding-left:240px no menu-lado.css, que precisa vir DEPOIS deste arquivo) */
 
@@ -59,30 +60,29 @@ html.casca,html.casca body{max-width:100%;overflow-x:hidden}
 html.casca #tourFundo{position:fixed;inset:0;z-index:90}
 html.casca #tourLuz{position:fixed;z-index:91;border-radius:10px;pointer-events:none;
   box-shadow:0 0 0 9999px rgba(10,24,16,.66);outline:2px solid #fff}
-html.casca #tourCaixa{position:fixed;z-index:92;left:12px;right:12px;max-width:400px;margin:0 auto;background:#fff;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;color:#0f1c14;border-radius:14px;padding:14px 16px;box-shadow:0 6px 28px rgba(0,0,0,.35);
+html.casca #tourCaixa{position:fixed;z-index:92;left:12px;right:12px;max-width:400px;margin:0 auto;background:var(--dg-superficie);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;color:var(--dg-texto);border-radius:14px;padding:14px 16px;box-shadow:0 6px 28px rgba(0,0,0,.35);
   font-size:14px;line-height:1.45;max-height:70dvh;overflow-y:auto}
 html.casca #tourCaixa:focus{outline:none}
 html.casca #tourCaixa h4{margin:0 0 2px;font-size:15.5px}
-html.casca #tourCaixa .tour-n{font-size:11.5px;color:#6c8172;margin-bottom:6px}
+html.casca #tourCaixa .tour-n{font-size:11.5px;color:var(--dg-texto-2);margin-bottom:6px}
 html.casca #tourCaixa p{margin:0 0 6px}
 html.casca #tourCaixa p b{color:#1f7a45}
 html.casca #tourCaixa .tour-acoes{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}
-html.casca #tourCaixa button{min-height:36px;padding:0 14px;border-radius:18px;border:1px solid #e1e8e3;
-  background:#fff;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;color:#38523f}
+html.casca #tourCaixa button{min-height:36px;padding:0 14px;border-radius:18px;border:1px solid var(--dg-borda);
+  background:var(--dg-superficie);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--dg-texto-2)}
 html.casca #tourCaixa button.pri{background:#2f9e5e;border-color:#2f9e5e;color:#fff}
 html.casca #tourCaixa button:disabled{opacity:.4;cursor:default}
 html.casca #tourCaixa .tour-x{margin-right:auto}
 
-/* Modo claro com o mesmo fundo da Conversa (18/10/2026, a pedido do dono): quase branco
-   (#fbfbfb) atrás da página e do cabeçalho, sem linha nem sombra embaixo dele. Vale para
-   Mesa, Lembretes, Avisos e o painel do agente, que carregam este arquivo. O modo escuro
-   de cada tela fica como estava. */
-@media (prefers-color-scheme:light){
-  html.casca:not([data-tema="escuro"]){--fundo:#fbfbfb;--header:#fbfbfb;--bg:#fbfbfb}
-  html.casca:not([data-tema="escuro"]) body,html.casca:not([data-tema="escuro"]) body.lp{--lp-fundo:#fbfbfb;background:#fbfbfb}
-  html.casca:not([data-tema="escuro"]) #cabecalho{background:#fbfbfb;border-bottom:0;box-shadow:none}
-}
-html.casca[data-tema="claro"]{--fundo:#fbfbfb;--header:#fbfbfb;--bg:#fbfbfb}
-html.casca[data-tema="claro"] body,html.casca[data-tema="claro"] body.lp{--lp-fundo:#fbfbfb;background:#fbfbfb}
-html.casca[data-tema="claro"] #cabecalho{background:#fbfbfb;border-bottom:0;box-shadow:none}
+/* Fundo da Conversa nas outras telas (18/10/2026): o cabeçalho e a página usam a paleta
+   (tema.css), então seguem o tema escolhido. Cada tela ainda pinta o próprio conteúdo. */
+html.casca{--fundo:var(--dg-fundo);--header:var(--dg-fundo);--bg:var(--dg-fundo);--lp-fundo:var(--dg-fundo)}
+html.casca body,html.casca body.lp{--lp-fundo:var(--dg-fundo);background:var(--dg-fundo)}
+html.casca #cabecalho{background:var(--dg-fundo);border-bottom:0;box-shadow:none}
+html.casca #cabecalho,aside#menu{--line:var(--dg-borda);--muted:var(--dg-texto-2);--txt:var(--dg-texto)}
+/* painel do agente: as cores dele (panel/public/css/main.css) passam a vir da paleta, para os cartões
+   terem o mesmo tom das outras telas nos dois temas. :not(#x) só ganha a disputa com o
+   html[data-tema="escuro"] do painel, que é carregado depois. */
+html.casca:not(#x){--painel:var(--dg-superficie);--fundo2:var(--dg-superficie-2);--linha:var(--dg-borda);
+  --texto:var(--dg-texto);--fraco:var(--dg-texto-2)}

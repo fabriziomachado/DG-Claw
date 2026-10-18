@@ -8,7 +8,8 @@
    Celular: gaveta (o #menu, o véu #overlayMenu e o ☰ continuam sendo do conversa.css).
    Computador (>= 1100px): barra fixa de 240px à esquerda, sem ☰ e sem véu. */
 aside#menu{
-  --ml-painel:#fff; --ml-fundo2:#f0f4f1; --ml-linha:#e1e8e3; --ml-texto:#0f1c14; --ml-fraco:#6c8172;
+  --ml-painel:var(--dg-lado,#fff); --ml-fundo2:var(--dg-superficie-2,#f0f4f1); --ml-linha:var(--dg-borda,#e1e8e3);
+  --ml-texto:var(--dg-texto,#0f1c14); --ml-fraco:var(--dg-texto-2,#6c8172);
   --ml-a1:var(--accent); --ml-a2:color-mix(in srgb,var(--accent) 70%,#1d3b8f);
   background:var(--ml-painel);color:var(--ml-texto);overflow-y:auto;overflow-x:hidden;
   padding:22px 14px 10px;gap:14px;
@@ -37,7 +38,7 @@ aside#menu{
 .ml-troca > button:hover{background:var(--ml-fundo2);color:var(--ml-texto)}
 .ml-seta{opacity:.7}
 .ml-lista{position:absolute;z-index:5;top:calc(100% + 6px);left:0;right:0;background:var(--ml-painel);
-  border:1px solid var(--ml-linha);border-radius:12px;box-shadow:0 8px 24px rgba(16,20,40,.14);padding:6px;
+  border:1px solid var(--ml-linha);border-radius:12px;box-shadow:var(--dg-sombra,0 8px 24px rgba(16,20,40,.14));padding:6px;
   display:none;max-height:50vh;overflow-y:auto;text-align:left}
 .ml-troca.aberto .ml-lista{display:block}
 .ml-ag{display:flex;align-items:center;gap:9px;min-height:44px;padding:6px 8px;border-radius:9px;
@@ -87,3 +88,12 @@ aside#menu .pe{margin-top:auto;padding-top:6px}
   /* as faixas são fixed e nasciam coladas na borda da tela, por baixo do menu */
   .faixa{left:248px}
 }
+
+/* seletor de tema em Configurações: Automático, Claro, Escuro (18/10/2026) */
+.ml-tema{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:9px 10px;font-size:14px;color:var(--ml-fraco)}
+.ml-tema-rot{flex:1}
+.ml-tema-opcoes{display:flex;flex:0 0 100%;background:var(--ml-fundo2);border-radius:10px;padding:3px;gap:2px}
+.ml-tema-opcoes button{flex:1;min-height:32px;border:0;border-radius:8px;background:transparent;color:var(--ml-fraco);
+  font:inherit;font-size:12px;cursor:pointer;padding:0 2px;white-space:nowrap}
+.ml-tema-opcoes button:hover{color:var(--ml-texto)}
+.ml-tema-opcoes button.on{background:var(--dg-superficie,#fff);color:var(--ml-texto);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}

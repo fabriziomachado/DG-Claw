@@ -747,6 +747,15 @@ header #btnMesa,header #btnLembretes,header #btnTutorial,header #btnSigilo{displ
   #fileira .fil-badge{left:calc(50% + 9px)}
 }
 @media(prefers-reduced-motion:reduce){#fileira .fil-foto{transition:none}}
+/* a fileira mora no cabeçalho: some o avatar e o nome soltos; o estado vai para baixo do nome do aberto */
+header.com-fileira{height:auto;align-items:center}
+header.com-fileira #av,header.com-fileira #who{display:none}
+header.com-fileira #fileira{flex:1 1 auto;min-width:0;padding:2px 0 0;border-bottom:0;background:transparent}
+#fileira .fil-estado{display:block;max-width:70px;margin-top:-3px;font-size:11px;line-height:1.2;color:var(--dg-texto-3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#fileira .fil-estado[hidden],#fileira .fil-estado:empty{display:none}
+#fileira .fil.atual{padding-bottom:8px}
+#fileira .fil.atual::after{bottom:1px}
 
 /* avisos de entrega e pedido como cartões claros e suaves, no tom do resto da conversa
    (18/10/2026). As cores vêm da paleta (tema.css), então valem nos dois temas. */

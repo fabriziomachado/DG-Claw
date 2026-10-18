@@ -98,7 +98,7 @@
           '<button type="button" role="tab" data-hist-aba="memorias" aria-selected="false">Memórias</button>' +
         '</nav>' +
         '<div class="hist-corpo" data-corpo="conversas">' +
-          `<form class="hist-busca" role="search">${ICO.lupa}<input type="search" id="histQ" placeholder="Buscar por assunto, nome ou número" autocomplete="off" enterkeyhint="search" aria-label="Buscar no histórico"></form>` +
+          `<form class="hist-busca" role="search">${ICO.lupa}<input type="search" id="histQ" placeholder="Buscar nas conversas e memórias" autocomplete="off" enterkeyhint="search" aria-label="Buscar no histórico"></form>` +
           '<div class="hist-so" role="radiogroup" aria-label="Onde buscar">' +
             '<button type="button" data-so="" aria-checked="true" role="radio">Tudo</button>' +
             '<button type="button" data-so="conversas" aria-checked="false" role="radio">Só conversas</button>' +
@@ -122,6 +122,8 @@
         return;
       }
       const arq = ev.target.closest('[data-arquivo]'); if (arq) return abreArquivo(arq.dataset.arquivo, arq.dataset.trecho || '');
+      const av = ev.target.closest('[data-arquivada]'); if (av) return abreArquivada(av.dataset.arquivada);
+      const nova = ev.target.closest('[data-hist-nova]'); if (nova) return novaConversa(nova);
       const vai = ev.target.closest('[data-ir]'); if (vai) return irPara(vai);
       if (ev.target.closest('[data-hist-volta]')) return mostraAba(aba);
       const sug = ev.target.closest('[data-sugestao]');
@@ -144,10 +146,80 @@
     if (qual === 'conversas' && !ultimaBusca) inicioConversas();
   }
 
-  function inicioConversas() {
-    el.querySelector('#histResultados').innerHTML =
-      `<div class="hist-vazio">${ICO.lupa}<p>Digite uma palavra para achar o que vocês já conversaram e o que ${esc(agente.nome)} anotou.</p>` +
-      '<p class="hist-dica">Ele também acha sozinho quando você pergunta "lembra quando…" na conversa.</p></div>';
+  /* Sem busca, a aba Conversas mostra as arquivadas: o que cada /clear (ou "Nova conversa") tirou da tela. */
+  async function inicioConversas() {
+    const lista = el.querySelector('#histResultados');
+    const meu = ++pedido;
+    const cab = '<div class="hist-arq-cab"><h3 class="hist-dia">Conversas arquivadas</h3>' +
+      '<button type="button" class="hist-nova" data-hist-nova>Nova conversa</button></div>';
+    lista.innerHTML = cab + '<p class="hist-carregando">Carregando…</p>';
+    let arq = [];
+    try { arq = (await api('/arquivadas')).arquivadas || []; } catch (e) {
+      if (meu === pedido) lista.innerHTML = cab + `<p class="hist-erro">Não consegui trazer as conversas arquivadas: ${esc(e.message)}</p>`;
+      return;
+    }
+    if (meu !== pedido) return;
+    if (!arq.length) {
+      lista.innerHTML = cab + `<div class="hist-vazio">${ICO.relogio.replace('width="16" height="16"', 'width="28" height="28"')}` +
+        '<p>Nenhuma conversa arquivada ainda.</p>' +
+        '<p class="hist-dica">Toque em <b>Nova conversa</b> (ou mande /clear no chat): a conversa de agora vem para cá e a tela recomeça limpa. ' +
+        `Para achar algo, digite uma palavra na busca acima.</p></div>`;
+      return;
+    }
+    let html = cab + '<ul class="hist-itens">';
+    for (const a of arq) {
+      html += `<li><button type="button" class="hist-item arquivada" data-arquivada="${esc(a.id)}">` +
+        `<span class="hist-arq-titulo">${esc(a.titulo)}</span>` +
+        `<span class="hist-quem">${esc(periodo(a.de, a.ate))} · ${a.total === 1 ? '1 mensagem' : a.total + ' mensagens'}</span>` +
+        (a.previa ? `<span class="hist-previa">${esc(a.previa)}</span>` : '') + '</button></li>';
+    }
+    lista.innerHTML = html + '</ul>';
+  }
+
+  // "18 de outubro, 07:13 a 10:58" (ep em segundos)
+  function periodo(de, ate) {
+    const d1 = new Date(de * 1000), d2 = new Date(ate * 1000);
+    const dia = (d) => diaHumano(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    const h = (d) => hhmm(d.getTime());
+    return dia(d1) === dia(d2) ? `${dia(d1)}, ${h(d1)} a ${h(d2)}` : `${dia(d1)} ${h(d1)} a ${dia(d2).toLowerCase()} ${h(d2)}`;
+  }
+
+  async function abreArquivada(id) {
+    const leitor = el.querySelector('[data-corpo="leitor"]');
+    for (const c of el.querySelectorAll('[data-corpo]')) c.hidden = c !== leitor;
+    el.querySelector('.hist-abas').hidden = true;
+    leitor.innerHTML = `<header class="hist-leitor-cab"><button type="button" class="hist-volta" data-hist-volta aria-label="Voltar">${ICO.voltar}</button>` +
+      '<div><b>Conversa arquivada</b><small>Carregando…</small></div></header><div class="hist-texto hist-conversa"></div>';
+    try {
+      const d = await api('/arquivadas/' + encodeURIComponent(id));
+      leitor.querySelector('b').textContent = d.arquivada.titulo;
+      leitor.querySelector('small').textContent = `${periodo(d.arquivada.de, d.arquivada.ate)} · ${d.arquivada.total} mensagens`;
+      let html = '', dia = '';
+      for (const m of d.msgs) {
+        const dt = new Date(m.ep * 1000);
+        const dd = diaHumano(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`);
+        if (dd !== dia) { dia = dd; html += `<p class="hist-conv-dia">${esc(dd)}</p>`; }
+        const dono = m.origin === 'dono';
+        const anexo = m.media ? `<span class="hist-conv-anexo">${ICO.nota}${esc(m.media.nome || 'arquivo')}</span>` : '';
+        const corpo = String(m.text || '').replace(/^\s*\[(ENTREGA|PEDIDO)\]\s*/i, '').replace(/```dgui[\s\S]*?```/g, '').trim();
+        html += `<div class="hist-conv-msg ${dono ? 'dono' : 'agente'}"><div class="hist-conv-balao">${anexo}${corpo ? mdSimples(corpo) : ''}</div>` +
+          `<span class="hist-conv-hora">${dono ? 'Você' : esc(agente.nome)} · ${hhmm(m.ep * 1000)}</span></div>`;
+      }
+      leitor.querySelector('.hist-texto').innerHTML = html || '<p class="hist-dica">Sem mensagens de texto nesta conversa.</p>';
+    } catch (e) { leitor.querySelector('small').textContent = 'Não consegui abrir: ' + e.message; }
+  }
+
+  async function novaConversa(botao) {
+    if (botao.dataset.confirma !== '1') {
+      botao.dataset.confirma = '1';
+      botao.textContent = 'Toque de novo para confirmar';
+      setTimeout(() => { if (botao.isConnected) { botao.dataset.confirma = ''; botao.textContent = 'Nova conversa'; } }, 4000);
+      return;
+    }
+    if (typeof window.DGConversaNova !== 'function') return;
+    botao.disabled = true; botao.textContent = 'Arquivando…';
+    fecha();
+    await window.DGConversaNova();
   }
 
   async function abre(ag) {

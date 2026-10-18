@@ -5,6 +5,8 @@
 //   GET /api/v1/historico/<slug>/busca?q=&so=&desde=  trechos de conversa e de memória com a palavra
 //   GET /api/v1/historico/<slug>/memorias         lista dos arquivos de memória, por grupo
 //   GET /api/v1/historico/<slug>/memoria?arquivo=  texto de um arquivo da lista acima
+//   GET /api/v1/historico/<slug>/arquivadas       as conversas que o /clear tirou da tela (arquivo-conversa.js)
+//   GET /api/v1/historico/<slug>/arquivadas/<id>  as mensagens de uma delas
 //
 // Tudo roda dentro da caixa do agente, como o próprio agente (podman exec -u agente): o índice e as
 // memórias são dele, e o Web (root) não abre banco nem arquivo escrito por quem lê o mundo. A busca é
@@ -14,6 +16,7 @@
 // Só o dono, pela sessão do navegador: nenhuma caixa.permitir, e a sessão "via caixa" é recusada.
 
 const { execFile } = require('node:child_process');
+const { trechosArquivados } = require('./arquivo-conversa');
 
 const FTS = '/opt/dgclaw/app/scripts/memory_index/conversas_fts.py';
 const CASA = '/home/agente';
@@ -55,7 +58,13 @@ function listaMemorias(saida) {
   return lista;
 }
 
-function criarHistorico({ registro, log, roda = rodaPadrao, agora = Date.now }) {
+// O que a tela de leitura de uma conversa arquivada precisa de cada mensagem.
+function mensagemLeitura(m) {
+  const media = m.media ? { kind: m.media.kind, nome: m.media.nome || '' } : null;
+  return { id: m.id, ep: m.ep, origin: m.origin, text: m.text || '', kind: m.kind || '', alerta: m.alerta || '', media };
+}
+
+function criarHistorico({ registro, log, conversa = null, arquivoConversa = null, roda = rodaPadrao, agora = Date.now }) {
   const json = (res, status, corpo) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(corpo)); };
   const erro = (res, status, motivo) => json(res, status, { ok: false, erro: motivo });
   const ultimoReindex = new Map();
@@ -91,8 +100,9 @@ function criarHistorico({ registro, log, roda = rodaPadrao, agora = Date.now }) 
     const p = url.pathname, m = req.method;
     if (p !== '/api/v1/historico' && !p.startsWith('/api/v1/historico/')) return false;
     if (!sessao || sessao.via === 'caixa') { erro(res, 403, 'O histórico só é aberto pelo dono, no navegador.'); return true; }
-    const mm = /^\/api\/v1\/historico\/([^/]+)(?:\/(busca|memorias|memoria))?$/.exec(p);
+    const mm = /^\/api\/v1\/historico\/([^/]+)(?:\/(busca|memorias|memoria|arquivadas)(?:\/(\d+(?:\.\d+)?))?)?$/.exec(p);
     if (!mm) { erro(res, 404, 'Rota do histórico desconhecida.'); return true; }
+    if (mm[3] && mm[2] !== 'arquivadas') { erro(res, 404, 'Rota do histórico desconhecida.'); return true; }
     if (m !== 'GET') { erro(res, 405, 'O histórico é só de leitura: use GET.'); return true; }
     const { a, erro: e, status } = agenteDe(decodeURIComponent(mm[1]));
     if (!a) { erro(res, status, e); return true; }
@@ -125,6 +135,19 @@ function criarHistorico({ registro, log, roda = rodaPadrao, agora = Date.now }) 
         if (!s) { erro(res, 503, `A busca falhou: ${(r.erro || 'sem resposta').trim().slice(0, 200)}`); return true; }
         const resultados = (s.resultados || []).map((x) => ({ tipo: x.tipo, quando: x.quando, ts: x.ts, dia: x.dia, canal: x.canal, papel: x.papel, ref: x.ref, trecho: x.trecho }));
         json(res, 200, { ok: true, aviso: s.aviso || '', resultados });
+        return true;
+      }
+
+      if (mm[2] === 'arquivadas') {
+        if (!conversa || !arquivoConversa) { json(res, 200, { ok: true, arquivadas: [] }); return true; }
+        const t = await conversa.thread(a);
+        const trechos = trechosArquivados(t.msgs, arquivoConversa.cortes(a.slug));
+        if (!mm[3]) { json(res, 200, { ok: true, arquivadas: trechos }); return true; }
+        const id = Number(mm[3]);
+        const tr = trechos.find((x) => x.id === id);
+        if (!tr) { erro(res, 404, 'Essa conversa arquivada não foi encontrada. Atualize a lista.'); return true; }
+        const msgs = t.msgs.filter((m) => m.ep >= tr.de && m.ep <= tr.ate).map(mensagemLeitura);
+        json(res, 200, { ok: true, arquivada: tr, msgs });
         return true;
       }
 

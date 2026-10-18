@@ -1449,7 +1449,9 @@ function render(opt) {
     itens.push(['topo', maisAntigas
       ? `<div class="topo">${carregandoAntigas ? 'carregando mensagens antigas…'
                                               : 'role para ver as antigas'}</div>`
-      : '<div class="topo">início da conversa</div>']);
+      : arquivadasTela && !EH_ADMIN && window.DGHistorico
+        ? '<div class="topo topo-arq">Conversa nova. As anteriores estão no <button type="button" data-abre-historico>Histórico</button></div>'
+        : '<div class="topo">início da conversa</div>']);
   }
   let dia = '', anterior = null;
   lidoAteEp = 0;
@@ -2065,6 +2067,7 @@ function integra(d) {
    vezes precisar, até o começo da conversa. */
 const PAGINA = 60, PAGINA_ANTIGAS = 80;
 let maisAntigas = true, carregandoAntigas = false;
+let arquivadasTela = false;   // um /clear já mandou conversas para Histórico > Arquivadas
 /* Sobe a cada troca inteira de `msgs`: uma página pedida antes da troca chega
    depois e não pode ser colada na janela nova. */
 let geracaoJanela = 0;
@@ -2077,6 +2080,7 @@ async function carregar(primeiraVez) {
   try {
     const d = await api(API + '/messages?limit=' + PAGINA);
     const novas = d.msgs || [];
+    arquivadasTela = !!d.arquivadas;
     if (primeiraVez || !msgs.length) {
       geracaoJanela++;
       msgs = novas;
@@ -3532,6 +3536,12 @@ async function mandaTexto(pend, semEsperar) {
   const ficou = entregue(pend, d);
   avisaEntrega(pend, true);
   if (!ficou) return true;
+  // /clear ou /new: o servidor arquivou a conversa anterior; a tela recomeça limpa
+  if (d && d.arquivou) {
+    pendentes = pendentes.filter(x => x !== pend);
+    await carregar(true);
+    return true;
+  }
   // comando que não responde com fala (/compact, /context...): não fica no "esperando a resposta"
   const semResposta = !!(d && d.comando && d.comando.espera_resposta === false);
   if (!semEsperar && !semResposta && !esperando) await esperaResposta(d.ep_enviado);
@@ -4187,6 +4197,9 @@ async function garanteMensagemDoAlerta(a) {
   msgs = Array.from(porId.values()).sort((x, y) => x.ep - y.ep);
   maisAntigas = !!d.mais_antigas;
 }
+wrap.addEventListener('click', ev => {
+  if (ev.target.closest('[data-abre-historico]')) window.DGHistorico.abre({ id: AGENTE.id, nome: AGENTE.nome || 'o agente' }, 'arquivadas');
+});
 filtrosEl.addEventListener('click', async ev => {
   if (ev.target.closest('[data-historico]')) { window.DGHistorico.abre({ id: AGENTE.id, nome: AGENTE.nome || 'o agente' }); return; }
   const b = ev.target.closest('[data-filtro]'); if (!b) return;
@@ -4205,6 +4218,8 @@ filtrosEl.addEventListener('click', async ev => {
 /* Histórico (historico.js): leva até a mensagem de um trecho achado na busca. O trecho vem do
    índice do agente (hora do registro dele); a mensagem do chat é a do mesmo lado mais perto dessa
    hora, até 3 min. Se ela é antiga, traz as páginas de trás até chegar lá. */
+// "Nova conversa" do Histórico: é o mesmo /clear que o dono pode digitar (o servidor arquiva a anterior)
+window.DGConversaNova = () => enviarTexto('/clear');
 window.DGConversaIr = async (epMs, doDono) => {
   const ep = epMs / 1000, JANELA = 3 * 60;   // as mensagens contam em segundos
   const perto = () => {

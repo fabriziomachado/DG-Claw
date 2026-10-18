@@ -36,6 +36,7 @@ const { criarMesa } = require('./lib/mesa');
 const { criarAvisos } = require('./lib/avisos');
 const { criarIntegracoes } = require('./lib/integracoes');
 const { criarHistorico } = require('./lib/historico');
+const { criarArquivoConversa } = require('./lib/arquivo-conversa');
 
 const METODOS_QUE_ESCREVEM = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const TIPOS_ESTATICOS = {
@@ -103,7 +104,10 @@ function criarServidor(opcoes) {
   caixa.permitir('/api/v1/tarefas');
   const avisos = criarAvisos({ config, registro, runner, caixa, log, agora: opcoes.agora });
   const integracoes = criarIntegracoes({ registro, log });
-  const historico = criarHistorico({ registro, log });
+  const arquivoConversa = criarArquivoConversa({ dataDir: config.dataDir, log });
+  // A conversa como a tela vê: depois do último /clear (o antes fica em Histórico > Arquivadas).
+  const threadTela = async (agente) => arquivoConversa.visivel(agente.slug, await conversa.thread(agente));
+  const historico = criarHistorico({ registro, log, conversa, arquivoConversa });
   caixa.permitir('/api/v1/avisos');
 
   let versaoJsCache = { ts: 0, valor: '0' };
@@ -341,15 +345,16 @@ function criarServidor(opcoes) {
       try {
         const loja = alertas(agente);
         if (!ar[2] && m === 'GET') {
-          const t = await conversa.thread(agente);
-          return H.enviaJson(res, 200, { ok: true, alertas: loja.listar(), avisos: t.avisos });
+          const t = await threadTela(agente);
+          const corte = arquivoConversa.ultimoCorte(agente.slug);
+          return H.enviaJson(res, 200, { ok: true, alertas: loja.listar().filter(a => a.ep > corte), avisos: t.avisos });
         }
         if (ar[3] === 'visto' && m === 'POST') {
           if (!loja.reconhecer(ar[2])) return H.erroJson(res, 404, 'Esse alerta não existe nesta conversa. Atualize a página.');
           return H.enviaJson(res, 200, { ok: true });
         }
         if (ar[3] === 'mensagem' && m === 'GET') {
-          const t = await conversa.thread(agente);
+          const t = await threadTela(agente);
           const mensagem = loja.mensagem(ar[2]);
           if (!mensagem) return H.erroJson(res, 404, 'Esse alerta não existe nesta conversa. Atualize a página.');
           // Carrega a origem e a sequência até o fim, sem lacuna na rolagem.
@@ -427,7 +432,7 @@ function criarServidor(opcoes) {
       if (acao === 'compartilhados' && m === 'GET') {
         try {
           if (url.searchParams.has('mensagem')) {
-            const t = await conversa.thread(agente), id = url.searchParams.get('mensagem');
+            const t = await threadTela(agente), id = url.searchParams.get('mensagem');
             const origem = t.msgs.find(x => x.id === id);
             if (!origem) return H.erroJson(res, 404, 'A mensagem não está nesta sessão. Atualize a lista.');
             return H.enviaJson(res, 200, { ok: true, mensagem: origem, msgs: t.msgs.filter(x => x.ep >= origem.ep) });
@@ -484,7 +489,7 @@ function criarServidor(opcoes) {
 
   async function mensagens(req, res, url, agente) {
     const q = url.searchParams;
-    const t = await conversa.thread(agente);
+    const t = await threadTela(agente);
     const todas = t.msgs;
     if (q.get('after') != null) {
       const after = numeroOuErro(res, 'after', q.get('after'), 0);
@@ -500,7 +505,7 @@ function criarServidor(opcoes) {
     if (before === undefined) return undefined;
     const base = before == null ? todas : todas.filter((x) => x.ep < before);
     const msgs = base.slice(Math.max(0, base.length - limite));
-    return H.enviaJson(res, 200, { ok: true, msgs, avisos: t.avisos, mais_antigas: base.length > limite, before, limit: limite });
+    return H.enviaJson(res, 200, { ok: true, msgs, avisos: t.avisos, mais_antigas: base.length > limite, before, limit: limite, arquivadas: !!t.corte });
   }
 
   async function esperar(req, res, url, agente) {
@@ -515,7 +520,7 @@ function criarServidor(opcoes) {
     let fechou = false;
     res.on('close', () => { fechou = true; });
     for (;;) {
-      const t = await conversa.thread(agente);
+      const t = await threadTela(agente);
       const novas = t.msgs.filter((x) => x.ep > since);
       const doAgente = novas.some((x) => x.origin === 'agente');
       if (doAgente || Date.now() >= fim || fechou) {
@@ -538,7 +543,7 @@ function criarServidor(opcoes) {
     if (since == null || since <= 0) since = Date.now() / 1000 - 60;
     abrirStream({
       req, res, agente, since, log, tickMs: opcoes.tickSseMs,
-      fontes: { thread: conversa.thread, atividade: conversa.atividade, versaoJs, foco: (a) => foco.lista(a.slug) },
+      fontes: { thread: threadTela, atividade: conversa.atividade, versaoJs, foco: (a) => foco.lista(a.slug) },
     });
     return undefined;
   }
@@ -555,6 +560,7 @@ function criarServidor(opcoes) {
       return H.erroJson(res, 400, `O "cliente_id" veio como ${JSON.stringify(String(cid).slice(0, 80))}, que não vale: use de 8 a 64 caracteres entre letras, números, "-" e "_". Nada foi enviado.`);
     }
     const r = await conversa.umaVez(agente, 'send', cid || null, () => conversa.enviar(agente, corpo));
+    arquivaSeLimpou(agente, r);
     return H.enviaJson(res, r.status, r.corpo);
   }
 
@@ -566,7 +572,19 @@ function criarServidor(opcoes) {
       return H.erroJson(res, 400, `O "cliente_id" veio como ${JSON.stringify(String(cid).slice(0, 80))}, que não vale: use de 8 a 64 caracteres entre letras, números, "-" e "_". Nada foi enviado.`);
     }
     const r = await conversa.umaVez(agente, 'comando', cid || null, () => conversa.comando(agente, corpo));
+    arquivaSeLimpou(agente, r);
     return H.enviaJson(res, r.status, r.corpo);
+  }
+
+  // /clear ou /new entregue ao agente: a conversa da tela recomeça e a anterior vai para as Arquivadas.
+  function arquivaSeLimpou(agente, r) {
+    const c = r && r.status < 300 && r.corpo && r.corpo.comando;
+    if (!c || !['/clear', '/new'].includes(c.executado_como || c.nome)) return;
+    try {
+      if (arquivoConversa.cortar(agente.slug, Date.now() / 1000)) r.corpo.arquivou = true;
+    } catch (e) {
+      log('erro', `Conversa de ${agente.slug}: o ${c.nome} foi entregue, mas não consegui arquivar a anterior: ${e.message}`);
+    }
   }
 
   async function upload(req, res, agente) {

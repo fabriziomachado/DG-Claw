@@ -251,14 +251,23 @@
       return html;
     }).join('');
   }
-  const ICO_LEITURA = { alerta: '⚠', queda: '📉', alta: '📈', ideia: '💡', ok: '✓', info: '•' };
+  const icoTraco = (d) => '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+  // ícones de traço fino, na cor do texto secundário (sem cor: o sentido vem do desenho)
+  const ICO_LEITURA = {
+    alerta: icoTraco('<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17.2v.1"/>'),
+    queda: icoTraco('<path d="M3 7l6 6 4-4 8 8"/><path d="M15 17h6v-6"/>'),
+    alta: icoTraco('<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>'),
+    ideia: icoTraco('<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>'),
+    ok: icoTraco('<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.8"/>'),
+    info: icoTraco('<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.8v.1"/>'),
+  };
   function leitura(c) {
     const dest = (Array.isArray(c.destaques) ? c.destaques : []).slice(0, 5).map((d) => (typeof d === 'string' ? { texto: d } : d || {}))
       .filter((d) => d.texto);
     const ico = (d) => ICO_LEITURA[d.tipo] || ICO_LEITURA.info;
     return `<div class="dgui-leitura">` +
       `<div class="dgui-leitura-tit">${txt(c.titulo || 'Leitura do especialista')}</div>` +
-      (dest.length ? '<ul class="dgui-destaques">' + dest.map((d) => `<li class="${esc(d.tipo || 'info')}"><span aria-hidden="true">${ico(d)}</span><span>${txt(d.texto)}</span></li>`).join('') + '</ul>' : '') +
+      (dest.length ? '<ul class="dgui-destaques">' + dest.map((d) => `<li>${ico(d)}<span>${txt(d.texto)}</span></li>`).join('') + '</ul>' : '') +
       (c.detalhe ? `<details class="dgui-leitura-det"><summary>Ver análise completa</summary><div class="dgui-leitura-txt">${textoSimples(c.detalhe)}</div></details>` : '') +
       '</div>';
   }
@@ -276,7 +285,11 @@
       // a fonte do painel vale para os gráficos de dentro (sai na imagem baixada), sem repetir na tela
       const herda = (Array.isArray(c.itens) ? c.itens : []).map((it) => (it && typeof it === 'object' && !Array.isArray(it) && !it.fonte && c.fonte
         ? Object.assign({}, it, { fonte: c.fonte, atualizado: it.atualizado || c.atualizado, _semRodape: true }) : it));
-      return `<div class="dgui-painel">${c.titulo ? `<div class="dgui-painel-tit">${txt(c.titulo)}</div>` : ''}${grade(herda, fundo)}${rodape(c)}</div>`;
+      // a leitura do especialista sai do cartão e fica logo abaixo dele, como bloco próprio
+      const leituras = herda.filter((it) => it && it.tipo === 'leitura');
+      const resto = herda.filter((it) => !(it && it.tipo === 'leitura'));
+      return `<div class="dgui-painel">${c.titulo ? `<div class="dgui-painel-tit">${txt(c.titulo)}</div>` : ''}${grade(resto, fundo)}${rodape(c)}</div>` +
+        leituras.map(leitura).join('');
     }
     return aviso('tipo "' + String(c.tipo || '').slice(0, 20) + '" desconhecido (use kpi, tabela, grafico ou painel)');
   }

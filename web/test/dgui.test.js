@@ -90,9 +90,15 @@ test('painel sem sugestões do agente ganha perguntas de análise padrão', () =
 test('leitura mostra destaques e recolhe o detalhe, com texto escapado', () => {
   const h = dgui.blocoParaHtml(bloco({ tipo: 'leitura', destaques: [{ tipo: 'alerta', texto: 'EAD concentra <b>' }, 'Prioridade: 1º semestre'],
     detalhe: '**Diagnóstico:** alto.\n\n- um\n- dois\n<script>x</script>' }));
-  assert.strictEqual((h.match(/<li class=/g) || []).length, 2);
+  assert.strictEqual((h.match(/<li><svg/g) || []).length, 2);
   assert.match(h, /<details class="dgui-leitura-det"><summary>Ver análise completa<\/summary>/);
   assert.match(h, /<b>Diagnóstico:<\/b>/);
   assert.ok(!h.includes('<script>'));
   assert.ok(!h.includes('concentra <b>'));
+});
+
+test('a leitura sai do cartão do painel e fica logo abaixo dele', () => {
+  const h = dgui.blocoParaHtml(bloco({ tipo: 'painel', titulo: 'P', itens: [{ tipo: 'kpi', valor: '1' }, { tipo: 'leitura', destaques: ['x'] }] }));
+  const fimPainel = h.indexOf('</div><div class="dgui-leitura">');
+  assert.ok(fimPainel > 0, 'a leitura vem depois do fechamento do painel');
 });

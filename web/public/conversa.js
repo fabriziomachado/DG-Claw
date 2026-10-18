@@ -3669,6 +3669,15 @@ async function entregaTranscricao(texto, manda) {
     setEstado('transcrição no campo: revise e envie');
     return;
   }
+  // Com anexos na bandeja (18/10/2026): a fala vira a legenda e vai junto com eles, como se a pessoa
+  // tivesse digitado e tocado na seta. Antes ia só o texto e os anexos ficavam para trás.
+  if (anexos.length) {
+    const atual = entrada.value.trim();
+    entrada.value = atual ? atual + ' ' + texto : texto;
+    ajustaCampo();
+    enviarComAnexos();
+    return;
+  }
   await enviarTexto(texto);
 }
 

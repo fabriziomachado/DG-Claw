@@ -369,7 +369,12 @@ function marcaTrabalhando(id, sim) {
   if (!el || el.classList.contains('trab') === sim) return;
   el.classList.toggle('trab', sim);
   const nome = (agentesMenu.find(a => a.id === id) || {}).nome || id;
-  if (id !== AGENTE.id) el.title = sim ? nome + ' está trabalhando' : '';
+  if (id === AGENTE.id) return;   // o aberto já tem o estado dele embaixo do nome (#estado)
+  el.title = sim ? nome + ' está trabalhando' : '';
+  // os outros também mostram "trabalhando" embaixo do nome, enquanto trabalham (18/10/2026)
+  let e = el.querySelector('.fil-estado');
+  if (sim && !e) { e = document.createElement('span'); e.className = 'fil-estado'; e.textContent = 'trabalhando'; el.appendChild(e); }
+  else if (!sim && e) e.remove();
 }
 /* O "+" da fileira abre o cartão "criar um agente novo" do Admin (onboarding.js). Já na conversa do
    Admin o toque abre direto; de outro agente, o link leva ao Admin com #criar e ele abre ao carregar. */

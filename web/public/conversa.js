@@ -4147,11 +4147,14 @@ function contagensFiltro() {
 function desenhaAlertas() {
   alertasCaixa.hidden = true;   // a pilha lateral antiga não aparece mais
   const c = contagensFiltro();
-  filtrosEl.hidden = !(c.nv || c.entregas || filtro !== 'tudo');
+  // o Histórico fica sempre à mão nos agentes (o Admin não guarda histórico pesquisável)
+  const temHist = !EH_ADMIN && !!window.DGHistorico;
+  filtrosEl.hidden = !(temHist || c.nv || c.entregas || filtro !== 'tudo');
   const chip = (k, rot, n, cls) => `<button type="button" class="filtro${filtro === k ? ' on' : ''}${cls ? ' ' + cls : ''}" data-filtro="${k}" aria-pressed="${filtro === k}">` +
     `${rot}${n ? ` <b>${n}</b>` : ''}</button>`;
   filtrosEl.innerHTML = chip('tudo', 'Tudo', 0) + chip('nao-vistas', 'Não vistas', c.nv) +
-    chip('pedidos', 'Pedem ação', c.pedidos, c.pedidos ? 'tem-pedido' : '') + chip('entregas', 'Entregas', c.entregas);
+    chip('pedidos', 'Pedem ação', c.pedidos, c.pedidos ? 'tem-pedido' : '') + chip('entregas', 'Entregas', c.entregas) +
+    (temHist ? `<button type="button" class="filtro filtro-hist" data-historico title="Buscar nas conversas antigas e ver as memórias">${window.DGHistorico.ICONE}Histórico</button>` : '');
   aplicaFiltro();
 }
 function idsDoFiltro() {
@@ -4185,6 +4188,7 @@ async function garanteMensagemDoAlerta(a) {
   maisAntigas = !!d.mais_antigas;
 }
 filtrosEl.addEventListener('click', async ev => {
+  if (ev.target.closest('[data-historico]')) { window.DGHistorico.abre({ id: AGENTE.id, nome: AGENTE.nome || 'o agente' }); return; }
   const b = ev.target.closest('[data-filtro]'); if (!b) return;
   filtro = b.dataset.filtro;
   try {
@@ -4198,6 +4202,34 @@ filtrosEl.addEventListener('click', async ev => {
   if (filtro !== 'tudo' && primeira) rolagem.mostra(primeira, { block: 'start' });
   if (filtro === 'tudo') rolagem.mostra(wrap.lastElementChild || wrap, { block: 'end' });
 });
+/* Histórico (historico.js): leva até a mensagem de um trecho achado na busca. O trecho vem do
+   índice do agente (hora do registro dele); a mensagem do chat é a do mesmo lado mais perto dessa
+   hora, até 3 min. Se ela é antiga, traz as páginas de trás até chegar lá. */
+window.DGConversaIr = async (epMs, doDono) => {
+  const ep = epMs / 1000, JANELA = 3 * 60;   // as mensagens contam em segundos
+  const perto = () => {
+    let melhor = null, dist = Infinity;
+    for (const m of msgs) {
+      if (typeof m.ep !== 'number' || ehDono(m) !== doDono) continue;
+      const d = Math.abs(m.ep - ep);
+      if (d < dist) { dist = d; melhor = m; }
+    }
+    return dist <= JANELA ? melhor : null;
+  };
+  let m = perto();
+  for (let voltas = 0; !m && maisAntigas && msgs.length && menorEp() > ep - JANELA && voltas < 40; voltas++) {
+    if (carregandoAntigas) await new Promise(ok => setTimeout(ok, 250));
+    else await carregaAntigas();
+    m = perto();
+  }
+  if (!m) return false;
+  if (filtro !== 'tudo') { filtro = 'tudo'; desenhaAlertas(); }
+  const alvo = Array.from(wrap.children).find(el => el.dataset && el.dataset.msg === m.id);
+  if (!alvo) return false;
+  rolagem.mostra(alvo, { block: 'center' });
+  alvo.classList.remove('msg-achada'); void alvo.offsetWidth; alvo.classList.add('msg-achada');
+  return true;
+};
 // "visto": a mensagem de um aviso ficou à vista por 1,2 s com a tela aberta
 const olhoVisto = 'IntersectionObserver' in window ? new IntersectionObserver(entradas => {
   for (const en of entradas) {

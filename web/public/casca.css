@@ -73,3 +73,16 @@ html.casca #tourCaixa button{min-height:36px;padding:0 14px;border-radius:18px;b
 html.casca #tourCaixa button.pri{background:#2f9e5e;border-color:#2f9e5e;color:#fff}
 html.casca #tourCaixa button:disabled{opacity:.4;cursor:default}
 html.casca #tourCaixa .tour-x{margin-right:auto}
+
+/* Modo claro com o mesmo fundo da Conversa (18/10/2026, a pedido do dono): quase branco
+   (#fbfbfb) atrás da página e do cabeçalho, sem linha nem sombra embaixo dele. Vale para
+   Mesa, Lembretes, Avisos e o painel do agente, que carregam este arquivo. O modo escuro
+   de cada tela fica como estava. */
+@media (prefers-color-scheme:light){
+  html.casca:not([data-tema="escuro"]){--fundo:#fbfbfb;--header:#fbfbfb;--bg:#fbfbfb}
+  html.casca:not([data-tema="escuro"]) body,html.casca:not([data-tema="escuro"]) body.lp{--lp-fundo:#fbfbfb;background:#fbfbfb}
+  html.casca:not([data-tema="escuro"]) #cabecalho{background:#fbfbfb;border-bottom:0;box-shadow:none}
+}
+html.casca[data-tema="claro"]{--fundo:#fbfbfb;--header:#fbfbfb;--bg:#fbfbfb}
+html.casca[data-tema="claro"] body,html.casca[data-tema="claro"] body.lp{--lp-fundo:#fbfbfb;background:#fbfbfb}
+html.casca[data-tema="claro"] #cabecalho{background:#fbfbfb;border-bottom:0;box-shadow:none}

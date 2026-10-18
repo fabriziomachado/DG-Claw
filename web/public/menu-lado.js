@@ -135,7 +135,11 @@
     const sec = $('mlConfig');
     if (!sec) return;
     const r = instrucaoInstalar({ standalone: ehStandalone(), ios: ehIos(), promptGuardado: !!promptGuardado });
-    sec.hidden = r.tipo === 'instalado';
+    // App já instalado: some só o "Instalar o app"; a seção fica, porque o Tema também está nela
+    const instalado = r.tipo === 'instalado';
+    $('mlInstalar').hidden = instalado;
+    if (instalado) mostraCaixa('');
+    sec.hidden = instalado && !document.getElementById('mlTema');
     $('mlInstalarSub').textContent = r.tipo === 'prompt' ? 'atalho na tela, abre sem barra do navegador'
       : 'como colocar na tela inicial';
   }

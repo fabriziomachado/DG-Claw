@@ -68,15 +68,19 @@ async function executar(acao, id, op = {}) {
     // As opções da boas-vindas: só oferece conectar a chave que o agente ainda não tem (18/10/2026).
     let faltam = ['GROQ_API_KEY', 'GEMINI_API_KEY'];
     try { faltam = chavesComp.faltam(web.cofreAgente, agente); } catch (_) { /* sem cofre legível: oferece tudo */ }
+    // As opções vão num cartão de escolha (```dgui tipo escolha, 18/10/2026): o dono toca em vez de digitar o número.
     const opcoes = [
-      faltam.includes('GROQ_API_KEY') && 'Conectar a Groq, para conversarmos por áudio',
-      'Conectar o Gmail',
-      'Mão na massa: começar logo uma tarefa',
-      faltam.includes('GEMINI_API_KEY') && 'Conectar a API do Gemini no modo gratuito, para você me ajudar com análise de vídeo',
-    ].filter(Boolean).map((t, i) => (i + 1) + '. ' + t + '.').join(' ');
+      faltam.includes('GROQ_API_KEY') && { texto: 'Conectar a Groq', detalhe: 'para conversarmos por áudio' },
+      { texto: 'Conectar o Gmail', detalhe: 'para eu ler e organizar seus e-mails' },
+      { texto: 'Mão na massa', detalhe: 'começar logo uma tarefa' },
+      faltam.includes('GEMINI_API_KEY') && { texto: 'Conectar o Gemini', detalhe: 'no modo gratuito, para análise de vídeo' },
+    ].filter(Boolean);
+    // Em prosa, não em JSON: esta mensagem aparece no balão do dono na conversa do agente.
+    const lista = opcoes.map(o => o.texto + ' (' + o.detalhe + ')').join('; ');
     const jaTem = ['GROQ_API_KEY', 'GEMINI_API_KEY'].filter(k => !faltam.includes(k)).map(k => k === 'GROQ_API_KEY' ? 'Groq (áudio)' : 'Gemini (vídeo)');
-    const TEXTO_OI = 'Oi! Sou ' + p.dono + '. Acabei de te criar. Me cumprimente pelo nome, se apresente brevemente e me ofereça estas opções, numeradas e nesta ordem: ' + opcoes +
-      (jaTem.length ? ' Já deixei no seu cofre as chaves de ' + jaTem.join(' e ') + ': diga que isso já está pronto, sem pedir de novo.' : '') +
+    const TEXTO_OI = 'Oi! Sou ' + p.dono + '. Acabei de te criar. Me cumprimente pelo nome e se apresente brevemente.' +
+      (jaTem.length ? ' Conte que as chaves de ' + jaTem.join(' e ') + ' já estão no seu cofre, prontas, sem pedir de novo.' : '') +
+      ' Termine com um cartão de escolha (bloco dgui do tipo escolha, pergunta "Por onde quer começar?", cada opção com texto e detalhe, sem lista numerada no texto) com estas opções, nesta ordem: ' + lista + '.' +
       ' Canais e conexões que ainda não configuramos não são falha: não fale de erro deles.';
     // Envia o oi e espera a resposta. A resposta só conta se for nova em relação ao que existia antes deste envio.
     const tentar = async () => {

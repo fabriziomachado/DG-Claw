@@ -1226,10 +1226,19 @@ function separaDoVisual(txt) {
 /* Hora discreta embaixo do balão, em linguagem de gente ("agora", "há 5 min", "ontem, 20:24").
    O HTML leva só a hora fixa e o ep: o texto humano é posto no DOM por humanizaHoras(), assim
    o render continua reaproveitando o nó (o HTML não muda a cada minuto). */
+/* ✓ entregue / ✓✓ azul lido, como no WhatsApp, nas mensagens do dono (18/10/2026): "lido" é o
+   agente ter feito algo depois dela (respondido ou rodado um comando). lidoAteEp vem do render. */
+let lidoAteEp = 0;
+const CHECK_1 = '<svg viewBox="0 0 16 11" width="15" height="11" aria-hidden="true"><path d="M1.5 5.8l3 3L11 2.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const CHECK_2 = '<svg viewBox="0 0 20 11" width="18" height="11" aria-hidden="true"><path d="M1.5 5.8l3 3L11 2.2M7.5 8.6l.4.2L15 2.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 function htmlHora(m, extra) {
   if (!m || m.pendente || typeof m.ep !== 'number') return '';
-  return `<span class="hora" data-ep="${m.ep}" title="${esc(m.dia + ' ' + m.hhmm)}">` +
-         `${m.editada ? 'editada · ' : ''}${esc(m.hhmm)}</span>`;
+  const hora = `<span class="hora" data-ep="${m.ep}" title="${esc(m.dia + ' ' + m.hhmm)}">` +
+               `${m.editada ? 'editada · ' : ''}${esc(m.hhmm)}</span>`;
+  if (!ehDono(m)) return hora;
+  const lido = lidoAteEp >= m.ep;
+  return `<span class="hora-cx">${hora}<span class="checks${lido ? ' lido' : ''}" title="${lido ? 'lida pelo agente' : 'entregue ao agente'}" ` +
+         `aria-label="${lido ? 'lida' : 'entregue'}">${lido ? CHECK_2 : CHECK_1}</span></span>`;
 }
 function horaHumana(ep, agora) {
   const s = Math.max(0, agora / 1000 - ep);
@@ -1437,6 +1446,8 @@ function render(opt) {
       : '<div class="topo">início da conversa</div>']);
   }
   let dia = '', anterior = null;
+  lidoAteEp = 0;
+  for (const x of todas) if (!x.pendente && !x.cartaoNasc && !ehDono(x) && typeof x.ep === 'number' && x.ep > lidoAteEp) lidoAteEp = x.ep;
   const blocos = TR ? TR.agrupa(todas) : todas.map(x => ({ msg: x }));
   for (let bi = 0; bi < blocos.length; bi++) {
     const bloco = blocos[bi];

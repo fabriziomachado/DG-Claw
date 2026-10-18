@@ -762,7 +762,7 @@ html:not([data-tema="x"]) body .row.alerta-entrega .bub,
 html:not([data-tema="x"]) body .row.alerta-pedido .bub{background:transparent;border:0;border-radius:0;padding:4px 2px;box-shadow:none}
 .row.alerta-entrega .acoes::after,.row.alerta-pedido .acoes::after{
   margin-left:8px;padding:1px 8px;border-radius:9px;font-size:11px;font-weight:600;border:1px solid var(--dg-borda);color:var(--dg-texto-2);white-space:nowrap}
-.row.alerta-entrega .acoes::after{content:"✓ Entrega"}
+.row.alerta-entrega .acoes::after{content:"Entrega"}
 .row.alerta-pedido .acoes::after{content:"Pedido"}
 .row.alerta-pedido.alerta-pendente .acoes::after{content:"● Precisa da sua decisão";color:var(--dg-pedido-texto);border-color:var(--dg-pedido-borda)}
 .row.alerta-entrega.alerta-pendente .acoes::after{content:"● Nova entrega";color:var(--dg-azul-forte);border-color:var(--dg-azul-suave)}
@@ -817,3 +817,10 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 .mid{background:var(--dg-superficie-2)}
 .midoff{background:var(--dg-superficie-2);color:var(--dg-texto-2);border-color:var(--dg-borda)}
 .row.me .bub:has(> .midcx.cxarq):not(:has(.p)){background:transparent;padding:0;border-radius:0}
+
+/* ✓ entregue e ✓✓ azul lido nas mensagens do dono */
+.row.me > .hora-cx{flex:0 0 100%;display:flex;justify-content:flex-end;align-items:center;gap:4px;margin:4px 6px 2px}
+.row.mfotos-row > .hora-cx{flex:0 0 auto}
+.hora-cx .hora{display:inline;margin:0}
+.checks{display:inline-flex;color:var(--dg-texto-3)}
+.checks.lido{color:var(--dg-azul)}

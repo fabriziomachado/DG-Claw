@@ -98,6 +98,14 @@
     av.style.background = ag.cor || '#2f9e5e';
   }
 
+  /* Foto trocada no menu (menu-lado.js): o cabeçalho muda sem recarregar. */
+  document.addEventListener('dgavatar', ev => {
+    const d = ev.detail || {};
+    if (!est.agente || d.id !== est.agente.id) return;
+    Object.assign(est.agente, { avatar: d.avatar, avatar_img: d.avatar_img });
+    pintaCabecalho(est.agente);
+  });
+
   function pintaTitulo() {
     const e = $('estado');
     if (e) e.textContent = est.titulo || '';

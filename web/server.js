@@ -37,6 +37,7 @@ const { criarAvisos } = require('./lib/avisos');
 const { criarIntegracoes } = require('./lib/integracoes');
 const { criarHistorico } = require('./lib/historico');
 const { criarArquivoConversa } = require('./lib/arquivo-conversa');
+const { criarAvatares } = require('./lib/avatar');
 
 const METODOS_QUE_ESCREVEM = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const TIPOS_ESTATICOS = {
@@ -108,6 +109,8 @@ function criarServidor(opcoes) {
   // A conversa como a tela vê: depois do último /clear (o antes fica em Histórico > Arquivadas).
   const threadTela = async (agente) => arquivoConversa.visivel(agente.slug, await conversa.thread(agente));
   const historico = criarHistorico({ registro, log, conversa, arquivoConversa });
+  // Foto trocada pelo dono no menu: vale por cima da foto da criação e do avatar do registro.
+  const avatares = criarAvatares({ dataDir: config.dataDir, registro, log });
   caixa.permitir('/api/v1/avisos');
 
   let versaoJsCache = { ts: 0, valor: '0' };
@@ -248,6 +251,10 @@ function criarServidor(opcoes) {
 
   // ── API ──────────────────────────────────────────────────────────────────
   function avatarDe(a) {
+    const inicial = (a.nome[0] || '?').toUpperCase();
+    const trocada = avatares.estado(a.slug);
+    if (trocada && trocada.url) return { avatar: inicial, avatar_img: trocada.url };
+    if (trocada && trocada.removida) return { avatar: inicial, avatar_img: null };
     const foto = onboarding.foto(a.slug);
     if (foto) return { avatar: a.nome.slice(0, 1), avatar_img: foto };
     const av = a.avatar || '';
@@ -420,6 +427,11 @@ function criarServidor(opcoes) {
     if (p === '/api/v1/trilha/docs.md' && m === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8', 'Cache-Control': 'no-store' });
       return res.end(fs.readFileSync(path.join(__dirname, 'docs', 'TRILHA-E-PERMISSAO.md'), 'utf8'));
+    }
+
+    if (/^\/api\/v1\/agents\/[^/]+\/avatar$/.test(p)) {
+      if (falhaDoRegistro(req, res, true)) return undefined;
+      if (await avatares.tratar(req, res, url, sessao, { enviaJson: H.enviaJson, erroJson: H.erroJson, lerCorpo: H.lerCorpo, agentePublico })) return undefined;
     }
 
     let mm = /^\/api\/v1\/agents\/([^/]+)(?:\/([a-z]+))?$/.exec(p);

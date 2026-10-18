@@ -97,3 +97,4 @@ aside#menu .pe{margin-top:auto;padding-top:6px}
   font:inherit;font-size:12px;cursor:pointer;padding:0 2px;white-space:nowrap}
 .ml-tema-opcoes button:hover{color:var(--ml-texto)}
 .ml-tema-opcoes button.on{background:var(--dg-superficie,#fff);color:var(--ml-texto);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+#mlInstalar[hidden]{display:none!important}

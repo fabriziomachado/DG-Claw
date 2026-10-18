@@ -119,6 +119,34 @@
     return { sx: Math.floor((w - lado) / 2), sy: Math.floor((h - lado) / 2), lado };
   }
 
+  /* Enquadramento da foto (o "Ajustar" da folha Trocar foto). Tudo em pixels do quadro na tela:
+     a = { w, h (tamanho da imagem), lado (quadro quadrado, onde o círculo fica inscrito),
+           zoom (1 = a imagem cobre o quadro, até ZOOM_MAX), x, y (canto da imagem dentro do quadro) }.
+     A imagem nunca deixa sobra dentro do quadro: x fica entre lado - largura e 0 (idem y). */
+  const ZOOM_MAX = 4;
+  const escalaCobre = (w, h, lado) => lado / Math.max(1, Math.min(w, h));
+  function limitaAjuste(a) {
+    const zoom = Math.min(ZOOM_MAX, Math.max(1, Number(a.zoom) || 1));
+    const e = escalaCobre(a.w, a.h, a.lado) * zoom, W = a.w * e, H = a.h * e;
+    const prende = (v, tam) => Math.min(0, Math.max(a.lado - tam, Number.isFinite(v) ? v : (a.lado - tam) / 2));
+    return { w: a.w, h: a.h, lado: a.lado, zoom, x: prende(a.x, W), y: prende(a.y, H) };
+  }
+  /* Começo: zoom 1, imagem centrada (sem x/y, limitaAjuste centra). */
+  const ajusteInicial = (w, h, lado) => limitaAjuste({ w, h, lado, zoom: 1, x: NaN, y: NaN });
+  const moveAjuste = (a, dx, dy) => limitaAjuste(Object.assign({}, a, { x: a.x + dx, y: a.y + dy }));
+  /* Zoom mantendo parado o ponto (fx, fy) do quadro: o dedo da pinça, o cursor da roda ou o centro. */
+  function zoomNoPonto(a, zoom, fx, fy) {
+    const z = Math.min(ZOOM_MAX, Math.max(1, Number(zoom) || 1));
+    const r = z / a.zoom;
+    return limitaAjuste(Object.assign({}, a, { zoom: z, x: fx - (fx - a.x) * r, y: fy - (fy - a.y) * r }));
+  }
+  /* O que está dentro do quadrado do círculo, em pixels da imagem (para o drawImage). */
+  function recorteDoAjuste(a) {
+    const e = escalaCobre(a.w, a.h, a.lado) * a.zoom, lado = Math.min(a.w, a.h, a.lado / e);
+    const sx = Math.min(a.w - lado, Math.max(0, -a.x / e)), sy = Math.min(a.h - lado, Math.max(0, -a.y / e));
+    return { sx, sy, lado };
+  }
+
   /* O que a escolha do arquivo diz antes de subir: '' (segue) ou a frase de erro. */
   function problemaArquivo(f) {
     if (!f) return 'Nenhuma foto escolhida.';
@@ -128,7 +156,7 @@
     return '';
   }
 
-  if (!raiz.document) return { ABAS_PAINEL, LINK_LEMBRETES, itemAgente, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar, recorteQuadrado, problemaArquivo };
+  if (!raiz.document) return { ABAS_PAINEL, LINK_LEMBRETES, itemAgente, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar, recorteQuadrado, problemaArquivo, ZOOM_MAX, escalaCobre, limitaAjuste, ajusteInicial, moveAjuste, zoomNoPonto, recorteDoAjuste };
 
   /* ── Parte com DOM ─────────────────────────────────────────────────────── */
   const $ = id => document.getElementById(id);
@@ -292,8 +320,9 @@
   }
 
   /* ── Trocar a foto do agente (18/10/2026) ─────────────────────────────────
-     Tocar na foto grande abre a folha "Trocar foto". A imagem é recortada no centro e reduzida
-     para 512 px aqui no aparelho (a foto do celular chega leve e já em pé) e sobe por
+     Tocar na foto grande abre a folha "Trocar foto". Escolhida a foto, o dono a enquadra num
+     círculo (arrastar, pinça, controle, roda do mouse, setas). Ao salvar, o quadrado do círculo
+     vira um JPEG de 512 px aqui no aparelho (a foto do celular chega leve e já em pé) e sobe por
      PUT /api/v1/agents/<id>/avatar, onde o servidor confere e refaz. Depois de salvar, avisa a
      página pelo evento "dgavatar" (detail = o agente como /api/v1/agents devolve). */
   const ICO_CAMERA = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2l1.5-2h6l1.5 2h2A1.5 1.5 0 0 1 20 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z"/><circle cx="12" cy="13" r="3.5"/></svg>';
@@ -315,8 +344,14 @@
     $('mlFotoBtn').onclick = () => abreFolhaFoto(agenteAtual || ag);
   }
 
-  /* Lê a imagem (respeitando a rotação da câmera), recorta no centro e devolve um JPEG de até 512 px. */
-  async function preparaFoto(arquivo) {
+  const ICO_MENOR = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="m8 15 3-3 2 2 1-1 2 2"/></svg>';
+  const ICO_MAIOR = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="2"/><circle cx="9" cy="9" r="1.6"/><path d="m4 18 5-5 4 4 3-3 4 4"/></svg>';
+  const ICO_CENTRO = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4"/></svg>';
+  const LADO_TRABALHO = 2048;   // menor lado da cópia de trabalho: dá 512 px nítidos mesmo no zoom 4x
+
+  /* Lê a imagem (respeitando a rotação da câmera) numa tela de trabalho reduzida. A mesma tela é
+     a que aparece no enquadramento e a que é recortada ao salvar, então o que se vê é o que sobe. */
+  async function abreImagem(arquivo) {
     let fonte, w, h, url = '';
     try {
       if (raiz.createImageBitmap) {
@@ -334,20 +369,35 @@
       w = fonte.naturalWidth; h = fonte.naturalHeight;
     }
     try {
-      const r = recorteQuadrado(w, h), lado = Math.min(512, r.lado);
+      if (!w || !h) throw new Error('imagem sem tamanho');
+      const k = Math.min(1, LADO_TRABALHO / Math.min(w, h), 4 * LADO_TRABALHO / Math.max(w, h));
       const cv = document.createElement('canvas');
-      cv.width = cv.height = lado;
+      cv.width = Math.max(1, Math.round(w * k)); cv.height = Math.max(1, Math.round(h * k));
       const cx = cv.getContext('2d');
       cx.fillStyle = '#fff';   // PNG transparente vira fundo branco, não preto
-      cx.fillRect(0, 0, lado, lado);
-      cx.drawImage(fonte, r.sx, r.sy, r.lado, r.lado, 0, 0, lado, lado);
-      const blob = await new Promise(ok => cv.toBlob(ok, 'image/jpeg', 0.9));
-      if (!blob) throw new Error('o navegador não gerou a imagem');
-      return blob;
+      cx.fillRect(0, 0, cv.width, cv.height);
+      cx.drawImage(fonte, 0, 0, cv.width, cv.height);
+      return cv;
     } finally {
       if (url) URL.revokeObjectURL(url);
       if (fonte && fonte.close) fonte.close();
     }
+  }
+
+  /* O quadrado do círculo, do jeito que está enquadrado, num JPEG de 512 px. */
+  async function fotoEnquadrada() {
+    const tela = folha.tela, a = ajusteTela(folha.ajuste), r = recorteDoAjuste(a);
+    const lado = Math.max(1, Math.min(512, Math.round(r.lado)));
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = lado;
+    const cx = cv.getContext('2d');
+    cx.fillStyle = '#fff';
+    cx.fillRect(0, 0, lado, lado);
+    cx.imageSmoothingQuality = 'high';
+    cx.drawImage(tela, r.sx, r.sy, r.lado, r.lado, 0, 0, lado, lado);
+    const blob = await new Promise(ok => cv.toBlob(ok, 'image/jpeg', 0.9));
+    if (!blob) throw new Error('o navegador não gerou a imagem');
+    return blob;
   }
 
   function folhaFoto() {
@@ -361,9 +411,17 @@
       `<div class="ml-fs-cab"><h2 id="mlFotoTit">Trocar foto</h2><button type="button" class="ml-fs-x" data-fs="fechar" aria-label="Fechar">${ICO_X}</button></div>` +
       '<p class="ml-fs-sub" id="mlFotoSub"></p>' +
       '<div class="ml-fs-previa" id="mlFotoPrevia" aria-hidden="true"></div>' +
+      '<div class="ml-fs-corte" id="mlFotoCorte" tabindex="0" role="group" aria-roledescription="enquadramento" ' +
+      'aria-label="Enquadrar a foto. Setas movem a foto; mais e menos aproximam e afastam." hidden>' +
+      '<div class="ml-fs-mascara" aria-hidden="true"></div></div>' +
+      '<p class="ml-fs-ajuste" id="mlFotoAjuste" hidden><b>Ajustar:</b> arraste para posicionar e use o controle para aproximar.</p>' +
+      '<div class="ml-fs-zoom" id="mlFotoZoomLinha" hidden>' +
+      `<label for="mlFotoZoom" class="ml-fs-oculto">Aproximar a foto</label>${ICO_MENOR}` +
+      `<input type="range" id="mlFotoZoom" min="1" max="${ZOOM_MAX}" step="0.01" value="1">${ICO_MAIOR}` +
+      `<button type="button" class="ml-fs-x ml-fs-centro" data-fs="centralizar" aria-label="Voltar ao enquadramento inicial" title="Voltar ao início">${ICO_CENTRO}</button></div>` +
       `<button type="button" class="ml-fs-btn" data-fs="escolher">${ICO_IMAGEM}<span>Escolher foto</span></button>` +
       '<input type="file" id="mlFotoArq" accept="image/*" hidden>' +
-      '<p class="ml-fs-dica">PNG, JPEG ou WebP. A foto fica redonda, cortada pelo centro.</p>' +
+      '<p class="ml-fs-dica" id="mlFotoDica">PNG, JPEG ou WebP. Depois você ajusta o enquadramento.</p>' +
       '<p class="ml-fs-erro" id="mlFotoErro" role="alert" hidden></p>' +
       '<div class="ml-fs-acoes">' +
       `<button type="button" class="ml-fs-btn ml-fs-remover" data-fs="remover">${ICO_LIXO}<span>Remover foto</span></button>` +
@@ -381,6 +439,7 @@
       else if (acao === 'escolher') $('mlFotoArq').click();
       else if (acao === 'salvar') salvaFoto();
       else if (acao === 'remover') removeFoto();
+      else if (acao === 'centralizar') { folha.ajuste = null; pintaCorte(); }
     });
     veu.addEventListener('keydown', ev => {
       if (ev.key === 'Escape') { ev.stopPropagation(); fechaFolhaFoto(); }
@@ -393,20 +452,90 @@
       if (prob) return erroFoto(prob);
       erroFoto('');
       try {
-        folha.blob = await preparaFoto(f);
+        folha.tela = await abreImagem(f);
       } catch (e) {
         console.warn('menu-lado: não consegui abrir a foto escolhida:', e.message);
-        folha.blob = null;
+        folha.tela = null;
+        pintaPrevia();
         return erroFoto('Não consegui abrir essa foto. Escolha uma foto PNG, JPEG ou WebP.');
       }
-      if (folha.previa) URL.revokeObjectURL(folha.previa);
-      folha.previa = URL.createObjectURL(folha.blob);
+      folha.ajuste = null;
       pintaPrevia();
+      $('mlFotoCorte').focus({ preventScroll: true });
     });
+    ligaCorte();
     return veu;
   }
 
-  const folha = { ag: null, blob: null, previa: '', ocupado: false, voltaFoco: null };
+  const folha = { ag: null, tela: null, ajuste: null, ocupado: false, voltaFoco: null };
+
+  /* O ajuste guardado vale para o tamanho atual do quadro (se o quadro mudou, recomeça centrado). */
+  function ajusteTela(a) {
+    const lado = $('mlFotoCorte').clientWidth || 248, t = folha.tela;
+    if (!a || a.lado !== lado || a.w !== t.width || a.h !== t.height) return ajusteInicial(t.width, t.height, lado);
+    return a;
+  }
+
+  function pintaCorte() {
+    if (!folha.tela) return;
+    const a = folha.ajuste = ajusteTela(folha.ajuste), t = folha.tela;
+    const e = escalaCobre(a.w, a.h, a.lado) * a.zoom;
+    t.style.width = (a.w * e) + 'px';
+    t.style.height = (a.h * e) + 'px';
+    t.style.transform = `translate(${a.x}px, ${a.y}px)`;
+    const z = $('mlFotoZoom');
+    z.value = String(a.zoom);
+    z.setAttribute('aria-valuetext', Math.round(a.zoom * 100) + '%');
+  }
+
+  /* Arrastar, pinça, roda do mouse, controle e teclado mexem no mesmo folha.ajuste. */
+  function ligaCorte() {
+    const area = $('mlFotoCorte'), dedos = new Map();
+    const ponto = ev => { const r = area.getBoundingClientRect(); return { x: ev.clientX - r.left, y: ev.clientY - r.top }; };
+    const muda = fn => { if (!folha.tela || folha.ocupado) return; folha.ajuste = fn(ajusteTela(folha.ajuste)); pintaCorte(); };
+    area.addEventListener('pointerdown', ev => {
+      if (!folha.tela || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
+      ev.preventDefault();
+      try { area.setPointerCapture(ev.pointerId); } catch (_) { /* ponteiro já solto */ }
+      dedos.set(ev.pointerId, ponto(ev));
+      area.classList.add('arrastando');
+    });
+    area.addEventListener('pointermove', ev => {
+      const antes = dedos.get(ev.pointerId);
+      if (!antes) return;
+      const agora = ponto(ev);
+      if (dedos.size === 1) muda(a => moveAjuste(a, agora.x - antes.x, agora.y - antes.y));
+      else if (dedos.size === 2) {
+        // pinça: o outro dedo fica parado neste evento; zoom pela distância, mover pelo ponto do meio
+        const outro = [...dedos.entries()].find(([id]) => id !== ev.pointerId)[1];
+        const d0 = Math.hypot(antes.x - outro.x, antes.y - outro.y), d1 = Math.hypot(agora.x - outro.x, agora.y - outro.y);
+        const m0 = { x: (antes.x + outro.x) / 2, y: (antes.y + outro.y) / 2 }, m1 = { x: (agora.x + outro.x) / 2, y: (agora.y + outro.y) / 2 };
+        muda(a => zoomNoPonto(moveAjuste(a, m1.x - m0.x, m1.y - m0.y), a.zoom * (d0 > 0 ? d1 / d0 : 1), m1.x, m1.y));
+      }
+      dedos.set(ev.pointerId, agora);
+    });
+    const solta = ev => { dedos.delete(ev.pointerId); if (!dedos.size) area.classList.remove('arrastando'); };
+    area.addEventListener('pointerup', solta);
+    area.addEventListener('pointercancel', solta);
+    area.addEventListener('lostpointercapture', solta);
+    area.addEventListener('wheel', ev => {
+      if (!folha.tela) return;
+      ev.preventDefault();
+      const p = ponto(ev);
+      muda(a => zoomNoPonto(a, a.zoom * Math.exp(-ev.deltaY * 0.0015), p.x, p.y));
+    }, { passive: false });
+    area.addEventListener('keydown', ev => {
+      const passo = ev.shiftKey ? 32 : 8, k = ev.key;
+      const mov = { ArrowLeft: [passo, 0], ArrowRight: [-passo, 0], ArrowUp: [0, passo], ArrowDown: [0, -passo] }[k];
+      if (mov) muda(a => moveAjuste(a, mov[0], mov[1]));
+      else if (k === '+' || k === '=') muda(a => zoomNoPonto(a, a.zoom * 1.1, a.lado / 2, a.lado / 2));
+      else if (k === '-' || k === '_') muda(a => zoomNoPonto(a, a.zoom / 1.1, a.lado / 2, a.lado / 2));
+      else if (k === '0') muda(a => ajusteInicial(a.w, a.h, a.lado));
+      else return;
+      ev.preventDefault();
+    });
+    $('mlFotoZoom').addEventListener('input', ev => muda(a => zoomNoPonto(a, Number(ev.target.value), a.lado / 2, a.lado / 2)));
+  }
 
   function erroFoto(texto) {
     const e = $('mlFotoErro');
@@ -415,26 +544,38 @@
   }
 
   function pintaPrevia() {
-    const ag = folha.ag, pv = $('mlFotoPrevia');
+    const ag = folha.ag, pv = $('mlFotoPrevia'), corte = $('mlFotoCorte'), tem = !!folha.tela;
+    pv.hidden = tem;
     pv.style.background = ag.cor || '#2f9e5e';
-    pv.innerHTML = folha.previa ? `<img src="${esc(folha.previa)}" alt="">` : fotoDe(ag);
+    pv.innerHTML = fotoDe(ag);
+    corte.hidden = !tem;
+    $('mlFotoAjuste').hidden = !tem;
+    $('mlFotoZoomLinha').hidden = !tem;
+    $('mlFotoDica').hidden = tem;
+    if (tem && folha.tela.parentNode !== corte) {
+      corte.querySelectorAll('canvas').forEach(c => c.remove());
+      folha.tela.className = 'ml-fs-tela';
+      folha.tela.setAttribute('aria-hidden', 'true');
+      corte.insertBefore(folha.tela, corte.firstChild);
+    }
+    if (!tem) corte.querySelectorAll('canvas').forEach(c => c.remove());
+    if (tem) pintaCorte();
     const temFoto = !!(ag.avatar_img || /^https:\/\//i.test(ag.avatar || ''));
     const veu = $('mlFotoVeu');
-    veu.querySelector('[data-fs="salvar"]').disabled = folha.ocupado || !folha.blob;
-    veu.querySelector('[data-fs="remover"]').hidden = !temFoto || !!folha.blob;
-    veu.querySelector('[data-fs="escolher"] span').textContent = (temFoto || folha.blob) ? 'Escolher outra foto' : 'Escolher foto';
+    veu.querySelector('[data-fs="salvar"]').disabled = folha.ocupado || !tem;
+    veu.querySelector('[data-fs="remover"]').hidden = !temFoto || tem;
+    veu.querySelector('[data-fs="escolher"] span').textContent = (temFoto || tem) ? 'Escolher outra foto' : 'Escolher foto';
     veu.querySelectorAll('[data-fs]').forEach(b => { if (b.dataset.fs !== 'salvar') b.disabled = folha.ocupado; });
+    $('mlFotoZoom').disabled = folha.ocupado;
   }
 
   function abreFolhaFoto(ag) {
     const veu = folhaFoto();
-    Object.assign(folha, { ag, blob: null, ocupado: false, voltaFoco: document.activeElement });
-    if (folha.previa) URL.revokeObjectURL(folha.previa);
-    folha.previa = '';
+    Object.assign(folha, { ag, tela: null, ajuste: null, ocupado: false, voltaFoco: document.activeElement });
     $('mlFotoSub').textContent = 'A foto de ' + ag.nome + ' aparece na conversa, no menu e no painel.';
     erroFoto('');
-    pintaPrevia();
     veu.hidden = false;
+    pintaPrevia();
     requestAnimationFrame(() => veu.classList.add('aberto'));
     veu.querySelector('.ml-fs').focus();   // o foco entra na folha sem acender o anel no botão
   }
@@ -444,8 +585,8 @@
     if (!veu || veu.hidden || folha.ocupado) return;
     veu.classList.remove('aberto');
     veu.hidden = true;
-    if (folha.previa) { URL.revokeObjectURL(folha.previa); folha.previa = ''; }
-    folha.blob = null;
+    folha.tela = null; folha.ajuste = null;
+    $('mlFotoCorte').querySelectorAll('canvas').forEach(c => c.remove());
     if (folha.voltaFoco && folha.voltaFoco.focus) folha.voltaFoco.focus();
   }
 
@@ -472,7 +613,15 @@
       if (!$('mlFotoVeu').hidden) pintaPrevia();
     }
   }
-  function salvaFoto() { if (folha.blob) enviaFoto('PUT', folha.blob); }
+  async function salvaFoto() {
+    if (!folha.tela) return;
+    let blob;
+    try { blob = await fotoEnquadrada(); } catch (e) {
+      console.warn('menu-lado: não consegui recortar a foto:', e.message);
+      return erroFoto('Não consegui preparar a foto. Escolha a foto de novo.');
+    }
+    enviaFoto('PUT', blob);
+  }
   function removeFoto() { enviaFoto('DELETE', null); }
 
   /* Foto nova (ou removida) salva: o menu muda na hora e a página é avisada para mudar o resto. */
@@ -504,5 +653,5 @@
   // o seletor nasce com a casca (que monta depois); pinta assim que ele existir
   (function espera(n) { if (document.querySelector('#mlTema [data-tema-op]')) pintaTema(); else if (n > 0) setTimeout(() => espera(n - 1), 200); })(25);
 
-  return { ABAS_PAINEL, LINK_LEMBRETES, itemAgente, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar, recorteQuadrado, problemaArquivo, inicia, marca, extras, abreFolhaFoto };
+  return { ABAS_PAINEL, LINK_LEMBRETES, itemAgente, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar, recorteQuadrado, problemaArquivo, ZOOM_MAX, escalaCobre, limitaAjuste, ajusteInicial, moveAjuste, zoomNoPonto, recorteDoAjuste, inicia, marca, extras, abreFolhaFoto };
 });

@@ -23,6 +23,54 @@
     return saida;
   }
 
+  /** Como agrupa(), mas junta todos os passos de um mesmo pedido (até a próxima fala do dono), mesmo com
+      falas do agente no meio. O grupo fica na posição do primeiro passo. (18/10/2026: "Fez 5 passos") */
+  function agrupaPorTurno(lista) {
+    const saida = [];
+    let grupo = null;
+    for (const m of lista) {
+      if (ehTrilha(m)) {
+        if (grupo) grupo.trilha.push(m);
+        else { grupo = { trilha: [m] }; saida.push(grupo); }
+      } else {
+        if (m && m.origin === 'dono') grupo = null;
+        saida.push({ msg: m });
+      }
+    }
+    return saida;
+  }
+
+  const base = c => String(c || '').split('/').filter(Boolean).pop() || String(c || '');
+  /** O que a linha de um passo mostra: o comando ou o alvo de verdade, sem frase fixa. */
+  function rotuloPasso(t) {
+    if (!t) return '';
+    const f = t.ferramenta;
+    if (f === 'Bash') return String(t.comando || t.titulo || '').split('\n')[0].trim().slice(0, 160);
+    if (f === 'Read' || f === 'Write' || f === 'Edit' || f === 'MultiEdit' || f === 'NotebookEdit') {
+      return base(String(t.titulo || '').replace(/^(gravou|editou)\s+/, ''));
+    }
+    return String(t.titulo || '');
+  }
+  /** Família do passo, para o ícone. */
+  function tipoPasso(f) {
+    if (f === 'Bash') return 'terminal';
+    if (f === 'Read') return 'ler';
+    if (f === 'Write' || f === 'Edit' || f === 'MultiEdit' || f === 'NotebookEdit') return 'editar';
+    if (f === 'Grep' || f === 'Glob') return 'buscar';
+    if (f === 'WebFetch' || f === 'WebSearch') return 'web';
+    if (f === 'Skill') return 'skill';
+    if (f === 'Task' || f === 'Agent') return 'ajuda';
+    return 'outro';
+  }
+  /** 8 s, 1 min 12 s, 2 min, 1 h 5 min */
+  function duracao(seg) {
+    const s = Math.max(0, Math.round(seg));
+    if (s < 60) return s + ' s';
+    const m = Math.floor(s / 60), r = s % 60;
+    if (m < 60) return r && m < 10 ? m + ' min ' + r + ' s' : m + ' min';
+    return Math.floor(m / 60) + ' h ' + (m % 60) + ' min';
+  }
+
   /** Texto da linha fechada de um grupo. */
   function rotuloGrupo(itens) {
     if (itens.length === 1) return 'rodou: ' + itens[0].trilha.titulo;
@@ -44,5 +92,5 @@
     return p.ferramenta + ': ' + (p.comando || p.titulo);
   }
 
-  return { agrupa, rotuloGrupo, textoFila, descricaoPedido, ehTrilha };
+  return { agrupa, agrupaPorTurno, rotuloPasso, tipoPasso, duracao, rotuloGrupo, textoFila, descricaoPedido, ehTrilha };
 });

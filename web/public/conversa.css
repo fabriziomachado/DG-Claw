@@ -841,3 +841,53 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 .acoes .hora-cx .hora{margin:0}
 /* sem a etiqueta "Entrega" visível: os checks bastam; o pedido pendente mantém o aviso */
 .row.alerta-entrega .acoes::after,.row.alerta-pedido:not(.alerta-pendente) .acoes::after{content:none;display:none}
+
+/* ── Passos do pedido (18/10/2026): linha colada no campo + resumo "Fez N passos" na conversa ── */
+#atividade{flex-direction:column;align-items:stretch;gap:0;padding:2px 16px 4px;font-weight:400}
+#atividade .pg-linha{display:flex;align-items:center;gap:9px;min-height:30px;min-width:0}
+#atividade .pg-meta{flex:0 0 auto;color:var(--dg-texto-3);font-size:12.5px;font-variant-numeric:tabular-nums;white-space:nowrap}
+#atividade .pg-meta:empty{display:none}
+#atividade .pg-seta{display:none;flex:0 0 14px;color:var(--dg-texto-3);transition:transform .15s}
+#atividade.trab .pg-seta{display:block}
+#atividade.trab.aberto .pg-seta{transform:rotate(180deg)}
+#atividade.trab .atv-nome,#atividade.trab .atv-sep{display:none}
+#atividade.trab .atv-acao{color:var(--dg-texto)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em}
+/* o ponto vira spinner enquanto ele trabalha */
+#atividade.trab .atv-ponto{width:15px;height:15px;background:none;border-radius:50%;border:2px solid var(--dg-borda);border-top-color:var(--dg-texto-2);
+  animation:pgGira .9s linear infinite;box-sizing:border-box}
+@keyframes pgGira{to{transform:rotate(360deg)}}
+.pg-gira{flex:0 0 15px;width:15px;height:15px;border-radius:50%;border:2px solid var(--dg-borda);border-top-color:var(--dg-texto-2);
+  animation:pgGira .9s linear infinite;box-sizing:border-box}
+#atividade .pg-lista{max-height:min(46vh,360px);overflow:auto;margin:4px 0 2px;overscroll-behavior:contain}
+#atividade .pg-lista[hidden]{display:none}
+
+.pg-passos{list-style:none;margin:0;padding:8px 10px;border:1px solid var(--dg-borda);border-radius:12px;background:var(--dg-superficie);
+  display:flex;flex-direction:column;gap:2px;cursor:default}
+.pg-passo{font-size:13px;color:var(--dg-texto-2);min-width:0}
+.pg-passo,.pg-passo>details>summary{display:flex;align-items:center;gap:8px;min-height:26px}
+.pg-passo>details{flex:1;min-width:0}
+.pg-passo>details>summary{cursor:pointer;list-style:none}
+.pg-passo>details>summary::-webkit-details-marker{display:none}
+.pg-passo>details[open]>summary{color:var(--dg-texto)}
+.pg-passo .pg-rot{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pg-passo .pg-q{flex:0 0 auto;padding-left:8px;font-size:11.5px;color:var(--dg-texto-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.pg-passo.agora{color:var(--dg-texto)}
+.pg-passo.vazio{color:var(--dg-texto-3)}
+.pg-ok{flex:0 0 15px;color:var(--dg-entrega-texto)}
+.pg-erro{flex:0 0 15px;color:var(--dg-erro-texto)}
+.pg-tipo{flex:0 0 14px;color:var(--dg-texto-3)}
+.pg-passo .tl-cmdtxt,.pg-passo .tl-saida,.pg-passo .tl-vazio{margin:4px 0 6px 23px}
+
+/* o resumo na conversa */
+.pg-resumo{font-size:13px}
+.pg-resumo>summary{display:inline-flex;align-items:center;gap:8px;padding:3px 10px 3px 8px;border-radius:999px;border:1px solid var(--dg-borda);
+  color:var(--dg-texto-3);cursor:pointer;list-style:none;min-height:28px}
+.pg-resumo>summary::-webkit-details-marker{display:none}
+.pg-resumo>summary:hover{border-color:var(--dg-texto-3);color:var(--dg-texto-2)}
+.pg-resumo>summary .pg-seta{color:var(--dg-texto-3);transition:transform .15s}
+.pg-resumo[open]>summary .pg-seta{transform:rotate(180deg)}
+.pg-resumo>.pg-passos{margin-top:6px;max-width:560px}
+.row.trilha .pg-resumo>summary{display:inline-flex;min-height:28px;padding:3px 10px 3px 8px}
+.row.trilha .pg-passo>details>summary{display:flex;min-height:26px;padding:0}
+@media (prefers-reduced-motion:reduce){#atividade.trab .atv-ponto,.pg-gira{animation-duration:2.4s}}

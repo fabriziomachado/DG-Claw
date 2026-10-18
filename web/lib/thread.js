@@ -237,7 +237,9 @@ function criarMontagem({ tz, midia }) {
       id: crypto.createHash('sha1').update(`trilha|${ep}|${id}|${uso.titulo}`).digest('hex').slice(0, 16),
       ep, hhmm, dia, origin: 'trilha', text: `rodou: ${uso.titulo}`, kind: 'text', media: null,
       fmt: 'text', editada: false, reacoes: [], cita: null, via: 'plataforma', quem: 'agente',
-      trilha: { ferramenta: uso.ferramenta, titulo: uso.titulo, comando: uso.comando, saida: res.saida, cortado: res.cortado, erro: res.erro },
+      // leitura (Read, Grep, busca na web...): a saída seria o próprio conteúdo lido, então não vai
+      trilha: Object.assign({ ferramenta: uso.ferramenta, titulo: uso.titulo, comando: uso.comando },
+        uso.leitura ? { saida: '', cortado: false, erro: res.erro, leitura: true } : { saida: res.saida, cortado: res.cortado, erro: res.erro }),
     };
     let i = estado.eventos.length;
     while (i > 0 && estado.eventos[i - 1].ep > item.ep) i--;

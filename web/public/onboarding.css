@@ -47,3 +47,13 @@ body.nas-modal-aberto{overflow:hidden}
   .nas-caixa .nas-topo{padding-right:36px}
 }
 @media(prefers-reduced-motion:reduce){.nas-modal,.nas-caixa{animation:none!important;transition:none!important}.nas-pilula{transition:none}}
+
+/* tema escuro (18/10/2026): o cartão de criação usa as superfícies da paleta */
+html[data-tema="escuro"] .nascimento,html[data-tema="escuro"] .nas-caixa{background:var(--dg-superficie);border-color:var(--dg-borda);color:var(--dg-texto)}
+html[data-tema="escuro"] .nascimento :is(h1,h2,h3,h4,p,label,legend,small,li,.nas-rotulo){color:inherit}
+html[data-tema="escuro"] .nascimento :is(input,textarea,select){background:var(--dg-superficie-2);color:var(--dg-texto);border-color:var(--dg-borda)}
+html[data-tema="escuro"] .nas-fechar{background:var(--dg-superficie-2);color:var(--dg-texto)}
+html[data-tema="escuro"] .nas-fechar:hover{background:var(--dg-borda)}
+html[data-tema="escuro"] .nas-trilho{background:var(--dg-superficie-2)}
+html[data-tema="escuro"] .nas-prog-erro{background:var(--dg-erro-fundo);color:var(--dg-erro-texto)}
+html[data-tema="escuro"] .nas-modal{background:var(--dg-sobreposicao)}

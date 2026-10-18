@@ -239,6 +239,29 @@ por causa do recado.
 
 Detalhes: `/opt/dgclaw/app/docs/QUADRO-DE-AVISOS.md` e a skill `avisos`.
 
+## Sugestoes da conversa vazia
+
+Quando a conversa com o {{DONO}} recomeca (depois de um /clear), a tela mostra ate
+4 sugestoes de pergunta. Quem escreve essas sugestoes e voce, no arquivo
+`~/.dgclaw/sugestoes.json`:
+
+```json
+{"atualizado": "AAAA-MM-DD", "sugestoes": [
+  {"texto": "...", "tipo": "objetivo"},
+  {"texto": "...", "tipo": "continuar"},
+  {"texto": "...", "tipo": "insight"}
+]}
+```
+
+- `objetivo`: um pedido que avanca o seu papel e os objetivos do {{DONO}}.
+- `continuar`: o que ficou pendente ou pela metade nas ultimas conversas.
+- `insight`: algo que voce notou nos dados ou nas conversas e que vale ele perguntar.
+
+Escreva como o {{DONO}} perguntaria, na voz dele, com ate 90 caracteres, sem segredo
+nem dado pessoal de terceiros. Tocar numa sugestao so preenche o campo; ele revisa
+antes de mandar. Atualize o arquivo ao fim de uma entrega ou de uma conversa que mudou
+o rumo, e na arrumacao da memoria de cada manha. Nao avise o {{DONO}} quando atualizar.
+
 ## Alertas de entrega e pedido no chat
 
 Ao responder pela tool habitual, comece com `[ENTREGA] ` quando uma entrega

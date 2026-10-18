@@ -7,6 +7,9 @@
 //   GET /api/v1/historico/<slug>/memoria?arquivo=  texto de um arquivo da lista acima
 //   GET /api/v1/historico/<slug>/arquivadas       as conversas que o /clear tirou da tela (arquivo-conversa.js)
 //   GET /api/v1/historico/<slug>/arquivadas/<id>  as mensagens de uma delas
+//   GET /api/v1/historico/<slug>/sugestoes        as sugestões da conversa vazia, que o próprio agente
+//                                                 mantém em ~/.dgclaw/sugestoes.json (objetivo dele e
+//                                                 últimas conversas); texto curto, nunca HTML
 //
 // Tudo roda dentro da caixa do agente, como o próprio agente (podman exec -u agente): o índice e as
 // memórias são dele, e o Web (root) não abre banco nem arquivo escrito por quem lê o mundo. A busca é
@@ -58,6 +61,24 @@ function listaMemorias(saida) {
   return lista;
 }
 
+const ARQ_SUGESTOES = `${CASA}/.dgclaw/sugestoes.json`;
+const TIPOS_SUGESTAO = ['objetivo', 'continuar', 'insight'];
+
+/** sugestoes.json do agente -> até 4 { texto, tipo } limpos, ou [] se o arquivo não presta. */
+function sugestoesValidas(bruto) {
+  let d; try { d = JSON.parse(bruto); } catch (_) { return []; }
+  const lista = Array.isArray(d) ? d : (d && Array.isArray(d.sugestoes) ? d.sugestoes : []);
+  const out = [];
+  for (const x of lista) {
+    const texto = String(typeof x === 'string' ? x : (x && x.texto) || '').replace(/[\u0000-\u001f<>]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (texto.length < 4 || texto.length > 120) continue;
+    const tipo = x && TIPOS_SUGESTAO.includes(x.tipo) ? x.tipo : '';
+    if (!out.some((o) => o.texto === texto)) out.push({ texto, tipo });
+    if (out.length === 4) break;
+  }
+  return out;
+}
+
 // O que a tela de leitura de uma conversa arquivada precisa de cada mensagem.
 function mensagemLeitura(m) {
   const media = m.media ? { kind: m.media.kind, nome: m.media.nome || '' } : null;
@@ -100,7 +121,7 @@ function criarHistorico({ registro, log, conversa = null, arquivoConversa = null
     const p = url.pathname, m = req.method;
     if (p !== '/api/v1/historico' && !p.startsWith('/api/v1/historico/')) return false;
     if (!sessao || sessao.via === 'caixa') { erro(res, 403, 'O histórico só é aberto pelo dono, no navegador.'); return true; }
-    const mm = /^\/api\/v1\/historico\/([^/]+)(?:\/(busca|memorias|memoria|arquivadas)(?:\/(\d+(?:\.\d+)?))?)?$/.exec(p);
+    const mm = /^\/api\/v1\/historico\/([^/]+)(?:\/(busca|memorias|memoria|arquivadas|sugestoes)(?:\/(\d+(?:\.\d+)?))?)?$/.exec(p);
     if (!mm) { erro(res, 404, 'Rota do histórico desconhecida.'); return true; }
     if (mm[3] && mm[2] !== 'arquivadas') { erro(res, 404, 'Rota do histórico desconhecida.'); return true; }
     if (m !== 'GET') { erro(res, 405, 'O histórico é só de leitura: use GET.'); return true; }
@@ -135,6 +156,12 @@ function criarHistorico({ registro, log, conversa = null, arquivoConversa = null
         if (!s) { erro(res, 503, `A busca falhou: ${(r.erro || 'sem resposta').trim().slice(0, 200)}`); return true; }
         const resultados = (s.resultados || []).map((x) => ({ tipo: x.tipo, quando: x.quando, ts: x.ts, dia: x.dia, canal: x.canal, papel: x.papel, ref: x.ref, trecho: x.trecho }));
         json(res, 200, { ok: true, aviso: s.aviso || '', resultados });
+        return true;
+      }
+
+      if (mm[2] === 'sugestoes') {
+        const r = await naCaixa(a, ['head', '-c', '8192', ARQ_SUGESTOES]);
+        json(res, 200, { ok: true, sugestoes: r.ok ? sugestoesValidas(r.saida) : [] });
         return true;
       }
 
@@ -175,4 +202,4 @@ function criarHistorico({ registro, log, conversa = null, arquivoConversa = null
   return { tratar };
 }
 
-module.exports = { criarHistorico, listaMemorias, grupoDe };
+module.exports = { criarHistorico, listaMemorias, grupoDe, sugestoesValidas };

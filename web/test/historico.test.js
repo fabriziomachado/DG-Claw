@@ -2,7 +2,7 @@
 // lib/historico.js: a busca e as memórias rodam na caixa do agente, só para o dono, só leitura.
 const test = require('node:test');
 const assert = require('node:assert');
-const { criarHistorico, listaMemorias, grupoDe } = require('../lib/historico');
+const { criarHistorico, listaMemorias, grupoDe, sugestoesValidas } = require('../lib/historico');
 
 function resposta() {
   const r = { status: 0, corpo: null };
@@ -95,4 +95,18 @@ test('o Admin não tem histórico e o histórico não muda nada', async () => {
   res = resposta();
   await h.tratar({ method: 'POST' }, res, new URL('http://x/api/v1/historico/ana/busca'), dono);
   assert.strictEqual(res.status, 405);
+});
+
+test('sugestões do agente: só texto curto, até 4, sem repetição, tipo conhecido', () => {
+  const l = sugestoesValidas(JSON.stringify({ sugestoes: [
+    { texto: 'Qual curso EAD tem a maior evasão?', tipo: 'objetivo' },
+    { texto: 'Qual curso EAD tem a maior evasão?', tipo: 'insight' },
+    { texto: '<img src=x onerror=alert(1)>', tipo: 'continuar' },
+    { texto: 'ok' }, 'Retome a correção do DB_Evasão', { texto: 'x'.repeat(200) },
+    { texto: 'Compare 2024 com 2023', tipo: 'qualquer' }, { texto: 'Quinta sugestão aqui' }, { texto: 'Sexta sugestão aqui' },
+  ] }));
+  assert.deepStrictEqual(l.map((x) => x.tipo), ['objetivo', 'continuar', '', '']);
+  assert.ok(!l.some((x) => /[<>]/.test(x.texto)));
+  assert.strictEqual(l.length, 4);
+  assert.deepStrictEqual(sugestoesValidas('não é json'), []);
 });

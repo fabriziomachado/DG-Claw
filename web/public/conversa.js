@@ -1394,13 +1394,31 @@ wrap.addEventListener('click', async ev => {
   }
 });
 
-/* Conversa vazia: nunca tela em branco. */
+/* Conversa vazia: nunca tela em branco (18/10/2026, no padrão de estado vazio): o avatar do agente,
+   uma pergunta curta e sugestões que só preenchem o campo (o dono revisa e envia). Depois de um
+   /clear, aponta para as conversas arquivadas no Histórico. */
+const SUGESTOES_VAZIO = ['O que você consegue fazer por mim?', 'O que ficou pendente da última conversa?', 'Me dê um resumo do que você sabe sobre o meu trabalho'];
 function htmlVazio() {
-  return '<div class="vazio"><div class="vz-ico" aria-hidden="true">🦞</div>' +
-    `<b>O ${esc(AGENTE.nome)} está acordando...</b>` +
-    '<small>Ele ainda não escreveu nada por aqui. Assim que responder, a conversa ' +
-    'aparece nesta tela sozinha. Você já pode mandar a primeira mensagem.</small></div>';
+  const img = AGENTE.avatar_img || (/^https:\/\//i.test(AGENTE.avatar || '') ? AGENTE.avatar : '');
+  const foto = img ? `<img src="${esc(img)}" alt="">` : esc(AGENTE.avatar || (AGENTE.nome || '?').slice(0, 1));
+  const comHist = !EH_ADMIN && !!window.DGHistorico;
+  const sub = arquivadasTela && comHist
+    ? 'Conversa nova. As anteriores estão no <button type="button" class="vz-link" data-abre-historico>Histórico</button>.'
+    : `Mande a primeira mensagem para o ${esc(AGENTE.nome)}. A resposta aparece aqui.`;
+  const sug = EH_ADMIN ? '' : '<div class="vz-sug" role="list">' + SUGESTOES_VAZIO.map(t =>
+    `<button type="button" role="listitem" class="vz-chip" data-vz-sugestao="${esc(t)}">${esc(t)}</button>`).join('') + '</div>';
+  return `<div class="vazio"><div class="vz-av" style="background:${esc(AGENTE.cor || '#2f9e5e')}" aria-hidden="true">${foto}</div>` +
+    `<b>Como posso ajudar?</b><small>${sub}</small>${sug}</div>`;
 }
+wrap.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-vz-sugestao]');
+  if (!b) return;
+  const campo = $('entrada');
+  campo.value = b.dataset.vzSugestao;
+  campo.dispatchEvent(new Event('input', { bubbles: true }));
+  campo.focus();
+  try { campo.setSelectionRange(campo.value.length, campo.value.length); } catch (_) { /* campo sem seleção */ }
+});
 
 /* Dia e hora de cada mensagem no fuso de QUEM ESTÁ LENDO, a partir do ep. O servidor formata no
    fuso dele (a KVM de teste roda em UTC): depois das 21h de Brasília a mensagem virava "dia

@@ -868,7 +868,47 @@ const ICONE_COPIAR = '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidde
 
 function textoEmParagrafos(txt, fmt) {
   return txt.split(/\n[ \t]*\n+/).filter(p => p.trim() !== '')
-    .map(p => `<div class="p">${formata(linkify(esc(p.trim())), fmt)}</div>`).join('');
+    .map(p => paragrafoComTabelas(p.trim(), fmt)).join('');
+}
+
+/* Tabela em Markdown (| a | b | com a linha |---|) vira tabela de verdade (18/10/2026): os
+   agentes respondem dados assim e a linha crua cheia de barras era ilegível. O texto do
+   parágrafo antes e depois da tabela continua como parágrafo. Cada célula passa pelo mesmo
+   esc + linkify + formata do resto, então negrito e link funcionam dentro dela. */
+const RX_LINHA_TAB = /^\s*\|.*\|\s*$/;
+const RX_SEP_TAB = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+function celulasTab(linha) {
+  return linha.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+}
+function htmlTabela(linhas, fmt) {
+  const cab = celulasTab(linhas[0]);
+  const alin = celulasTab(linhas[1]).map(c => /^:-+:$/.test(c) ? 'center' : /-:$/.test(c) ? 'right' : '');
+  const corpo = linhas.slice(2).map(celulasTab);
+  const cel = c => formata(linkify(esc(c)), fmt);
+  // coluna só de números (1.234, 7,5%, R$ 10) alinha à direita, como planilha
+  const numerica = cab.map((_, i) => corpo.length > 0 && corpo.every(r => /^[\s*_]*[-+]?(R\$\s*)?[\d.,]+\s*%?[\s*_]*$/.test(r[i] || '')));
+  const st = i => { const a = alin[i] || (numerica[i] ? 'right' : ''); return a ? ` style="text-align:${a}"` : ''; };
+  return '<div class="tabela-md"><table><thead><tr>' + cab.map((c, i) => `<th${st(i)}>${cel(c)}</th>`).join('') +
+         '</tr></thead><tbody>' + corpo.map(r => '<tr>' + cab.map((_, i) => `<td${st(i)}>${cel(r[i] || '')}</td>`).join('') + '</tr>').join('') +
+         '</tbody></table></div>';
+}
+function paragrafoComTabelas(p, fmt) {
+  const linhas = p.split('\n');
+  let html = '', texto = [];
+  const soltaTexto = () => { if (texto.length) html += `<div class="p">${formata(linkify(esc(texto.join('\n').trim())), fmt)}</div>`; texto = []; };
+  for (let i = 0; i < linhas.length; i++) {
+    if (RX_LINHA_TAB.test(linhas[i]) && i + 1 < linhas.length && RX_SEP_TAB.test(linhas[i + 1])) {
+      let j = i + 2;
+      while (j < linhas.length && RX_LINHA_TAB.test(linhas[j])) j++;
+      soltaTexto();
+      html += htmlTabela(linhas.slice(i, j), fmt);
+      i = j - 1;
+    } else {
+      texto.push(linhas[i]);
+    }
+  }
+  soltaTexto();
+  return html;
 }
 
 /* ```bloco``` vira a "caixa de texto" com fundo mais escuro e o botão de

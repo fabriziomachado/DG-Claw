@@ -733,3 +733,21 @@ html:not([data-tema="x"]) body .row.alerta-pedido .bub{background:var(--dg-pedid
 html:not([data-tema="x"]) body .row.alerta-entrega .bub{background:var(--dg-entrega-fundo);border:1px solid var(--dg-entrega-borda)}
 html:not([data-tema="x"]) body .row.alerta-pedido .bub strong,
 html:not([data-tema="x"]) body .row.alerta-pedido .bub b{color:var(--dg-texto)}
+
+/* tabelas que os agentes mandam em Markdown (18/10/2026) */
+.tabela-md{margin:8px 0 12px;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;
+           border:1px solid var(--dg-borda);border-radius:12px}
+.tabela-md table{border-collapse:collapse;width:100%;font-size:14.5px;line-height:1.45;font-variant-numeric:tabular-nums}
+.tabela-md th,.tabela-md td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--dg-borda);white-space:nowrap}
+.tabela-md td:first-child,.tabela-md th:first-child{white-space:normal;min-width:9em}
+.tabela-md th{font-weight:600;background:var(--dg-superficie-2);color:var(--dg-texto)}
+.tabela-md tbody tr:last-child td{border-bottom:0}
+.tabela-md tbody tr:nth-child(even) td{background:color-mix(in srgb,var(--dg-superficie-2) 45%,transparent)}
+.row.me .tabela-md{background:var(--dg-superficie)}
+
+/* celular: as ferramentas do topo ficam na mesma linha do nome, sem uma segunda fileira */
+@media (max-width:700px){
+  header .ferr{order:0;flex:0 1 auto;max-width:45%;margin-top:0}
+  header .ferr .tools{padding:0}
+}
+@media (max-width:520px){.tabela-md th,.tabela-md td{padding:7px 9px}.tabela-md table{font-size:14px}}

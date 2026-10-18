@@ -306,6 +306,7 @@
     if (c.tipo === 'grafico' || c.tipo === 'gráfico') return grafico(c);
     if (c.tipo === 'leitura') return leitura(c);
     if (c.tipo === 'escolha') return escolha(c);
+    if (c.tipo === 'painel' && c.vivo && !c._vivoDentro && fundo === 0) return painelVivo(c, fundo);
     if (c.tipo === 'painel' && Array.isArray(c.filtros) && c.filtros.length && c.variantes && typeof c.variantes === 'object') return painelComFiltros(c, fundo);
     if (c.tipo === 'painel') {
       // a fonte do painel vale para os gráficos de dentro (sai na imagem baixada), sem repetir na tela
@@ -355,6 +356,99 @@
       if (corpo) corpo.innerHTML = corpoFiltrado(c, sel, 0);
     }
   }
+
+  /* Painel que se atualiza (18/10/2026, ideia 4): "vivo": {"id", "a_cada_min"}. O agente deixa um
+     script em ~/.dgclaw/paineis/<id>.sh que imprime o painel; o Web roda e guarda (paineis-vivos.js).
+     A tela mostra a versão mais nova que já tem (vivoCache) e, quando passa do intervalo, pede outra.
+     Discreto, como o dono pediu: "atualizado há 3 min" e um ícone de atualizar. */
+  const RX_VIVO = /^[a-z0-9][a-z0-9-]{0,39}$/;
+  const vivoCache = new Map();   // "agente/id" -> { painel, atualizado }
+  const agenteDaTela = () => raiz.DGUI_AGENTE || ((/^\/a\/([^/]+)/.exec((raiz.location && raiz.location.pathname) || '') || [])[1] || '');
+  const ICO_ATU = svgIco('<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/>');
+  function painelVivo(c, fundo) {
+    const v = c.vivo || {};
+    const id = String(v.id || ''), ag = agenteDaTela();
+    if (!RX_VIVO.test(id) || !ag) return componente(Object.assign({}, c, { _vivoDentro: true }), fundo);
+    const k = ag + '/' + id, cache = vivoCache.get(k);
+    const base = cache && cache.painel && typeof cache.painel === 'object' ? normaliza(Object.assign({}, cache.painel, { tipo: 'painel' }), 0) : c;
+    const min = Math.max(1, Math.min(1440, Number(v.a_cada_min) || 15));
+    const quando = cache && cache.atualizado ? cache.atualizado : 0;
+    return `<div class="dgui-vivo" data-dgui-vivo="${esc(k)}" data-a-cada="${min}" data-quando="${quando}">` +
+      `<div class="dgui-vivo-meta"><span class="dgui-vivo-txt">${esc(textoQuando(quando))}</span>` +
+      `<button type="button" class="dgui-vivo-atu" data-dgui-vivo-atu="${esc(k)}" title="Atualizar agora" aria-label="Atualizar agora">${ICO_ATU}</button></div>` +
+      componente(Object.assign({}, base, { vivo: v, _vivoDentro: true }), fundo) + '</div>';
+  }
+  function textoQuando(ms) {
+    if (!ms) return 'ainda não atualizado';
+    const m = Math.round((Date.now() - ms) / 60000);
+    return m < 1 ? 'atualizado agora' : m < 60 ? `atualizado há ${m} min` : m < 1440 ? `atualizado há ${Math.floor(m / 60)} h` : `atualizado em ${new Date(ms).toLocaleDateString('pt-BR')}`;
+  }
+  async function vivoPede(k, atualiza) {
+    const [ag, id] = k.split('/');
+    const url = '/api/v1/paineis/' + encodeURIComponent(ag) + '/' + encodeURIComponent(id) + (atualiza ? '/atualizar' : '');
+    const r = await fetch(url, { method: atualiza ? 'POST' : 'GET', credentials: 'same-origin', cache: 'no-store' });
+    const d = await r.json().catch(() => null);
+    if (!r.ok || !d || d.ok === false) throw new Error((d && d.erro) || 'erro ' + r.status);
+    return d;
+  }
+  function vivoRedesenha(k) {
+    for (const el of raiz.document.querySelectorAll('[data-dgui-vivo="' + (raiz.CSS && raiz.CSS.escape ? raiz.CSS.escape(k) : k) + '"]')) {
+      const c = registro.get(el.dataset.dguiVivoChave);
+      if (!c) continue;
+      const tmp = raiz.document.createElement('div');
+      tmp.innerHTML = painelVivo(c, 0);
+      const novo = tmp.firstElementChild;
+      novo.dataset.dguiVivoChave = el.dataset.dguiVivoChave;
+      novo.dataset.vivoVisto = '1';
+      el.replaceWith(novo);
+    }
+  }
+  const vivoAndando = new Set();
+  async function vivoAtualiza(k, forcar) {
+    if (vivoAndando.has(k)) return;
+    vivoAndando.add(k);
+    raiz.document.querySelectorAll('[data-dgui-vivo-atu="' + k + '"]').forEach((b) => b.classList.add('girando'));
+    try {
+      if (!forcar) {
+        const d = await vivoPede(k, false);
+        if (d.painel) vivoCache.set(k, { painel: d.painel, atualizado: d.atualizado });
+        const el = raiz.document.querySelector('[data-dgui-vivo="' + k + '"]');
+        const min = el ? Number(el.dataset.aCada) || 15 : 15;
+        if (d.painel && d.atualizado && Date.now() - d.atualizado < min * 60000) { vivoRedesenha(k); return; }
+      }
+      const d2 = await vivoPede(k, true);
+      if (d2.painel) vivoCache.set(k, { painel: d2.painel, atualizado: d2.atualizado });
+      vivoRedesenha(k);
+    } catch (e) {
+      raiz.document.querySelectorAll('[data-dgui-vivo="' + k + '"] .dgui-vivo-txt').forEach((t) => { t.textContent = 'não consegui atualizar'; t.title = e.message; });
+    } finally {
+      vivoAndando.delete(k);
+      raiz.document.querySelectorAll('[data-dgui-vivo-atu="' + k + '"]').forEach((b) => b.classList.remove('girando'));
+    }
+  }
+  // Painéis vivos novos na tela: guarda os dados originais e confere se há versão mais nova.
+  function vivoProcura() {
+    if (!raiz.document || raiz.document.hidden) return;
+    for (const el of raiz.document.querySelectorAll('[data-dgui-vivo]')) {
+      const k = el.dataset.dguiVivo;
+      if (!el.dataset.vivoVisto) {
+        el.dataset.vivoVisto = '1';
+        const comp = el.closest('.dgui');
+        if (comp && !el.dataset.dguiVivoChave) {
+          // a chave do painel original: refeita do bloco que a conversa desenhou
+          const c = vivoOriginal.get(k);
+          if (c) el.dataset.dguiVivoChave = chave(c);
+        }
+        vivoAtualiza(k, false);
+        continue;
+      }
+      const t = el.querySelector('.dgui-vivo-txt');
+      const q = Number(el.dataset.quando) || 0;
+      if (t && q) t.textContent = textoQuando(q);
+      if (q && Date.now() - q > (Number(el.dataset.aCada) || 15) * 60000) vivoAtualiza(k, true);
+    }
+  }
+  const vivoOriginal = new Map();   // "agente/id" -> painel como veio na mensagem
 
   // KPIs seguidos ficam lado a lado numa fileira; o resto ocupa a largura toda
   function grade(itens, fundo) {
@@ -428,6 +522,9 @@
       return `<div class="dgui">${aviso('o JSON do bloco está inválido (' + String(e.message).slice(0, 120) + ')')}<pre class="dgui-cru">${esc(m[1].slice(0, 2000))}</pre></div>`;
     }
     dados = normaliza(dados, 0);
+    if (dados && dados.tipo === 'painel' && dados.vivo && RX_VIVO.test(String(dados.vivo.id || '')) && agenteDaTela()) {
+      vivoOriginal.set(agenteDaTela() + '/' + dados.vivo.id, dados);
+    }
     const analitico = dados && !Array.isArray(dados) && ['painel', 'grafico', 'gráfico', 'tabela'].includes(dados.tipo);  // escolha não leva sugestões
     const sug = analitico ? sugestoes(Array.isArray(dados.sugestoes) && dados.sugestoes.length ? dados.sugestoes : sugestoesPadrao(dados)) : '';
     return `<div class="dgui">${componente(dados, 0)}${sug}</div>`;
@@ -636,6 +733,14 @@
     });
     lins.forEach((l) => corpo.appendChild(l));
   }
+  if (raiz.document && typeof MutationObserver === 'function') {
+    let agendado = false;
+    const olha = () => { if (agendado) return; agendado = true; setTimeout(() => { agendado = false; vivoProcura(); }, 120); };
+    raiz.document.addEventListener('DOMContentLoaded', () => { if (raiz.document.body) new MutationObserver(olha).observe(raiz.document.body, { childList: true, subtree: true }); olha(); });
+    if (raiz.document.body) new MutationObserver(olha).observe(raiz.document.body, { childList: true, subtree: true });
+    setInterval(vivoProcura, 60000);
+    raiz.document.addEventListener('visibilitychange', olha);
+  }
   if (raiz.document) {
     raiz.document.addEventListener('click', (ev) => {
       if (!ev.target.closest) return;
@@ -643,6 +748,8 @@
       if (th) { ordena(th); return; }
       const acao = ev.target.closest('[data-dgui-acao]');
       if (acao) { age(acao); return; }
+      const atu = ev.target.closest('[data-dgui-vivo-atu]');
+      if (atu) { vivoAtualiza(atu.dataset.dguiVivoAtu, true); return; }
       const fchip = ev.target.closest('.dgui-fchip[data-dgui-filtro]');
       if (fchip) { trocaFiltro(fchip, fchip.dataset.fv); return; }
       const leg = ev.target.closest('[data-dgui-serie]');

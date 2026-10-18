@@ -58,6 +58,7 @@ A frase antes do bloco é obrigatória: no Telegram e no WhatsApp o bloco não �
 | `tabela` | `titulo`, `colunas` (textos, ou `{"nome","alinha":"direita|centro"}`), `linhas` (lista de listas), `ordenavel` (padrão `true`) | Números alinham à direita sozinhos. Até 300 linhas. |
 | `grafico` | `forma` (`barras`, `colunas`, `linhas`, `pizza`), `titulo`, `unidade` (`"%"`, `"R$"`, `"alunos"`), `categorias`, `series` (`[{"nome","valores":[...]}]`) | Até 6 séries e 80 categorias. Pizza usa só a primeira série. |
 | `leitura` | `titulo` (padrão "Leitura do especialista"), `destaques` (3 frases curtas, ou `{"tipo":"alerta|queda|alta|ideia|ok","texto"}`), `detalhe` (texto com `**negrito**`, parágrafos e itens `- `) | A interpretação dos dados. Os destaques ficam à vista; o detalhe abre em "Ver análise completa". |
+| `escolha` | `pergunta`, `opcoes` (textos, ou `{"texto","detalhe","recomendada":true}`) | Para uma decisão do dono (junto do `[PEDIDO]`): lista A, B, C para tocar e "Outra resposta". A opção tocada chega como a resposta dele. |
 | `painel` | `titulo`, `itens` (lista de componentes), `fonte`, `atualizado`, `sugestoes` | Um painel por resposta costuma bastar. |
 
 ## Interpretação: no componente `leitura`, não em textão

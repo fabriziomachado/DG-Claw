@@ -1229,14 +1229,20 @@ function separaDoVisual(txt) {
 /* ✓ entregue / ✓✓ azul lido, como no WhatsApp, nas mensagens do dono (18/10/2026): "lido" é o
    agente ter feito algo depois dela (respondido ou rodado um comando). lidoAteEp vem do render. */
 let lidoAteEp = 0;
+// até onde VOCÊ já viu as mensagens do agente neste aparelho (as do agente ganham ✓ / ✓✓ também)
+let vistoAteEp = 0;
+try { vistoAteEp = Number(localStorage.getItem('dgclaw-visto-ate:' + AGENTE.id)) || 0; } catch (_) { /* sem storage */ }
 const CHECK_1 = '<svg viewBox="0 0 16 11" width="15" height="11" aria-hidden="true"><path d="M1.5 5.8l3 3L11 2.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 const CHECK_2 = '<svg viewBox="0 0 20 11" width="18" height="11" aria-hidden="true"><path d="M1.5 5.8l3 3L11 2.2M7.5 8.6l.4.2L15 2.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 function htmlHora(m, extra) {
   if (!m || m.pendente || typeof m.ep !== 'number') return '';
   const hora = `<span class="hora" data-ep="${m.ep}" title="${esc(m.dia + ' ' + m.hhmm)}">` +
                `${m.editada ? 'editada · ' : ''}${esc(m.hhmm)}</span>`;
-  if (!ehDono(m)) return hora;
-  const lido = lidoAteEp >= m.ep;
+  const lido = ehDono(m) ? lidoAteEp >= m.ep : vistoAteEp >= m.ep;
+  if (!ehDono(m)) {
+    return `<span class="hora-cx">${hora}<span class="checks${lido ? ' lido' : ''}" data-ep-chk="${m.ep}" title="${lido ? 'você viu' : 'chegou, você ainda não viu'}" ` +
+           `aria-label="${lido ? 'vista por você' : 'não vista'}">${lido ? CHECK_2 : CHECK_1}</span></span>`;
+  }
   return `<span class="hora-cx">${hora}<span class="checks${lido ? ' lido' : ''}" title="${lido ? 'lida pelo agente' : 'entregue ao agente'}" ` +
          `aria-label="${lido ? 'lida' : 'entregue'}">${lido ? CHECK_2 : CHECK_1}</span></span>`;
 }
@@ -1512,7 +1518,8 @@ function render(opt) {
   aplicaNos(nos);
   humanizaHoras();
   // os filtros nascem mais abaixo (alertas): antes disso, um render do cache não pode tocá-los
-  if (filtrosProntos) { aplicaFiltro(); observaVistos(); }
+  if (filtrosProntos) { aplicaFiltro(); observaVistos(); observaLeitura(); }
+  if (window.dgui && window.dgui.restauraEscolhas) window.dgui.restauraEscolhas(wrap);
   visuaisAposRender();
   respiroDasFaixas();
   guardaCache();
@@ -4210,6 +4217,31 @@ const olhoVisto = 'IntersectionObserver' in window ? new IntersectionObserver(en
     }, 1200);
   }
 }, { root: chat, threshold: [0, 0.5, 1] }) : null;
+/* ✓✓ azul nas mensagens do agente quando ficam à vista por 1 s (guardado por aparelho) */
+const olhoLeitura = 'IntersectionObserver' in window ? new IntersectionObserver(entradas => {
+  for (const en of entradas) {
+    const el = en.target;
+    clearTimeout(el._lerT);
+    if (!en.isIntersecting || en.intersectionRatio < 0.5) continue;
+    el._lerT = setTimeout(() => {
+      if (document.hidden) return;
+      const ep = Number(el.dataset.epChk) || 0;
+      if (ep <= vistoAteEp) return;
+      vistoAteEp = ep;
+      try { localStorage.setItem('dgclaw-visto-ate:' + AGENTE.id, String(vistoAteEp)); } catch (_) { /* sem storage */ }
+      for (const c of wrap.querySelectorAll('.checks[data-ep-chk]')) {
+        if (Number(c.dataset.epChk) <= vistoAteEp && !c.classList.contains('lido')) {
+          c.classList.add('lido'); c.innerHTML = CHECK_2; c.title = 'você viu'; c.setAttribute('aria-label', 'vista por você');
+        }
+      }
+    }, 1000);
+  }
+}, { root: chat, threshold: [0, 0.5, 1] }) : null;
+function observaLeitura() {
+  if (!olhoLeitura) return;
+  olhoLeitura.disconnect();
+  for (const c of wrap.querySelectorAll('.checks[data-ep-chk]:not(.lido)')) olhoLeitura.observe(c);
+}
 filtrosProntos = true;
 function observaVistos() {
   if (!olhoVisto) return;

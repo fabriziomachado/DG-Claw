@@ -451,13 +451,13 @@ function htmlPasso(i, seg) {
   const t = i.trilha;
   const rot = TR.rotuloPasso(t);
   const tipo = TR.tipoPasso(t.ferramenta);
-  const cab = `${t.erro ? IC_FALHOU : IC_FEITO}${icPasso(tipo)}<span class="pg-rot${tipo === 'terminal' ? ' mono' : ''}">${esc(rot)}</span>` +
+  const cab = `${t.erro ? IC_FALHOU : IC_FEITO}${icPasso(tipo)}<span class="pg-rot">${esc(rot)}</span>` +
     (seg != null ? `<span class="pg-q">${esc(TR.duracao(seg))}</span>` : '');
   const temDetalhe = !t.leitura || t.erro;
-  if (!temDetalhe) return `<li class="pg-passo" title="${esc(t.titulo)}">${cab}</li>`;
+  if (!temDetalhe) return `<li class="pg-passo" title="${esc(t.comando || t.titulo)}">${cab}</li>`;
   const saida = t.saida ? `<pre class="tl-saida${t.erro ? ' erro' : ''}">${esc(t.saida)}${t.cortado ? '\n…' : ''}</pre>`
     : `<div class="tl-vazio">${t.erro ? 'falhou, sem texto de saída' : 'sem saída'}</div>`;
-  return `<li class="pg-passo"><details data-tl="${esc(i.id)}"${trilhaAbertas.has(i.id) ? ' open' : ''}><summary title="${esc(t.titulo)}">${cab}</summary>` +
+  return `<li class="pg-passo"><details data-tl="${esc(i.id)}"${trilhaAbertas.has(i.id) ? ' open' : ''}><summary title="${esc(t.comando || t.titulo)}">${cab}</summary>` +
     `<pre class="tl-cmdtxt">${esc(t.comando)}</pre>${saida}</details></li>`;
 }
 /* Os passos feitos, cada um com o tempo até o próximo (o último, até `fimEp`). */
@@ -474,9 +474,9 @@ function pintaPassos(est) {
   const rot = p ? TR.rotuloPasso(p) : (est.acao === 'pensando' ? 'pensando…' : acaoAmigavel(est.acao));
   atvNomeEl.textContent = '';
   atvSepEl.hidden = true;
-  atvAcaoEl.className = 'atv-acao' + (p && p.ferramenta === 'Bash' ? ' mono' : '');
+  atvAcaoEl.className = 'atv-acao';
   atvAcaoEl.textContent = rot;
-  atvAcaoEl.title = p ? p.titulo : '';
+  atvAcaoEl.title = p ? (p.comando || p.titulo || '') : '';
   const n = feitos.length + (p ? 1 : 0);
   const ini = desde || (Date.parse(est.desde || '') / 1000) || agoraSeg;
   pgMetaEl.textContent = (n ? (n === 1 ? '1 passo · ' : n + ' passos · ') : '') + mmss(agoraSeg - ini);
@@ -484,7 +484,7 @@ function pintaPassos(est) {
   if (pgAberto) {
     const inicioAgora = p ? (Date.parse(est.desde || '') / 1000 || agoraSeg) : agoraSeg;
     const agoraLi = p ? `<li class="pg-passo agora"><i class="pg-gira" aria-hidden="true"></i>${icPasso(TR.tipoPasso(p.ferramenta))}` +
-      `<span class="pg-rot${p.ferramenta === 'Bash' ? ' mono' : ''}">${esc(rot)}</span><span class="pg-q">${esc(TR.duracao(agoraSeg - inicioAgora))}</span></li>` : '';
+      `<span class="pg-rot">${esc(rot)}</span><span class="pg-q">${esc(TR.duracao(agoraSeg - inicioAgora))}</span></li>` : '';
     const html = '<ul class="pg-passos">' + (feitos.length || agoraLi ? htmlPassos(feitos, inicioAgora) + agoraLi
       : `<li class="pg-passo vazio">${esc(AGENTE.nome)} ainda não rodou nenhum passo neste pedido.</li>`) + '</ul>';
     if (pgListaEl.innerHTML !== html) pgListaEl.innerHTML = html;

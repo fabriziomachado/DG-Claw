@@ -733,7 +733,7 @@ header #btnMesa,header #btnLembretes,header #btnTutorial,header #btnSigilo{displ
 #fileira::-webkit-scrollbar{display:none}
 #fileira .fil{position:relative;flex:0 0 76px;display:flex;flex-direction:column;align-items:center;gap:5px;
   padding:4px 0 10px;text-decoration:none;color:var(--dg-texto-2);border-radius:12px;-webkit-tap-highlight-color:transparent}
-#fileira .fil:hover{background:var(--dg-superficie-2)}
+@media(hover:hover){#fileira .fil:hover{background:var(--dg-superficie-2)}}
 #fileira .fil:focus-visible{outline:2px solid var(--dg-azul);outline-offset:-2px}
 #fileira .fil-foto{display:flex;align-items:center;justify-content:center;width:52px;height:52px;border-radius:50%;
   overflow:hidden;color:#fff;font-size:22px;font-weight:600;line-height:1;

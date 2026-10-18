@@ -310,7 +310,7 @@ function atvFrase(est) {
              classe: 'atv-alerta', titulo: est.detalhe || '' };
   }
   if (est.alerta === 'ferramenta_longa') {
-    return { nome: nome, acao: (est.detalhe || est.acao) + ' rodando' + (d ? ' há ' + d : ''), classe: 'atv-alerta',
+    return { nome: nome, acao: acaoAmigavel(est.detalhe || est.acao) + ' rodando' + (d ? ' há ' + d : ''), classe: 'atv-alerta',
              titulo: est.detalhe || '' };
   }
   if (est.alerta === 'sem_escrita') {
@@ -320,11 +320,30 @@ function atvFrase(est) {
   }
   const longa = est.acao !== 'pensando' && est.desde &&
     atvAgoraMs() - Date.parse(est.desde) >= 60000;
-  const oQue = est.detalhe || est.acao;
+  const oQue = acaoAmigavel(est.detalhe || est.acao);
   return { nome: nome + ' está trabalhando',
            acao: oQue + (longa && d ? ', há ' + d : ''),
            base: oQue, classe: longa ? 'atv-longa' : '', titulo: est.detalhe || '' };
 }
+/* Nome técnico da ferramenta vira frase de gente na faixa "está trabalhando" (18/10/2026):
+   "mcp__dgchat__reply" virava texto cru para o dono. O que não está na lista passa como veio. */
+const ACOES_AMIGAVEIS = {
+  mcp__dgchat__reply: 'escrevendo a resposta', mcp__dgchat__send_file: 'enviando um arquivo',
+  mcp__dgchat__whatsapp_reply: 'respondendo no WhatsApp', mcp__dgchat__whatsapp_send_file: 'enviando um arquivo no WhatsApp',
+  Bash: 'rodando um comando', Read: 'lendo um arquivo', Edit: 'editando um arquivo', Write: 'escrevendo um arquivo',
+  MultiEdit: 'editando um arquivo', NotebookEdit: 'editando um caderno', Grep: 'procurando nos arquivos', Glob: 'procurando arquivos',
+  WebFetch: 'lendo uma página da internet', WebSearch: 'pesquisando na internet', Skill: 'seguindo uma skill',
+  Task: 'pedindo ajuda a um subagente', Agent: 'pedindo ajuda a um subagente', TodoWrite: 'organizando as tarefas',
+  ToolSearch: 'procurando uma ferramenta',
+};
+function acaoAmigavel(t) {
+  const s = String(t || '');
+  if (ACOES_AMIGAVEIS[s]) return ACOES_AMIGAVEIS[s];
+  const m = /^mcp__(?:claude_ai_)?([^_]+(?:_[^_]+)*?)__(.+)$/.exec(s);
+  if (m) return 'usando ' + m[1].replace(/_/g, ' ');
+  return s;
+}
+
 function pintaAtividade() {
   if (!atividadeEl || demoAtividade) return;
   const foto = window.atividadeFoto;

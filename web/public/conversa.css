@@ -131,13 +131,13 @@
   /* ── Faixas de aviso e de erro (nunca erro mudo) ── */
   .faixa{position:fixed;left:8px;right:8px;bottom:calc(var(--barra-h) + 8px);z-index:30;
          border-radius:10px;padding:10px 12px;font-size:13.5px;display:none;
-         box-shadow:0 2px 10px rgba(0,0,0,.18);line-height:1.4}
+         box-shadow:var(--dg-sombra);line-height:1.4}
   .faixa.aparece{display:flex;gap:8px;align-items:flex-start}
   .faixa .txt{flex:1}
   .faixa .x{border:0;background:transparent;color:inherit;font-size:16px;cursor:pointer;
             min-width:32px;min-height:32px}
-  #faixaErro{background:#fbe0e0;color:#8f2f2f;border:1px solid #f0bcbc}
-  #faixaAviso{background:#fdf3d0;color:#7a5c12;border:1px solid #efe0a8;
+  #faixaErro{background:var(--dg-erro-fundo);color:var(--dg-erro-texto);border:1px solid var(--dg-erro-borda)}
+  #faixaAviso{background:var(--dg-pedido-fundo);color:var(--dg-pedido-texto);border:1px solid var(--dg-pedido-borda);
               bottom:calc(var(--barra-h) + 8px)}
   #faixaErro.aparece + #faixaAviso.aparece{bottom:calc(var(--barra-h) + 66px)}
   /* botões dentro da faixa ("Tentar de novo", "Descartar"): numa linha própria
@@ -244,21 +244,21 @@
      não alcança mais aqui, mas #estado precisa respeitar o hidden. */
   .who #estado[hidden]{display:none}
   #atividade{flex:0 0 auto;display:flex;align-items:center;gap:8px;cursor:pointer;
-             padding:7px 14px;background:#cfe3c8;color:var(--dg-texto-2);font-size:13.5px;font-weight:600;
-             border-top:1px solid rgba(0,0,0,.05)}
+             padding:6px 16px;background:var(--dg-fundo);color:var(--dg-texto-2);font-size:13px;font-weight:500;
+             border-top:0}
   #atividade[hidden]{display:none}
   #atividade .atv-txt{display:block;min-width:0;flex:1 1 auto;white-space:nowrap;overflow:hidden;
                 text-overflow:ellipsis}
   #atividade .atv-acao{transition:opacity .15s}
   #atividade .atv-acao.troca{opacity:0}
-  .atv-ponto{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:#23784a;
+  .atv-ponto{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--dg-entrega-texto);
              animation:atvPulsa 1.6s ease-in-out infinite}
   #atividade.atv-longa .atv-ponto{animation-duration:3s}
   #atividade.atv-alerta .atv-ponto,#atividade.atv-cinza .atv-ponto{animation:none}
-  #atividade.atv-alerta .atv-ponto{background:#b7791f}
-  #atividade.atv-cinza .atv-ponto{background:#8a948d}
-  #atividade.atv-alerta .atv-txt{color:#8a5a0f}
-  #atividade.atv-cinza .atv-txt{color:#6f7a72}
+  #atividade.atv-alerta .atv-ponto{background:var(--dg-pedido-texto)}
+  #atividade.atv-cinza .atv-ponto{background:var(--dg-texto-3)}
+  #atividade.atv-alerta .atv-txt{color:var(--dg-pedido-texto)}
+  #atividade.atv-cinza .atv-txt{color:var(--dg-texto-3)}
   @keyframes atvPulsa{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
   @media (prefers-reduced-motion:reduce){
     .atv-ponto{animation:none}
@@ -751,3 +751,7 @@ html:not([data-tema="x"]) body .row.alerta-pedido .bub b{color:var(--dg-texto)}
   header .ferr .tools{padding:0}
 }
 @media (max-width:520px){.tabela-md th,.tabela-md td{padding:7px 9px}.tabela-md table{font-size:14px}}
+
+/* faixa "está trabalhando": discreta, centralizada na coluna, nome em destaque leve (18/10/2026) */
+#atividade{max-width:780px;width:100%;margin:0 auto}
+#atividade .atv-nome{color:var(--dg-texto);font-weight:600}

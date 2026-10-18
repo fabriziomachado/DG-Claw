@@ -390,6 +390,8 @@ const VOLTAR_HTML =
 // por isso os caminhos são absolutos e não levam o prefixo. Painel solto não tem esses arquivos:
 // vira vazio e a tela fica exatamente como era. O casca.css vem ANTES do menu-lado.css (a ordem importa).
 const CASCA_HTML = [
+  '<link rel="stylesheet" href="/tema.css">',
+  '<script src="/tema.js"></script>',
   '<link rel="stylesheet" href="/casca.css">',
   '<link rel="stylesheet" href="/menu-lado.css">',
   '<script src="/tour.js"></script>',

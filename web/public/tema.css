@@ -1,0 +1,76 @@
+/* tema.css: a paleta única do DG Claw, em claro e em escuro (18/10/2026).
+
+   Toda tela usa estas variáveis em vez de cor escrita à mão: trocar uma cor aqui muda o
+   sistema inteiro, e uma tela nova já nasce funcionando nos dois temas. Quem decide o
+   tema é o tema.js, que SEMPRE põe html[data-tema="claro"|"escuro"] (a opção Automático
+   vira uma das duas pelo sistema), então aqui basta o seletor do escuro.
+
+   Nomes:
+     --dg-fundo         fundo da página
+     --dg-lado          fundo do menu lateral
+     --dg-superficie    cartões, a cápsula de digitar, menus
+     --dg-superficie-2  preenchimento sutil (hover, chips, código)
+     --dg-borda         bordas e divisórias
+     --dg-texto         texto principal
+     --dg-texto-2       texto secundário
+     --dg-texto-3       texto bem discreto (hora, dicas)
+     --dg-azul          ação principal (enviar, links, foco)
+     --dg-balao-dono    balão da mensagem do dono
+     --dg-pedido-*      aviso que espera uma decisão (amarelo)
+     --dg-entrega-*     aviso de entrega (verde)
+     --dg-erro-*        erro (vermelho)
+     --dg-sombra        sombra leve de cartões flutuantes */
+
+:root{
+  color-scheme:light;
+  --dg-fundo:#fbfbfb;
+  --dg-lado:#f7f7f7;
+  --dg-superficie:#ffffff;
+  --dg-superficie-2:#f2f2f2;
+  --dg-borda:#e5e5e5;
+  --dg-texto:#0d0d0d;
+  --dg-texto-2:#5d5d5d;
+  --dg-texto-3:#9a9a9a;
+  --dg-azul:#3b82f6;
+  --dg-azul-forte:#2563eb;
+  --dg-azul-suave:#a9c8fb;
+  --dg-balao-dono:#e8f1fb;
+  --dg-pedido-fundo:#fffbeb;
+  --dg-pedido-borda:#fde68a;
+  --dg-pedido-texto:#7a5a00;
+  --dg-entrega-fundo:#f0fdf4;
+  --dg-entrega-borda:#bbf7d0;
+  --dg-entrega-texto:#1f7a45;
+  --dg-erro-fundo:#fdecea;
+  --dg-erro-borda:#f3c1bb;
+  --dg-erro-texto:#a01818;
+  --dg-sombra:0 2px 10px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --dg-sobreposicao:rgba(0,0,0,.35);
+}
+
+html[data-tema="escuro"]{
+  color-scheme:dark;
+  --dg-fundo:#212121;
+  --dg-lado:#181818;
+  --dg-superficie:#2b2b2b;
+  --dg-superficie-2:#353535;
+  --dg-borda:#3d3d3d;
+  --dg-texto:#ececec;
+  --dg-texto-2:#b4b4b4;
+  --dg-texto-3:#8a8a8a;
+  --dg-azul:#3b82f6;
+  --dg-azul-forte:#60a5fa;
+  --dg-azul-suave:#2c4a78;
+  --dg-balao-dono:#303846;
+  --dg-pedido-fundo:#3a3220;
+  --dg-pedido-borda:#6b5a23;
+  --dg-pedido-texto:#f5d76e;
+  --dg-entrega-fundo:#1b3324;
+  --dg-entrega-borda:#2f6b43;
+  --dg-entrega-texto:#86e0a8;
+  --dg-erro-fundo:#3f2020;
+  --dg-erro-borda:#7a3a33;
+  --dg-erro-texto:#ffb3aa;
+  --dg-sombra:0 2px 10px rgba(0,0,0,.35),0 1px 2px rgba(0,0,0,.3);
+  --dg-sobreposicao:rgba(0,0,0,.55);
+}

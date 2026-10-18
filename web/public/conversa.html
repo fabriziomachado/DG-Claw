@@ -21,6 +21,8 @@ if (navigator.standalone === true ||
 </script>
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/tema.css">
+<script src="/tema.js"></script>
 <link rel="stylesheet" href="/chat.css">
 <link rel="stylesheet" href="/conversa.css">
 <link rel="stylesheet" href="/onboarding.css">
@@ -85,7 +87,7 @@ if (navigator.standalone === true ||
   <section class="ml-config" id="mlConfig" data-tour="gm-config" aria-label="Configurações">
     <h3>Configurações</h3>
     <button type="button" class="ml-tab" id="mlInstalar"><span class="ml-ico" aria-hidden="true">⤓</span><span class="ml-tx">Instalar o app<small id="mlInstalarSub"></small></span></button>
-    <button type="button" class="ml-tab" id="mlTema"><span class="ml-ico" aria-hidden="true">◐</span><span class="ml-tx">Tema<small id="mlTemaSub"></small></span></button>
+    <div class="ml-tema" id="mlTema" role="radiogroup" aria-label="Tema"><span class="ml-ico" aria-hidden="true">◐</span><span class="ml-tema-rot">Tema</span><span class="ml-tema-opcoes"><button type="button" role="radio" data-tema-op="auto">Automático</button><button type="button" role="radio" data-tema-op="claro">Claro</button><button type="button" role="radio" data-tema-op="escuro">Escuro</button></span></div>
     <p class="ml-ajuda" id="mlInstalarAjuda" role="status" hidden></p>
   </section>
   <div class="pe">

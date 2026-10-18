@@ -12,14 +12,13 @@
    Quem é o agente: o caminho (/p/<slug>/), senão ?a=<slug>, senão o último aberto (localStorage
    'dgclaw:agente', gravado pela Conversa), senão o primeiro agente que não é o Admin.
    O visual mora em casca.css (não depende do chat.css nem do conversa.css); o menu, em menu-lado.js/css. */
-/* Tema escolhido no botão de tema do painel do agente (localStorage "dgclaw-tema", mesma origem):
-   vale também para as outras telas da casca (Mesa, Lembretes, Avisos), não só para o painel.
-   Roda já no carregamento do script, antes de montar a casca. Sem escolha, segue o sistema. */
+/* Tema (18/10/2026): o tema.js decide claro/escuro. As telas da plataforma já o carregam no
+   <head>; o painel do agente, se vier de uma versão que ainda não o inclui, recebe aqui. */
 (function () {
-  if (typeof document === 'undefined') return;
-  let t = null;
-  try { t = localStorage.getItem('dgclaw-tema'); } catch (_) { /* sem storage: segue o sistema */ }
-  if (t === 'claro' || t === 'escuro') document.documentElement.dataset.tema = t;
+  if (typeof document === 'undefined' || window.DGTema) return;
+  const s = document.createElement('script');
+  s.src = '/tema.js';
+  (document.head || document.documentElement).appendChild(s);
 })();
 
 (function (raiz, fabrica) {
@@ -73,7 +72,7 @@
     '<div id="mlPainel" data-tour="gm-painel" hidden></div></nav>' +
     '<section class="ml-config" id="mlConfig" data-tour="gm-config" aria-label="Configurações"><h3>Configurações</h3>' +
     '<button type="button" class="ml-tab" id="mlInstalar"><span class="ml-ico" aria-hidden="true">⤓</span><span class="ml-tx">Instalar o app<small id="mlInstalarSub"></small></span></button>' +
-    '<button type="button" class="ml-tab" id="mlTema"><span class="ml-ico" aria-hidden="true">◐</span><span class="ml-tx">Tema<small id="mlTemaSub"></small></span></button>' +
+    '<div class="ml-tema" id="mlTema" role="radiogroup" aria-label="Tema"><span class="ml-ico" aria-hidden="true">◐</span><span class="ml-tema-rot">Tema</span><span class="ml-tema-opcoes"><button type="button" role="radio" data-tema-op="auto">Automático</button><button type="button" role="radio" data-tema-op="claro">Claro</button><button type="button" role="radio" data-tema-op="escuro">Escuro</button></span></div>' +
     '<p class="ml-ajuda" id="mlInstalarAjuda" role="status" hidden></p></section>' +
     '<div class="pe"><div class="conta"><form method="post" action="/sair" id="formSair"><button type="submit" class="sair">Sair</button></form></div></div>' +
     '</aside>';

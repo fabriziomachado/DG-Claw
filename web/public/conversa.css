@@ -355,12 +355,22 @@
 .anx[data-estado="subindo"]::after{content:"";position:absolute;left:0;bottom:0;height:3px;z-index:3;
   width:var(--pct,0%);background:#2f9e5e;border-radius:0 2px 2px 0;transition:width .3s}
 
-/* ── Conversa vazia: o agente ainda está acordando ── */
-.vazio{max-width:26em;margin:28px auto;padding:22px 20px;border-radius:16px;text-align:center;
-  background:rgba(255,255,255,.92);box-shadow:0 1px 4px rgba(0,0,0,.12);color:var(--dg-texto-2)}
-.vazio .vz-ico{font-size:34px;line-height:1;margin-bottom:8px}
-.vazio b{display:block;font-size:16.5px;color:var(--txt);margin-bottom:6px}
-.vazio small{display:block;font-size:13.5px;line-height:1.45;color:var(--muted)}
+/* ── Conversa vazia: avatar do agente, pergunta curta e sugestões (padrão de estado vazio) ── */
+.vazio{max-width:30em;margin:0 auto;padding:12vh 20px 24px;text-align:center;color:var(--dg-texto-2);
+  display:flex;flex-direction:column;align-items:center;animation:vz-entra .3s ease-out}
+@keyframes vz-entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.vazio{animation:none}}
+.vazio .vz-av{width:72px;height:72px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;
+  font-size:30px;font-weight:600;color:#fff;margin-bottom:16px;box-shadow:0 0 0 4px var(--dg-fundo),0 0 0 5px var(--dg-borda)}
+.vazio .vz-av img{width:100%;height:100%;object-fit:cover}
+.vazio b{display:block;font-size:22px;font-weight:650;letter-spacing:-.01em;color:var(--dg-texto);margin-bottom:6px}
+.vazio small{display:block;font-size:14.5px;line-height:1.5;color:var(--dg-texto-2);max-width:24em}
+.vazio .vz-link{font:inherit;color:var(--dg-azul-forte);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.vazio .vz-sug{display:flex;flex-direction:column;gap:8px;margin-top:24px;width:100%;max-width:22em}
+.vazio .vz-chip{font:inherit;font-size:14px;text-align:left;padding:10px 14px;border-radius:12px;border:1px solid var(--dg-borda);
+  background:transparent;color:var(--dg-texto);cursor:pointer;transition:background .12s,border-color .12s}
+.vazio .vz-chip:hover{background:var(--dg-superficie);border-color:var(--dg-texto-3)}
+.vazio .vz-chip:focus-visible{outline:2px solid var(--dg-azul);outline-offset:1px}
 
 /* ── Visor de arquivos (foto, vídeo, áudio, documento) ── */
 #lightbox .lbtopo{flex:0 0 auto;gap:8px;padding-left:max(10px,env(safe-area-inset-left));

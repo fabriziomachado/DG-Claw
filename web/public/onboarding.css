@@ -57,3 +57,10 @@ html[data-tema="escuro"] .nas-fechar:hover{background:var(--dg-borda)}
 html[data-tema="escuro"] .nas-trilho{background:var(--dg-superficie-2)}
 html[data-tema="escuro"] .nas-prog-erro{background:var(--dg-erro-fundo);color:var(--dg-erro-texto)}
 html[data-tema="escuro"] .nas-modal{background:var(--dg-sobreposicao)}
+
+/* "usar as mesmas chaves dos outros agentes" (18/10/2026) */
+.nas-chaves{padding-top:4px}
+.nascimento label.nas-marcar{display:flex!important;align-items:flex-start;gap:10px;margin:0;font-size:14.5px;font-weight:400;line-height:1.4;cursor:pointer}
+.nascimento .nas-marcar input{width:20px!important;height:20px;min-height:0;margin:1px 0 0;padding:0;flex:0 0 20px;accent-color:var(--accent,#2f9e5e)}
+.nascimento .nas-marcar b{font-weight:650}
+.nascimento .nas-marcar small{opacity:.7;font-weight:400}

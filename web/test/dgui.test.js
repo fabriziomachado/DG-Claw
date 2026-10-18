@@ -102,3 +102,21 @@ test('a leitura sai do cartão do painel e fica logo abaixo dele', () => {
   const fimPainel = h.indexOf('</div><div class="dgui-leitura">');
   assert.ok(fimPainel > 0, 'a leitura vem depois do fechamento do painel');
 });
+
+test('normaliza: painel em formato alternativo (componentes, kpi com itens, dados [{rotulo,valor}], leitura texto, sugestões) desenha sem erro', () => {
+  const D = require('../public/dgui.js');
+  const bloco = 'dgui\n' + JSON.stringify({ titulo: 'Portfólio', componentes: [
+    { tipo: 'kpi', itens: [{ rotulo: 'Atrasados', valor: '10', detalhe: 'de 11' }, { rotulo: 'Sem prazo', valor: '17' }] },
+    { tipo: 'grafico', formato: 'barras', titulo: 'Dias', dados: [{ rotulo: 'A', valor: 708 }, { rotulo: 'B', valor: 688 }] },
+    { tipo: 'leitura', texto: 'Só um está em dia.' },
+    { tipo: 'sugestoes', itens: ['Por que?', 'Quais sem prazo?'] },
+  ] });
+  const h = D.blocoParaHtml(bloco);
+  assert.ok(!/Não consegui/.test(h), h.slice(0, 300));
+  assert.equal((h.match(/class="dgui-kpi"/g) || []).length, 2);
+  assert.ok(h.includes('Atrasados') && h.includes('de 11'));
+  assert.ok(/dgui-grafico/.test(h) && h.includes('Só um está em dia.'));
+  assert.ok(h.includes('Quais sem prazo?'));
+  const certo = { tipo: 'kpi', titulo: 'X', valor: '1' };
+  assert.deepEqual(D.normaliza(certo), certo, 'o formato certo passa igual');
+});

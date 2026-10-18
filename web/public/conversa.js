@@ -4500,6 +4500,7 @@ const olhoLeitura = 'IntersectionObserver' in window ? new IntersectionObserver(
           c.classList.add('lido'); c.innerHTML = CHECK_2; c.title = 'você viu'; c.setAttribute('aria-label', 'vista por você');
         }
       }
+      baixaAntigos();
     }, 1000);
   }
 }, { root: chat, threshold: [0, 0.5, 1] }) : null;
@@ -4515,6 +4516,24 @@ function observaVistos() {
   // só entrega some ao ser vista; pedido espera a sua resposta (respondePedidos)
   const pend = new Set(alertasLista.filter(a => a.tipo !== 'pedido').map(a => a.mensagem_id));
   for (const el of wrap.querySelectorAll('[data-msg]')) if (pend.has(el.dataset.msg)) olhoVisto.observe(el);
+}
+/* Aviso que ficou para trás (18/10/2026: o número na fileira não sumia mesmo com tudo lido): a
+   entrega sai quando você já viu uma mensagem do agente igual ou mais nova que ela (o ✓✓ azul), e o
+   pedido sai quando você já escreveu depois dele. Sem isso, entrega antiga, de uma página da conversa
+   que nunca voltou à tela, ficava "não vista" para sempre. */
+async function baixaAntigos() {
+  const dono = ultimaFalaDono();
+  const velhos = alertasLista.filter(a => !vistosEnviados.has(a.id) && typeof a.ep === 'number' &&
+    (a.tipo === 'pedido' ? a.ep < dono : a.ep <= vistoAteEp));
+  if (!velhos.length) return;
+  for (const a of velhos) {
+    vistosEnviados.add(a.id);
+    try {
+      await api(API + '/alertas/' + encodeURIComponent(a.id) + '/visto', { method: 'POST', body: {} });
+      alertasLista = alertasLista.filter(x => x.id !== a.id);
+    } catch (e) { vistosEnviados.delete(a.id); console.warn('aviso antigo:', e.message); }
+  }
+  alertasRevisao++; desenhaAlertas();
 }
 /* Você escreveu depois de um pedido: ele foi respondido e sai de "Pedem ação". */
 async function respondePedidos() {
@@ -4541,7 +4560,7 @@ async function consultaAlertas() {
   const revisao = alertasRevisao;
   try {
     const d = await api(API + '/alertas');
-    if (revisao === alertasRevisao) { alertasLista = d.alertas || []; desenhaAlertas(); observaVistos(); }
+    if (revisao === alertasRevisao) { alertasLista = d.alertas || []; desenhaAlertas(); observaVistos(); baixaAntigos(); }
     if (d.avisos && d.avisos.length) mostraAviso(d.avisos.join(' '));
   } catch (e) { mostraErro('Não consegui atualizar os alertas: ' + e.message); }
   finally { alertasLendo = false; }

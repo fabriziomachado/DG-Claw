@@ -99,7 +99,7 @@ th[aria-sort="descending"] .dgui-ord::after{content:"▼";color:var(--dg-azul)}
 @media (max-width:520px){.dgui-sugestao{flex:1 1 100%;justify-content:space-between}}
 
 /* ampliar: o componente ocupa a tela */
-.dgui-cheio{position:fixed!important;inset:16px;z-index:95;overflow:auto;background:var(--dg-superficie);
+.dgui-cheio{position:fixed!important;inset:max(16px,calc(env(safe-area-inset-top) + 8px)) 12px max(16px,calc(env(safe-area-inset-bottom) + 8px));margin:0!important;max-width:none!important;z-index:95;overflow:auto;background:var(--dg-superficie);
             border:1px solid var(--dg-borda);border-radius:16px;padding:20px!important;box-shadow:0 0 0 100vmax var(--dg-sobreposicao)}
 .dgui-cheio .dgui-svg{max-height:calc(100vh - 160px)}
 .dgui-cheio .dgui-barra{height:20px}

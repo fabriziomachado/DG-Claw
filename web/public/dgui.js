@@ -445,7 +445,24 @@
     const comp = btn.closest('.dgui-comp'); if (!comp) return;
     const c = registro.get(comp.dataset.dgui); const acao = btn.dataset.dguiAcao;
     if (acao === 'ampliar') {
-      const aberto = comp.classList.toggle('dgui-cheio');
+      // Ampliado, o componente vai para o <body>: dentro da conversa, um balão com transform ou a
+      // rolagem do #chat prendiam o position:fixed e ele abria cortado sob o topo (18/10/2026).
+      // Um marcador guarda o lugar para ele voltar ao fechar.
+      const doc = raiz.document;
+      const aberto = !comp.classList.contains('dgui-cheio');
+      if (aberto) {
+        const marca = doc.createComment('dgui-ampliado');
+        comp.parentNode.insertBefore(marca, comp);
+        comp._dguiVolta = marca;
+        doc.body.appendChild(comp);
+        comp.classList.add('dgui-cheio');
+      } else {
+        comp.classList.remove('dgui-cheio');
+        const marca = comp._dguiVolta;
+        if (marca && marca.parentNode) { marca.parentNode.insertBefore(comp, marca); marca.remove(); }
+        else comp.remove();   // a conversa se redesenhou enquanto estava aberto: a cópia nova já está lá
+        comp._dguiVolta = null;
+      }
       raiz.document.documentElement.classList.toggle('dgui-tem-cheio', aberto);
       btn.innerHTML = aberto ? ICO.fechar : ICO.ampliar;
       btn.title = btn.ariaLabel = aberto ? 'Fechar' : 'Ampliar';

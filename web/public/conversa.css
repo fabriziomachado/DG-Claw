@@ -824,3 +824,9 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 .hora-cx .hora{display:inline;margin:0}
 .checks{display:inline-flex;color:var(--dg-texto-3)}
 .checks.lido{color:var(--dg-azul)}
+
+/* hora + checks nas mensagens do agente (dentro da linha das ações) */
+.acoes .hora-cx{display:inline-flex;align-items:center;gap:4px;margin-left:6px}
+.acoes .hora-cx .hora{margin:0}
+/* sem a etiqueta "Entrega" visível: os checks bastam; o pedido pendente mantém o aviso */
+.row.alerta-entrega .acoes::after,.row.alerta-pedido:not(.alerta-pendente) .acoes::after{content:none;display:none}

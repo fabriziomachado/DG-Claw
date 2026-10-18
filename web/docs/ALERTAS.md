@@ -55,3 +55,14 @@ instruções dos agentes também ensinam a marcação.
 Validação: `node --test web/test/`, `node --check` nos arquivos JS e smoke por curl.
 O Web usa Node nativo, sem dependências ou bundler; seus fontes são o artefato de
 produção. A suíte geral é `bash tests/rodar.sh`.
+
+## Opções para escolher no pedido
+
+Num `[PEDIDO]` com caminhos claros, o agente põe as opções num bloco ```dgui:
+
+```dgui
+{"tipo":"escolha","pergunta":"Posso reiniciar o smartsau agora?","opcoes":[{"texto":"Sim, pode reiniciar","detalhe":"leva uns 20 segundos"},"Não, deixa para depois"]}
+```
+
+A conversa mostra a pergunta e as opções em lista (A, B, C...) com "Outra resposta". Um toque manda a
+opção como mensagem do dono, e o pedido sai de "Pedem ação" quando ele responde.

@@ -272,6 +272,25 @@
       '</div>';
   }
 
+  /* ── Escolha: o agente pede uma decisão e mostra as opções numa lista para tocar, como o
+     Claude faz. Um toque manda a opção como resposta; "Outra resposta" leva ao campo. ── */
+  const LETRAS = 'ABCDEFGH';
+  function escolha(c) {
+    const ops = (Array.isArray(c.opcoes) ? c.opcoes : []).slice(0, 8)
+      .map((o) => (typeof o === 'string' ? { texto: o } : o || {})).filter((o) => o.texto);
+    if (!ops.length) return aviso('escolha sem "opcoes"');
+    const chave = 'e' + chaveTexto(JSON.stringify(c));
+    return `<div class="dgui-escolha" data-escolha="${chave}">` +
+      (c.pergunta ? `<div class="dgui-escolha-perg">${txt(c.pergunta)}</div>` : '') +
+      '<div class="dgui-escolha-ops" role="list">' + ops.map((o, i) =>
+        `<button type="button" class="dgui-op" role="listitem" data-dgui-opcao="${esc(String(o.texto).slice(0, 200))}">` +
+        `<span class="dgui-op-letra">${LETRAS[i]}</span><span class="dgui-op-txt"><b>${txt(o.texto)}${o.recomendada ? ' <span class="dgui-op-rec">Recomendada</span>' : ''}</b>` +
+        (o.detalhe ? `<small>${txt(o.detalhe)}</small>` : '') + '</span></button>').join('') +
+      `<button type="button" class="dgui-op dgui-op-outra" data-dgui-outra="1"><span class="dgui-op-letra">✎</span><span class="dgui-op-txt"><b>Outra resposta</b><small>escrever do meu jeito</small></span></button>` +
+      '</div></div>';
+  }
+  function chaveTexto(t) { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); }
+
   function aviso(m) { return `<div class="dgui-aviso">Não consegui desenhar este componente: ${esc(m)}.</div>`; }
 
   function componente(c, fundo) {
@@ -281,6 +300,7 @@
     if (c.tipo === 'tabela') return tabela(c);
     if (c.tipo === 'grafico' || c.tipo === 'gráfico') return grafico(c);
     if (c.tipo === 'leitura') return leitura(c);
+    if (c.tipo === 'escolha') return escolha(c);
     if (c.tipo === 'painel') {
       // a fonte do painel vale para os gráficos de dentro (sai na imagem baixada), sem repetir na tela
       const herda = (Array.isArray(c.itens) ? c.itens : []).map((it) => (it && typeof it === 'object' && !Array.isArray(it) && !it.fonte && c.fonte
@@ -313,7 +333,7 @@
     try { dados = JSON.parse(m[1]); } catch (e) {
       return `<div class="dgui">${aviso('o JSON do bloco está inválido (' + String(e.message).slice(0, 120) + ')')}<pre class="dgui-cru">${esc(m[1].slice(0, 2000))}</pre></div>`;
     }
-    const analitico = dados && !Array.isArray(dados) && ['painel', 'grafico', 'gráfico', 'tabela'].includes(dados.tipo);
+    const analitico = dados && !Array.isArray(dados) && ['painel', 'grafico', 'gráfico', 'tabela'].includes(dados.tipo);  // escolha não leva sugestões
     const sug = analitico ? sugestoes(Array.isArray(dados.sugestoes) && dados.sugestoes.length ? dados.sugestoes : sugestoesPadrao(dados)) : '';
     return `<div class="dgui">${componente(dados, 0)}${sug}</div>`;
   }
@@ -483,6 +503,22 @@
       const acao = ev.target.closest('[data-dgui-acao]');
       if (acao) { age(acao); return; }
       // pergunta sugerida: a conversa (conversa.js) escuta e manda ao agente
+      const op = ev.target.closest('[data-dgui-opcao]');
+      if (op) {
+        const caixa = op.closest('.dgui-escolha');
+        if (caixa && caixa.classList.contains('respondida')) return;
+        if (caixa) {
+          caixa.classList.add('respondida'); op.classList.add('escolhida');
+          try { raiz.localStorage.setItem('dgui-escolha:' + caixa.dataset.escolha, op.dataset.dguiOpcao); } catch (_) { /* sem storage */ }
+        }
+        raiz.document.dispatchEvent(new CustomEvent('dgui-pergunta', { detail: { texto: op.dataset.dguiOpcao } }));
+        return;
+      }
+      if (ev.target.closest('[data-dgui-outra]')) {
+        const campo = raiz.document.getElementById('entrada');
+        if (campo) { campo.focus(); campo.scrollIntoView({ block: 'nearest' }); }
+        return;
+      }
       const sug = ev.target.closest('[data-dgui-pergunta]');
       if (sug) raiz.document.dispatchEvent(new CustomEvent('dgui-pergunta', { detail: { texto: sug.dataset.dguiPergunta } }));
     });
@@ -498,7 +534,16 @@
     });
   }
 
-  const api = { blocoParaHtml, numero, csvDe, tsvDe, pngDe, svgParaImagem, registro };
+  // marca a opção já escolhida neste aparelho (depois de recarregar a página)
+  function restauraEscolhas(raizEl) {
+    for (const cx of (raizEl || raiz.document).querySelectorAll('.dgui-escolha:not(.respondida)')) {
+      let v = null; try { v = raiz.localStorage.getItem('dgui-escolha:' + cx.dataset.escolha); } catch (_) { /* sem storage */ }
+      if (!v) continue;
+      cx.classList.add('respondida');
+      for (const b of cx.querySelectorAll('[data-dgui-opcao]')) if (b.dataset.dguiOpcao === v) b.classList.add('escolhida');
+    }
+  }
+  const api = { restauraEscolhas, blocoParaHtml, numero, csvDe, tsvDe, pngDe, svgParaImagem, registro };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   raiz.dgui = api;
 })(typeof window !== 'undefined' ? window : globalThis);

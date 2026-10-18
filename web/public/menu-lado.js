@@ -266,33 +266,24 @@
     pintaInstalar();
   }
 
-  /* Tema claro/escuro em Configurações (18/10/2026): o botão de tema ficava no rodapé do menu antigo
-     do painel, que a casca esconde. A escolha vai para "dgclaw-tema" (a mesma chave do painel), vale
-     para painel, Mesa, Lembretes e Avisos (o casca.js aplica ao carregar) e é aplicada na hora. A
-     Conversa só tem versão clara: lá a escolha só fica guardada. */
-  const ehConversa = () => !!document.getElementById('chat');
-  function temaAtual() {
-    const d = document.documentElement.dataset.tema;
-    if (d === 'claro' || d === 'escuro') return d;
-    let g = null;
-    try { g = localStorage.getItem('dgclaw-tema'); } catch (_) { /* sem storage */ }
-    if (g === 'claro' || g === 'escuro') return g;
-    return raiz.matchMedia && raiz.matchMedia('(prefers-color-scheme: dark)').matches ? 'escuro' : 'claro';
-  }
+  /* Tema em Configurações (18/10/2026): Automático, Claro ou Escuro, pelo tema.js (DGTema). O
+     botão de tema antigo ficava no rodapé do menu do painel, que a casca esconde. */
   function pintaTema() {
-    const sub = document.getElementById('mlTemaSub');
-    if (sub) sub.textContent = temaAtual() === 'escuro' ? 'escuro (toque para claro)' : 'claro (toque para escuro)';
+    const pref = raiz.DGTema ? raiz.DGTema.preferencia() : 'auto';
+    for (const b of document.querySelectorAll('#mlTema [data-tema-op]')) {
+      const on = b.dataset.temaOp === pref;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-checked', String(on));
+    }
   }
   document.addEventListener('click', (ev) => {
-    const b = ev.target.closest ? ev.target.closest('#mlTema') : null;
-    if (!b) return;
-    const novo = temaAtual() === 'escuro' ? 'claro' : 'escuro';
-    try { localStorage.setItem('dgclaw-tema', novo); } catch (_) { /* vale só nesta aba */ }
-    if (!ehConversa()) document.documentElement.dataset.tema = novo;
-    pintaTema();
+    const b = ev.target.closest ? ev.target.closest('#mlTema [data-tema-op]') : null;
+    if (!b || !raiz.DGTema) return;
+    raiz.DGTema.escolhe(b.dataset.temaOp);
   });
-  // o botão nasce com a casca (que monta depois); pinta assim que ele existir
-  (function espera(n) { if (document.getElementById('mlTemaSub')) pintaTema(); else if (n > 0) setTimeout(() => espera(n - 1), 200); })(25);
+  document.addEventListener('dgtema', pintaTema);
+  // o seletor nasce com a casca (que monta depois); pinta assim que ele existir
+  (function espera(n) { if (document.querySelector('#mlTema [data-tema-op]')) pintaTema(); else if (n > 0) setTimeout(() => espera(n - 1), 200); })(25);
 
   return { ABAS_PAINEL, LINK_LEMBRETES, itemAgente, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar, inicia, marca, extras };
 });

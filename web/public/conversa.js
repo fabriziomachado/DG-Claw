@@ -1541,7 +1541,7 @@ function htmlCorpo(m) {
     // veio marcado como mídia e o arquivo não chegou até aqui: o rótulo explica o que era
     midia = `<span class="midia">${ROTULO_MIDIA[m.kind]} (não baixada)</span>`;
   }
-  const cita = m.cita ? `<div class="cita"><b>${ehDono({ origin: m.cita.origin }) ? 'Você' :
+  const cita = m.cita ? `<div class="cita"${m.cita.id ? ` role="button" tabindex="0" data-ir-msg="${esc(m.cita.id)}" title="Ir até a mensagem citada"` : ''}><b>${ehDono({ origin: m.cita.origin }) ? 'Você' :
       esc(AGENTE.nome)}</b>${esc(m.cita.texto)}</div>` : '';
   let leg = legendaUtil(m);
   let doVisual = '';
@@ -1644,7 +1644,8 @@ function htmlFotosDono(grupo, troca) {
 const ICONE_ACAO = {
   copiar: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/></svg>',
   ok:     '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
-  ouvir:  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>'
+  ouvir:  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
+  responder: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H12"/></svg>'
 };
 function htmlAcoes(m, hora) {
   hora = hora || '';
@@ -1652,6 +1653,7 @@ function htmlAcoes(m, hora) {
   return `<div class="acoes" data-acoes="${esc(m.id)}">` +
          `<button type="button" class="ac" data-ac="copiar" title="Copiar" aria-label="Copiar a resposta">${ICONE_ACAO.copiar}</button>` +
          `<button type="button" class="ac ac-ouvir" data-ac="ouvir" title="Ouvir em voz alta" aria-label="Ouvir a resposta em voz alta">${ICONE_ACAO.ouvir}</button>` +
+         `<button type="button" class="ac" data-ac="responder" title="Responder citando" aria-label="Responder citando esta mensagem">${ICONE_ACAO.responder}</button>` +
          hora + '</div>';
 }
 wrap.addEventListener('click', async ev => {
@@ -1661,6 +1663,7 @@ wrap.addEventListener('click', async ev => {
   const m = msgs.find(x => x.id === id);
   const texto = m ? legendaUtil(m) : '';
   if (!texto) return;
+  if (b.dataset.ac === 'responder') { comecaResposta(m); return; }
   if (b.dataset.ac === 'copiar') {
     try {
       await navigator.clipboard.writeText(texto);
@@ -1754,7 +1757,10 @@ function render(opt) {
                  hhmm: p.hhmm, origin: 'dono', text: p.texto,
                  kind: p.kind || 'text', pendente: true, local: p });
     const re = RX_CITA_LOCAL.exec(String(p.texto || ''));
-    if (re) Object.assign(todas[todas.length - 1], { text: re[2], cita: { origin: 'agente', texto: re[1] } });
+    if (re) {
+      const orig = re[1] ? msgs.find(x => x.id === re[1]) : null;
+      Object.assign(todas[todas.length - 1], { text: re[3], cita: { origin: orig ? orig.origin : 'agente', texto: re[2], id: re[1] || undefined } });
+    }
   }
   // cartões "X nasceu às HH:MM" (onboarding.js): entram na ordem cronológica como qualquer item
   if (window.DGOnboarding && window.DGOnboarding.cartoes) {
@@ -3054,7 +3060,7 @@ function despachaAnexos() {
   entrada.value = '';
   ajustaCampo();
   vozNoCampo = false;
-  enviarTexto(t, lista);
+  enviarTexto(respondendo && t ? comResposta(t) : t, lista);
 }
 
 btnAnexo.onclick = () => {
@@ -4194,6 +4200,65 @@ async function falar(texto) {
 }
 
 /* ── Modo texto e toggles ─────────────────────────────────────────────────── */
+/* Responder citando (19/10/2026, ideia 2): o botão ↩ das respostas, ou deslizar qualquer mensagem
+   para a direita no celular, prende a mensagem acima do campo; o envio sai com "↩ [id] trecho" na
+   primeira linha, que o servidor transforma em citação (tocar nela leva até a original). */
+let respondendo = null;   // { id, texto, origin }
+const respChip = document.createElement('div');
+respChip.id = 'respChip'; respChip.hidden = true;
+document.querySelector('.barra').insertBefore(respChip, document.querySelector('.barra').firstChild);
+function comecaResposta(m) {
+  const t = String(legendaUtil(m) || m.text || '').replace(/\s+/g, ' ').trim();
+  if (!t) return;
+  respondendo = { id: m.id, texto: t.length > 120 ? t.slice(0, 119) + '…' : t, origin: m.origin };
+  respChip.innerHTML = `<div class="cita"><b>${ehDono(m) ? 'Você' : esc(AGENTE.nome)}</b>${esc(respondendo.texto)}</div>` +
+    `<button type="button" class="resp-x" aria-label="Não responder citando" title="Cancelar">✕</button>`;
+  respChip.hidden = false;
+  entrada.focus();
+}
+function fimResposta() { respondendo = null; respChip.hidden = true; respChip.innerHTML = ''; }
+respChip.addEventListener('click', ev => { if (ev.target.closest('.resp-x')) fimResposta(); });
+function comResposta(t) {
+  if (!respondendo || !/^[a-f0-9]{8,40}$/.test(respondendo.id)) { fimResposta(); return t; }
+  const r = '↩ [' + respondendo.id + '] ' + respondendo.texto + '\n' + t;
+  fimResposta();
+  return r;
+}
+// tocar numa citação leva até a mensagem original (e pisca)
+wrap.addEventListener('click', ev => {
+  const c = ev.target.closest ? ev.target.closest('.cita[data-ir-msg]') : null;
+  if (!c) return;
+  const alvo = wrap.querySelector('[data-msg="' + CSS.escape(c.dataset.irMsg) + '"]');
+  if (!alvo) { mostraAviso('A mensagem citada é antiga e não está carregada; role para cima para encontrá-la.'); return; }
+  rolagem.mostra(alvo, { block: 'center' });
+  alvo.classList.remove('msg-achada'); void alvo.offsetWidth; alvo.classList.add('msg-achada');
+});
+// deslizar para a direita (celular) responde citando
+(function () {
+  let ini = null;
+  wrap.addEventListener('touchstart', ev => {
+    const row = ev.target.closest && ev.target.closest('.row[data-msg]');
+    if (!row || ev.touches.length !== 1 || ev.target.closest('.dg-car, .dgui, pre, .cod, table')) { ini = null; return; }
+    ini = { x: ev.touches[0].clientX, y: ev.touches[0].clientY, row, dx: 0 };
+  }, { passive: true });
+  wrap.addEventListener('touchmove', ev => {
+    if (!ini) return;
+    const dx = ev.touches[0].clientX - ini.x, dy = Math.abs(ev.touches[0].clientY - ini.y);
+    if (dy > 24 || dx < 0) { ini.row.style.transform = ''; if (dy > 24) ini = null; return; }
+    ini.dx = dx;
+    ini.row.style.transform = 'translateX(' + Math.min(dx, 70) + 'px)';
+  }, { passive: true });
+  wrap.addEventListener('touchend', () => {
+    if (!ini) return;
+    const { row, dx } = ini; ini = null;
+    row.style.transition = 'transform .15s'; row.style.transform = '';
+    setTimeout(() => { row.style.transition = ''; }, 160);
+    if (dx > 60) {
+      const m = msgs.find(x => x.id === row.dataset.msg);
+      if (m) comecaResposta(m);
+    }
+  });
+})();
 function enviarDoCampo() {
   if (anexos.length) {
     // a legenda é o texto do campo: despachaAnexos lê e limpa o campo sozinho
@@ -4206,7 +4271,7 @@ function enviarDoCampo() {
   ajustaCampo();
   vozNoCampo = false;
   if (lcInterceptaLogin(t)) return;   // /login abre o cartão e não vai ao agente
-  enviarTexto(t);
+  enviarTexto(comResposta(t));
 }
 // pergunta sugerida embaixo de um painel (dgui.js): vai ao agente como se a pessoa tivesse digitado
 document.addEventListener('dgui-pergunta', ev => {
@@ -4218,8 +4283,8 @@ document.addEventListener('dgui-pergunta', ev => {
   const perg = String(ev.detail.pergunta || '').replace(/\s+/g, ' ').trim().slice(0, 160);
   enviarTexto(perg ? '↩ ' + perg + '\n' + t : t);
 });
-const RX_CITA_LOCAL = /^↩ ([^\n]{1,200})\n([\s\S]+)$/;
-const semCita = t => { const r = RX_CITA_LOCAL.exec(String(t || '')); return r ? r[2] : t; };
+const RX_CITA_LOCAL = /^↩ (?:\[([a-f0-9]{8,40})\] )?([^\n]{1,200})\n([\s\S]+)$/;
+const semCita = t => { const r = RX_CITA_LOCAL.exec(String(t || '')); return r ? r[3] : t; };
 btnEnviar.onclick = () => {
   destravarAudio();
   if (gravando) { paraEEnvia(true); return; }

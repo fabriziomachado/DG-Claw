@@ -950,3 +950,12 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 
 /* botão do painel no topo: no celular o menu lateral já leva a todas as abas do painel (18/10/2026) */
 @media(max-width:700px){header #btnPainel{display:none!important}}
+
+/* responder citando (19/10/2026): a mensagem citada fica presa acima do campo até enviar ou cancelar */
+#respChip{display:flex;align-items:flex-start;gap:8px;margin:0 6px 8px}
+#respChip[hidden]{display:none}
+#respChip .cita{flex:1;min-width:0;margin:0}
+.resp-x{flex:0 0 28px;width:28px;height:28px;border:0;border-radius:50%;background:transparent;color:var(--dg-texto-3);cursor:pointer;font-size:13px}
+.resp-x:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
+.cita[data-ir-msg]{cursor:pointer}
+.cita{background:color-mix(in srgb,var(--accent) 9%,transparent)}

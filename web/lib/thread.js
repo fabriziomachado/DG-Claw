@@ -63,7 +63,8 @@ const PRAZO_COMPACTACAO_S = 600;
 const FALHA_COMPACT = /\b(error|erro|fail|falh|cancel|abort|not enough|cannot|could not)/i;
 const REMINDER = /<system-reminder>[\s\S]*?<\/system-reminder>/g;
 const ANEXO_LINHA = /^\[anexo:\s*(.+?)\]\s*$/gm;
-const RX_CITA = /^↩ ([^\n]{1,200})\n([\s\S]+)$/;
+// "↩ <pergunta>" (cartão de escolha) ou "↩ [<id>] <trecho>" (responder citando uma mensagem, 19/10/2026)
+const RX_CITA = /^↩ (?:\[([a-f0-9]{8,40})\] )?([^\n]{1,200})\n([\s\S]+)$/;
 const ROTULO_EMOJI = { photo: '📷 foto', video: '🎬 vídeo', audio: '🎤 áudio', document: '📄 arquivo' };
 const CHUNK = 4 * 1024 * 1024;
 
@@ -201,8 +202,13 @@ function criarMontagem({ tz, midia }) {
     }).replace(/\n{3,}/g, '\n\n').trim();
     // Resposta a um cartão de escolha (19/10/2026): a primeira linha "↩ <pergunta>" vira a citação do balão
     const re = RX_CITA.exec(corpo);
-    const cita = re ? { origin: 'agente', texto: re[1].trim() } : null;
-    empurra(estado, agente, { ep, origin: 'dono', text: re ? re[2].trim() : corpo, caminhos, via: 'plataforma', quem: dg.attrs.from || 'pessoa', cita });
+    let cita = null;
+    if (re) {
+      const orig = re[1] ? estado.eventos.find((e) => e.id === re[1]) : null;
+      cita = { origin: orig ? orig.origin : 'agente', texto: re[2].trim() };
+      if (re[1]) { cita.id = re[1]; if (orig) cita.ep = orig.ep; }
+    }
+    empurra(estado, agente, { ep, origin: 'dono', text: re ? re[3].trim() : corpo, caminhos, via: 'plataforma', quem: dg.attrs.from || 'pessoa', cita });
   }
 
   /** A fala do dono pelo WhatsApp: as marcas "[imagem salvo em ...]" viram anexo, o resto é o texto. */

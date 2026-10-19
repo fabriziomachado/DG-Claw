@@ -251,3 +251,16 @@ test('thread: resposta a um cartão de escolha ("↩ pergunta" na primeira linha
   assert.equal(ev[1].text, '↩ só a seta', 'sem quebra de linha não é citação');
   assert.equal(ev[1].cita, null);
 });
+
+test('thread: responder citando uma mensagem ("↩ [id] trecho") guarda de quem é a original e o id para pular até ela', () => {
+  const { agente, leitor } = preparar();
+  const tmp = path.join(pastaTemp('jsonl'), 's.jsonl');
+  const linha = (txt, n) => JSON.stringify({ type: 'user', timestamp: `2026-10-12T15:00:0${n}.000Z`, message: { content: `<dgchat from="pessoa" chat="c_ana" msg="m${n}" ts="x">${txt}</dgchat>` } }) + '\n';
+  fs.writeFileSync(tmp, linha('primeira', 1));
+  const id = leitor.ler(tmp, agente).eventos[0].id;
+  fs.appendFileSync(tmp, linha(`↩ [${id}] primeira\nconcordo`, 2));
+  const ev = leitor.ler(tmp, agente).eventos;
+  assert.equal(ev[1].text, 'concordo');
+  assert.equal(ev[1].cita.id, id); assert.equal(ev[1].cita.origin, 'dono'); assert.equal(ev[1].cita.texto, 'primeira');
+  assert.equal(typeof ev[1].cita.ep, 'number');
+});

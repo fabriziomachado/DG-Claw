@@ -250,3 +250,7 @@ th[aria-sort="descending"] .dgui-ord::after{content:"▼";color:var(--dg-azul)}
 .dgui-recolhida .dgui-tabela-rola th:first-child,.dgui-recolhida .dgui-tabela-rola td:first-child{padding-left:14px}
 .dgui-painel .dgui-dados:last-child .dgui-recolhida:last-child .dgui-tabela-rola{border-radius:0 0 15px 15px}
 @media (prefers-reduced-motion:reduce){.dgui-dados-seta svg{transition:none}}
+/* tabela do pé do painel em tela cheia: a seta de abrir/fechar não faz sentido ali */
+.dgui-cheio.dgui-recolhida .dgui-dados-seta{display:none}
+.dgui-cheio.dgui-recolhida .dgui-dados-cab{padding:0 0 10px}
+.dgui-cheio.dgui-recolhida .dgui-tabela-rola{border:1px solid var(--dg-borda);border-radius:10px}

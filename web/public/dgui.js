@@ -101,7 +101,7 @@
     const cab = recolhida
       ? `<div class="dgui-dados-cab"><button type="button" class="dgui-dados-abre" data-dgui-dados aria-expanded="${aberta}">${ICO.tabela}` +
         `<span class="dgui-dados-rot"><b>Dados</b> · ${c.titulo ? txt(c.titulo) : linhas.length + (linhas.length === 1 ? ' linha' : ' linhas')}</span></button>` +
-        b('copiar', 'Copiar para o Excel') + b('baixar', 'Baixar planilha (CSV)') +
+        b('copiar', 'Copiar para o Excel') + b('baixar', 'Baixar planilha (CSV)') + b('ampliar', 'Ampliar') +
         `<button type="button" class="dgui-acao dgui-dados-seta" data-dgui-dados aria-label="${aberta ? 'Fechar' : 'Abrir'} os dados" title="${aberta ? 'Fechar' : 'Abrir'} os dados">${ICO.abre}</button></div>`
       : ferramentas('tabela') + (c.titulo ? `<div class="dgui-tit">${txt(c.titulo)}</div>` : '');
     return `<div class="dgui-tabela dgui-comp${recolhida ? ' dgui-recolhida' : ''}${aberta ? ' dgui-aberta' : ''}" data-dgui="${k}">` + cab +
@@ -794,6 +794,11 @@
       // Um marcador guarda o lugar para ele voltar ao fechar.
       const doc = raiz.document;
       const aberto = !comp.classList.contains('dgui-cheio');
+      // a tabela recolhida no pé do painel abre ao ampliar e volta a fechar ao sair, se estava fechada
+      if (comp.classList.contains('dgui-recolhida')) {
+        if (aberto && !comp.classList.contains('dgui-aberta')) { alternaDados(comp); comp._dguiAbriu = true; }
+        else if (!aberto && comp._dguiAbriu) { alternaDados(comp); comp._dguiAbriu = false; }
+      }
       if (aberto) {
         const marca = doc.createComment('dgui-ampliado');
         comp.parentNode.insertBefore(marca, comp);

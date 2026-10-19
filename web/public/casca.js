@@ -47,11 +47,11 @@
 
   const MARCACAO_CABECALHO =
     '<header data-tour="casca-cabecalho" id="cabecalho">' +
-    '<button class="btn ghost" id="btnMenu" type="button" aria-label="Abrir o menu" data-tour="casca-menu">☰</button>' +
+    '<button class="btn ghost" id="btnMenu" type="button" aria-label="Abrir o menu" data-tour="casca-menu"><svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>' +
     '<div class="av" id="av" aria-hidden="true"></div>' +
     '<div class="who" id="who" data-tour="casca-titulo"><b id="nomeAgente">DG Claw</b><span id="estado"></span></div>' +
     '<a class="btn" id="btnSessoes" href="#" hidden data-tour="casca-sessoes" aria-label="Abrir as Sessões deste agente" title="Sessões de trabalho deste agente"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="11.5" rx="2"/><path d="M9 20h6M12 16v4"/></svg> <span class="lbl">Sessões</span></a>' +
-    '<button class="btn" id="btnTutorial" type="button" title="Visita guiada desta tela: o que é cada parte e por que está aqui">Tutorial</button>' +
+    '<button class="btn" id="btnTutorial" type="button" aria-label="Tutorial desta tela" title="Visita guiada desta tela: o que é cada parte e por que está aqui"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></button>' +
     '</header>';
 
   /* A única marcação do menu: a Conversa (conversa.html) e as outras telas (monta) usam esta (menu-lado.js mexe nestes ids). */
@@ -116,6 +116,97 @@
     Object.assign(est.agente, { avatar: d.avatar, avatar_img: d.avatar_img });
     pintaCabecalho(est.agente);
   });
+
+  /* Fileira de agentes (19/10/2026, pedido do dono): o mesmo cabeçalho da Conversa em todas as telas.
+     Todos lado a lado com o nome embaixo; o aberto sublinhado e com o nome da página embaixo; anel e
+     número quando há aviso não visto; arco girando em quem trabalha. Um toque abre a conversa do agente,
+     e o "+" leva ao Admin para criar outro. A da Conversa é desenhada pelo conversa.js; o visual é o
+     mesmo (fileira.css). */
+  function fotoFileira(a) {
+    const img = a.avatar_img || (/^https:\/\//i.test(a.avatar || '') ? a.avatar : '');
+    return img ? `<img src="${esc(img)}" alt="">` : esc(a.avatar || (a.nome || '?').slice(0, 1));
+  }
+  function montaFileira(lista, atual) {
+    const ordem = lista.filter(a => a.tipo === 'admin').concat(lista.filter(a => a.tipo !== 'admin'));
+    const admin = lista.find(a => a.tipo === 'admin');
+    const nav = document.createElement('nav');
+    nav.id = 'fileira';
+    nav.setAttribute('aria-label', 'Trocar de agente');
+    nav.innerHTML = (admin ? `<a class="fil novo" href="/a/${encodeURIComponent(admin.id)}#criar" aria-label="Criar um agente novo">` +
+        '<span class="fil-foto"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>' +
+        '<span class="fil-nome">Novo</span></a>' : '') +
+      ordem.map(a => {
+        const eh = a.id === atual.id;
+        return `<a class="fil${eh ? ' atual' : ''}" href="/a/${encodeURIComponent(a.id)}" data-avt="${esc(a.id)}" style="--arco:${esc(a.cor || '#2f9e5e')}"` +
+          ` aria-label="${esc('Conversar com ' + a.nome)}">` +
+          `<span class="fil-foto" style="background:${esc(a.cor || '#2f9e5e')}">${fotoFileira(a)}</span>` +
+          `<span class="fil-nome">${esc(a.nome)}</span></a>`;
+      }).join('');
+    return nav;
+  }
+  function pregaFileira(lista, atual) {
+    const cab = $('cabecalho');
+    if (!cab || lista.length < 2 || $('fileira')) return;
+    const nav = montaFileira(lista, atual);
+    $('btnMenu').after(nav);
+    cab.classList.add('com-fileira');
+    const at = nav.querySelector('.atual');
+    if (at) {
+      $('estado').classList.add('fil-estado');
+      at.appendChild($('estado'));
+      if (at.scrollIntoView) at.scrollIntoView({ block: 'nearest', inline: 'center' });
+    }
+    const outros = lista.filter(a => a.id !== atual.id);
+    const doAgente = id => nav.querySelector('[data-avt="' + CSS.escape(id) + '"]');
+    // avisos não vistos de cada outro agente: anel e número (amarelo se algum pede decisão)
+    async function avisos() {
+      if (document.hidden) return;
+      for (const a of outros) {
+        let alertas = [];
+        try {
+          const r = await fetch('/api/v1/agents/' + encodeURIComponent(a.id) + '/alertas', { credentials: 'same-origin', cache: 'no-store' });
+          if (!r.ok) continue;
+          alertas = ((await r.json()) || {}).alertas || [];
+        } catch (_) { continue; }
+        const el = doAgente(a.id);
+        if (!el) continue;
+        let b = el.querySelector('.fil-badge');
+        el.classList.toggle('aviso', alertas.length > 0);
+        el.classList.toggle('pede', alertas.some(x => x.tipo === 'pedido'));
+        if (!alertas.length) { if (b) b.remove(); continue; }
+        if (!b) { b = document.createElement('span'); b.className = 'fil-badge'; el.appendChild(b); }
+        b.textContent = alertas.length > 9 ? '9+' : String(alertas.length);
+      }
+    }
+    // quem está trabalhando: arco girando na foto e "trabalhando" embaixo do nome (o aberto mantém o nome da página)
+    async function trabalho() {
+      if (document.hidden) return;
+      let d = null;
+      try {
+        const r = await fetch('/api/v1/atividade', { credentials: 'same-origin', cache: 'no-store' });
+        if (r.ok) d = await r.json();
+      } catch (_) { return; }
+      if (!d || !d.agentes) return;
+      for (const a of lista) {
+        const el = doAgente(a.id);
+        const sim = (d.agentes[a.id] || {}).estado === 'trabalhando';
+        if (!el || el.classList.contains('trab') === sim) continue;
+        el.classList.toggle('trab', sim);
+        if (a.id === atual.id) continue;
+        let e = el.querySelector('.fil-estado');
+        if (sim && !e) { e = document.createElement('span'); e.className = 'fil-estado'; e.textContent = 'trabalhando'; el.appendChild(e); }
+        else if (!sim && e) e.remove();
+      }
+    }
+    avisos(); setInterval(avisos, 30000);
+    trabalho(); setInterval(trabalho, 6000);
+    document.addEventListener('visibilitychange', () => { avisos(); trabalho(); });
+    document.addEventListener('dgavatar', ev => {
+      const d = ev.detail || {};
+      const el = d.id && doAgente(d.id);
+      if (el) el.querySelector('.fil-foto').innerHTML = fotoFileira(Object.assign({}, lista.find(a => a.id === d.id) || {}, d));
+    });
+  }
 
   function pintaTitulo() {
     const e = $('estado');
@@ -207,6 +298,7 @@
         if (!ag) ag = { id: erro ? slug : '', nome: 'DG Claw', cor: '#2f9e5e', avatar: 'D' };
         est.agente = ag;
         pintaCabecalho(ag);
+        if (!erro && ag.id) pregaFileira(lista, ag);
         if (!erro) guardaAgente(ag.id);
         if (!raiz.DGMenuLado) {
           console.warn('casca: menu-lado.js não carregou; o menu fica sem conteúdo. Carregue /menu-lado.js antes de /casca.js.');

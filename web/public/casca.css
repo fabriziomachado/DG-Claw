@@ -1,4 +1,5 @@
 @import url('/tema.css');
+@import url('/fileira.css');
 /* casca.css: o cabeçalho e a gaveta do menu da tela de Conversa, para as outras telas (Mesa, Lembretes,
    Avisos e o painel do agente). Montados pelo casca.js. Carregue este arquivo ANTES do menu-lado.css:
    as regras da gaveta aqui têm a mesma força das do computador (barra fixa) lá, e a última vence. O visual do cabeçalho e da gaveta é copiado do
@@ -73,3 +74,15 @@ html.casca #cabecalho,aside#menu{--line:var(--dg-borda);--muted:var(--dg-texto-2
    html[data-tema="escuro"] do painel, que é carregado depois. */
 html.casca:not(#x){--painel:var(--dg-superficie);--fundo2:var(--dg-superficie-2);--linha:var(--dg-borda);
   --texto:var(--dg-texto);--fraco:var(--dg-texto-2)}
+
+/* fileira de agentes no cabeçalho das outras telas (19/10/2026): igual à da Conversa; somem o avatar e o
+   nome soltos, e o nome da página vai para baixo do agente aberto */
+html.casca #cabecalho.com-fileira{padding-top:calc(2px + env(safe-area-inset-top));padding-bottom:0;align-items:center}
+html.casca #cabecalho.com-fileira .av,html.casca #cabecalho.com-fileira .who{display:none}
+html.casca #cabecalho #fileira .fil-estado{color:var(--dg-texto-3)}
+/* com a fileira, os botões do topo viram ícones de traço discretos, como na Conversa */
+html.casca #cabecalho.com-fileira .btn{width:40px;min-width:40px;height:40px;min-height:40px;padding:0;border:0;border-radius:50%;
+  background:transparent;color:var(--dg-texto-2);display:inline-flex;align-items:center;justify-content:center;flex:0 0 40px}
+html.casca #cabecalho.com-fileira .btn:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
+html.casca #cabecalho.com-fileira #btnSessoes .lbl{display:none}
+html.casca #cabecalho.com-fileira{gap:4px}

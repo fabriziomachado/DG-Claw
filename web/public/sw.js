@@ -5,7 +5,7 @@
    abrir rápido e para o app instalado ter o que mostrar. NUNCA mexe em /api/,
    /p/, /login, /sair nem nas páginas de conversa (/a/...): conteúdo da conversa,
    painéis e sessão passam direto para a rede, sem cópia nenhuma. */
-const VERSAO = 'dgclaw-estaticos-v81';
+const VERSAO = 'dgclaw-estaticos-v82';
 const ESTATICOS = [
   '/tema.css', '/tema.js', '/dgui.css', '/dgui.js', '/historico.css', '/historico.js', '/conversa.css', '/chat.css', '/conversa.js', '/icones-topo.js', '/menu-lado.js', '/menu-lado.css', '/casca.js', '/casca.css', '/fileira.css', '/sessao-paralela.js', '/login-cartao.js', '/trilha-tela.js', '/vendor/highlight-11.9.0.min.js', '/rolagem.js', '/tour.js',
   '/onboarding.js', '/onboarding.css',
@@ -68,7 +68,7 @@ self.addEventListener('push', ev => {
     try { cru = ev.data.text(); } catch (e) { console.warn('sw: não consegui ler o texto do aviso:', e.message); }
     try { d = JSON.parse(cru); } catch (e) { console.warn('sw: o aviso não veio em JSON, mostro o texto cru:', e.message); }
   }
-  if (!d || typeof d !== 'object') d = { titulo: 'DG Claw', corpo: cru || 'Você tem um aviso novo.' };
+  if (!d || typeof d !== 'object') d = { titulo: 'S2 Bot', corpo: cru || 'Você tem um aviso novo.' };
   const acoes = Array.isArray(d.acoes) ? d.acoes.filter(a => a && a.acao && a.titulo).slice(0, 2) : [];
   const opcoes = {
     body: d.corpo || '',
@@ -85,7 +85,7 @@ self.addEventListener('push', ev => {
   const badge = typeof d.contador === 'number' && self.navigator && self.navigator.setAppBadge
     ? (d.contador > 0 ? self.navigator.setAppBadge(d.contador) : self.navigator.clearAppBadge()).catch(e => console.warn('sw: não consegui pôr o número no ícone:', e.message))
     : Promise.resolve();
-  ev.waitUntil(Promise.all([self.registration.showNotification(d.titulo || 'DG Claw', opcoes), badge]));
+  ev.waitUntil(Promise.all([self.registration.showNotification(d.titulo || 'S2 Bot', opcoes), badge]));
 });
 
 /* Foca uma janela já aberta do DG Claw e leva para a url; sem janela, abre uma. */

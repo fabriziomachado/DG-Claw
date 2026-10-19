@@ -1,7 +1,7 @@
 {
-  "name": "S2 · SmartSAU",
-  "short_name": "S2",
-  "description": "Converse com os seus agentes do DG Claw.",
+  "name": "S2 Bot",
+  "short_name": "S2 Bot",
+  "description": "Converse com os seus agentes do S2 Bot.",
   "lang": "pt-BR",
   "start_url": "/",
   "scope": "/",

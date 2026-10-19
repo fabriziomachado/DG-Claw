@@ -5,7 +5,7 @@
    Toda função que pode falhar devolve { ok:false, erro:"frase em português com o que fazer" }.
    Contrato das rotas: web/docs/AVISOS-NO-APARELHO.md. */
 (function () {
-  const TEXTO_IPHONE = 'No iPhone, os avisos só funcionam com o DG Claw instalado na tela de início: toque em Compartilhar, Adicionar à Tela de Início, abra por lá e ative de novo.';
+  const TEXTO_IPHONE = 'No iPhone, os avisos só funcionam com o S2 Bot instalado na tela de início: toque em Compartilhar, Adicionar à Tela de Início, abra por lá e ative de novo.';
 
   const ehIos = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
   const instalado = () => navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
@@ -90,7 +90,7 @@
 
   async function ativar(nomeAparelho) {
     if (iphoneSemInstalar()) return { ok: false, erro: TEXTO_IPHONE };
-    if (!suportado()) return { ok: false, erro: 'Este navegador não aceita avisos. Use o Chrome, o Edge ou o Firefox no computador ou no Android, ou instale o DG Claw na tela de início do iPhone.' };
+    if (!suportado()) return { ok: false, erro: 'Este navegador não aceita avisos. Use o Chrome, o Edge ou o Firefox no computador ou no Android, ou instale o S2 Bot na tela de início do iPhone.' };
     if (Notification.permission === 'denied') {
       return { ok: false, erro: 'Os avisos estão bloqueados para este site. Libere nas configurações do navegador (ícone de cadeado ao lado do endereço, Notificações, Permitir) e ative de novo.' };
     }

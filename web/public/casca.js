@@ -49,7 +49,7 @@
     '<header data-tour="casca-cabecalho" id="cabecalho">' +
     '<button class="btn ghost" id="btnMenu" type="button" aria-label="Abrir o menu" data-tour="casca-menu"><svg class="ico" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h10"/></svg></button>' +
     '<div class="av" id="av" aria-hidden="true"></div>' +
-    '<div class="who" id="who" data-tour="casca-titulo"><b id="nomeAgente">DG Claw</b><span id="estado"></span></div>' +
+    '<div class="who" id="who" data-tour="casca-titulo"><b id="nomeAgente">S2 Bot</b><span id="estado"></span></div>' +
     '<a class="btn" id="btnSessoes" href="#" hidden data-tour="casca-sessoes" aria-label="Abrir as Sessões deste agente" title="Sessões de trabalho deste agente"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="11.5" rx="2"/><path d="M9 20h6M12 16v4"/></svg> <span class="lbl">Sessões</span></a>' +
     '<button class="btn" id="btnTutorial" type="button" aria-label="Tutorial desta tela" title="Visita guiada desta tela: o que é cada parte e por que está aqui"><svg class="ico" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.6M12 17h.01"/></svg></button>' +
     '</header>';
@@ -61,7 +61,7 @@
     '<button class="fechar" id="btnFechaMenu" type="button" aria-label="Fechar o menu">✕</button>' +
     '<div class="ml-marca" data-tour="gm-marca">' +
     '<div class="ml-moldura" id="mlMoldura" aria-hidden="true"></div>' +
-    '<div class="ml-nome" id="mlNome">DG Claw</div>' +
+    '<div class="ml-nome" id="mlNome">S2 Bot</div>' +
     '<div class="ml-sub" id="mlSub"></div>' +
     '<button type="button" class="gm-tut" id="gmTutorial" title="Visita guiada do menu: o que é cada parte e por que está aqui">Tutorial</button>' +
     '<div class="ml-troca" id="mlTroca" data-tour="agentes" hidden>' +
@@ -102,7 +102,7 @@
 
   function pintaCabecalho(ag) {
     document.documentElement.style.setProperty('--accent', ag.cor || '#2f9e5e');
-    $('nomeAgente').textContent = ag.nome || 'DG Claw';
+    $('nomeAgente').textContent = ag.nome || 'S2 Bot';
     const av = $('av');
     const img = ag.avatar_img || (/^https:\/\//i.test(ag.avatar || '') ? ag.avatar : '');
     av.innerHTML = img ? `<img src="${esc(img)}" alt="">` : esc(ag.avatar || (ag.nome || '?').slice(0, 1));
@@ -295,7 +295,7 @@
         est.lista = lista;
         let ag = escolheAgente(lista, ctx);
         const slug = (/^\/p\/([^/]+)/.exec(location.pathname) || [])[1] || new URLSearchParams(location.search).get('a') || guardado || '';
-        if (!ag) ag = { id: erro ? slug : '', nome: 'DG Claw', cor: '#2f9e5e', avatar: 'D' };
+        if (!ag) ag = { id: erro ? slug : '', nome: 'S2 Bot', cor: '#2f9e5e', avatar: 'D' };
         est.agente = ag;
         pintaCabecalho(ag);
         if (!erro && ag.id) pregaFileira(lista, ag);

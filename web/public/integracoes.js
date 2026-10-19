@@ -89,7 +89,7 @@
   function pintaPlataforma() {
     const ch = dados.plataforma.chaves;
     return sec('Chaves da plataforma', ch.filter((c) => c.ligada).length + ' de ' + ch.length,
-      'Chaves que o próprio DG Claw usa (não os agentes). Para ligar ou trocar uma delas, peça ao Admin no chat: ela vai do Cofre de um agente para a plataforma sem aparecer em lugar nenhum.',
+      'Chaves que o próprio S2 Bot usa (não os agentes). Para ligar ou trocar uma delas, peça ao Admin no chat: ela vai do Cofre de um agente para a plataforma sem aparecer em lugar nenhum.',
       '<ul class="ig-lista">' + ch.map((c) => `<li class="ig-item" data-busca="${esc((c.nome + ' ' + c.para).toLowerCase())}"><span class="ig-ico">🔑</span>` +
         `<div class="ig-txt"><div class="ig-nome">${esc(c.nome)}</div><div class="ig-det">${esc(c.para)}</div></div>` +
         `<div class="ig-acoes">${c.ligada ? est('configurado') : '<span class="ig-est">não configurada</span>'}</div></li>`).join('') + '</ul>');

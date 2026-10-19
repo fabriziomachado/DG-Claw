@@ -292,7 +292,7 @@ function pintaAvatar(el, a) {
   el.style.background = a.cor || '#2f9e5e';
 }
 document.documentElement.style.setProperty('--accent', AGENTE.cor || '#2f9e5e');
-document.title = AGENTE.nome + ' - DG Claw';
+document.title = AGENTE.nome + ' - S2 Bot';
 $('nomeAgente').textContent = AGENTE.nome;
 pintaAvatar(avEl, AGENTE);
 /* Foto trocada no menu (menu-lado.js): o cabeçalho e a conversa vazia mudam sem recarregar. */
@@ -4422,7 +4422,7 @@ let avisosOutros = 0;
 function pintaBadgeApp() {
   let n = avisosOutros;
   try { n += alertasLista.length; } catch (_) { /* a lista desta conversa ainda não nasceu */ }
-  document.title = (n ? '(' + n + ') ' : '') + AGENTE.nome + ' - DG Claw';
+  document.title = (n ? '(' + n + ') ' : '') + AGENTE.nome + ' - S2 Bot';
   try {
     if (n && navigator.setAppBadge) navigator.setAppBadge(n).catch(() => {});
     else if (!n && navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {});
@@ -4786,7 +4786,7 @@ function passosTutorial() {
   }
   if (!$('mlConfig').hidden) {
     passos.push({ alvo: '#mlConfig', antes: abreM, titulo: 'Configurações',
-      oque: 'Hoje tem um item: Instalar o app, que coloca o DG Claw como aplicativo na tela inicial do aparelho.',
+      oque: 'Hoje tem um item: Instalar o app, que coloca o S2 Bot como aplicativo na tela inicial do aparelho.',
       como: 'No Android e no computador, com Chrome ou Edge, o toque abre o pedido de instalação do navegador. No iPhone e no iPad, o item mostra o caminho: Compartilhar e depois Adicionar à Tela de Início. O item some sozinho quando o app já está instalado.',
       porque: 'O app instalado abre sem a barra do navegador e fica a um toque, como qualquer outro aplicativo.' });
   }

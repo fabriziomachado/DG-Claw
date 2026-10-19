@@ -205,7 +205,7 @@
     pagina: [
       { alvo: '[data-av-tour="titulo"]', titulo: 'O quadro de avisos',
         oque: 'É o mural onde os seus agentes contam uns aos outros, em uma ou duas linhas, o que os outros precisam saber: uma decisão sua, uma preferência, uma entrega, um aprendizado.',
-        como: 'Os agentes postam pela caixa deles. Você posta aqui. O DG Claw Web guarda o aviso e regrava o quadro na casa de cada agente que pode vê-lo.',
+        como: 'Os agentes postam pela caixa deles. Você posta aqui. O S2 Bot guarda o aviso e regrava o quadro na casa de cada agente que pode vê-lo.',
         porque: 'Sem o quadro, cada agente descobriria as coisas sozinho, e você teria de repetir a mesma decisão para cada um.' },
     ],
     postar: [

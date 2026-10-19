@@ -38,7 +38,7 @@
     alvo: '#faixaLembretes',
     titulo: 'Faixa de lembretes',
     oque: 'Os lembretes que estão tocando agora, de qualquer agente. Cada linha mostra quem lembra, o que é e quantos avisos já saíram.',
-    como: 'O DG Claw confere a cada 15 segundos e repete o aviso no intervalo do lembrete (5 minutos, se você não mudou) até o teto. Feito encerra a ocorrência em todos os aparelhos. Adiar traz o aviso de volta no prazo que você escolher, com a contagem de avisos zerada.',
+    como: 'O S2 Bot confere a cada 15 segundos e repete o aviso no intervalo do lembrete (5 minutos, se você não mudou) até o teto. Feito encerra a ocorrência em todos os aparelhos. Adiar traz o aviso de volta no prazo que você escolher, com a contagem de avisos zerada.',
     porque: 'Para você não esquecer de algo que pediu para ser lembrado, mesmo que tenha deixado passar o primeiro aviso.',
   };
 

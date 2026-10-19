@@ -63,7 +63,7 @@
     sqlite3: 'Consultando o banco de dados', psql: 'Consultando o banco de dados', mysql: 'Consultando o banco de dados',
     'dgclaw-abrir-zip': 'Abrindo um zip', crontab: 'Ajustando uma rotina agendada', systemctl: 'Conferindo um serviço',
     ps: 'Conferindo o que está rodando', pgrep: 'Conferindo o que está rodando', kill: 'Parando um processo', pkill: 'Parando um processo',
-    gh: 'Falando com o GitHub', which: 'Conferindo uma ferramenta', 'dgclaw-api': 'Falando com o DG Claw', claude: 'Chamando o Claude', codex: 'Chamando o Codex', gemini: 'Chamando o Gemini',
+    gh: 'Falando com o GitHub', which: 'Conferindo uma ferramenta', 'dgclaw-api': 'Falando com o S2 Bot', claude: 'Chamando o Claude', codex: 'Chamando o Codex', gemini: 'Chamando o Gemini',
   };
   const GIT = { status: 'Conferindo o Git', diff: 'Conferindo as mudanças no Git', log: 'Olhando o histórico do Git', add: 'Preparando uma versão no Git',
     commit: 'Salvando uma versão no Git', push: 'Enviando ao GitHub', pull: 'Buscando atualizações no Git', clone: 'Baixando um repositório', checkout: 'Trocando de ramo no Git' };

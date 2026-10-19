@@ -397,7 +397,7 @@ function criarPush({ dataDir, log, agora, enviarHttp }) {
       if (p === '/api/v1/push/teste') {
         if (m !== 'POST') return metodoErrado('POST');
         const c = await H.lerJson(req, 4 * 1024);
-        const r = await enviar({ titulo: 'DG Claw', corpo: 'Aviso de teste: se você está lendo isto, os avisos neste aparelho funcionam.', tag: 'teste-aviso', url: '/' }, typeof c.endpoint === 'string' ? { endpoint: c.endpoint } : undefined);
+        const r = await enviar({ titulo: 'S2 Bot', corpo: 'Aviso de teste: se você está lendo isto, os avisos neste aparelho funcionam.', tag: 'teste-aviso', url: '/' }, typeof c.endpoint === 'string' ? { endpoint: c.endpoint } : undefined);
         if (r.inscricoes === 0) { H.erroJson(res, 409, 'Nenhum aparelho está com os avisos ativados. Toque em "Ativar avisos neste aparelho" e tente de novo.', r); return true; }
         if (r.ok === 0 && r.falhas.length) {
           const f = r.falhas[0];

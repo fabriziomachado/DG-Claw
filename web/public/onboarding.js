@@ -218,7 +218,7 @@
     function inicio() {
       tela = 'inicio';
       document.body.classList.add('admin-primeiro-acesso');
-      host.innerHTML = cab('Bem-vindo ao seu DG Claw') + '<section data-tour="nas-inicio"><p>Eu sou o Admin. Cuido deste servidor e ajudo você a criar seus agentes.</p><p>Você escolhe um nome, conta o que quer delegar e acompanha tudo por aqui. Depois, é só conversar com seu agente pelo menu à esquerda.</p><button id="nasComecar" type="button" class="nas-principal" data-pergunta="Quero criar meu primeiro agente">Quero criar meu primeiro agente</button></section><p class="nas-erro" role="alert" hidden></p>';
+      host.innerHTML = cab('Bem-vindo ao seu S2 Bot') + '<section data-tour="nas-inicio"><p>Eu sou o Admin. Cuido deste servidor e ajudo você a criar seus agentes.</p><p>Você escolhe um nome, conta o que quer delegar e acompanha tudo por aqui. Depois, é só conversar com seu agente pelo menu à esquerda.</p><button id="nasComecar" type="button" class="nas-principal" data-pergunta="Quero criar meu primeiro agente">Quero criar meu primeiro agente</button></section><p class="nas-erro" role="alert" hidden></p>';
       abreModal();
       host.querySelector('.nas-tutorial').onclick = () => tutorial('[data-tour="nas-inicio"]');
       host.querySelector('#nasComecar').onclick = async () => {

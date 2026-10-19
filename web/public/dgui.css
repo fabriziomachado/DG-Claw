@@ -237,6 +237,8 @@ th[aria-sort="descending"] .dgui-ord::after{content:"▼";color:var(--dg-azul)}
    "Dados · título", com copiar e baixar à mão; tocar abre ali mesmo, colada nas bordas do cartão. */
 .dgui-painel .dgui-dados{margin:0 -14px -14px;border-top:1px solid var(--dg-borda)}
 .dgui-dados .dgui-recolhida + .dgui-recolhida{border-top:1px solid var(--dg-borda)}
+.dgui-faixa-corpo{padding:2px 14px 14px 14px}
+.dgui-faixa-corpo .dgui-destaques li{font-size:14px}
 .dgui-dados-cab{display:flex;align-items:center;gap:2px;padding:6px 8px 6px 6px}
 .dgui-dados-abre{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:6px 8px;border:0;border-radius:8px;background:transparent;
   font:inherit;font-size:13px;color:var(--dg-texto-3);text-align:left;cursor:pointer}

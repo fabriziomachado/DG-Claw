@@ -38,7 +38,9 @@
     fechar: svgIco('<path d="M6 6l12 12M18 6L6 18"/>'),
     ok: svgIco('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
     tabela: svgIco('<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10"/>'),
-    abre: svgIco('<path d="m9 6 6 6-6 6"/>')
+    abre: svgIco('<path d="m9 6 6 6-6 6"/>'),
+    luz: svgIco('<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9V16h7v-2.1A6 6 0 0 0 12 3z"/>'),
+    doc: svgIco('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>')
   };
   function ferramentas(tipo) {
     const b = (acao, rotulo) => `<button type="button" class="dgui-acao" data-dgui-acao="${acao}" title="${rotulo}" aria-label="${rotulo}">${ICO[acao]}</button>`;
@@ -291,6 +293,34 @@
       '</div>';
   }
 
+  /* Leitura dentro do cartão do painel (19/10/2026, proposta A do dono): no pé do cartão, antes dos
+     Dados, ela vira duas faixas fechadas iguais à dos Dados, "Leitura do especialista · N destaques" e
+     "Análise completa"; um toque abre ali mesmo. Fora de um painel a leitura continua um bloco aberto. */
+  function faixa(c, parte, ico, rotulo, sub, corpo) {
+    const k = 'f' + chaveTexto(parte + JSON.stringify(c));
+    const aberta = dadosAbertos.has(k);
+    return `<div class="dgui-comp dgui-faixa dgui-recolhida${aberta ? ' dgui-aberta' : ''}" data-dgui="${k}">` +
+      `<div class="dgui-dados-cab"><button type="button" class="dgui-dados-abre" data-dgui-dados aria-expanded="${aberta}">${ICO[ico]}` +
+      `<span class="dgui-dados-rot"><b>${rotulo}</b>${sub ? ' · ' + sub : ''}</span></button>` +
+      `<button type="button" class="dgui-acao dgui-dados-seta" data-dgui-dados aria-label="${aberta ? 'Fechar' : 'Abrir'}" title="${aberta ? 'Fechar' : 'Abrir'}">${ICO.abre}</button></div>` +
+      `<div class="dgui-faixa-corpo"${aberta ? '' : ' hidden'}>${corpo}</div></div>`;
+  }
+  function leituraEmFaixas(c) {
+    const dest = (Array.isArray(c.destaques) ? c.destaques : []).slice(0, 5).map((d) => (typeof d === 'string' ? { texto: d } : d || {}))
+      .filter((d) => d.texto);
+    const ico = (d) => ICO_LEITURA[d.tipo] || ICO_LEITURA.info;
+    let html = '';
+    if (dest.length) {
+      html += faixa(c, 'leitura', 'luz', txt(c.titulo || 'Leitura do especialista'), dest.length + (dest.length === 1 ? ' destaque' : ' destaques'),
+        '<ul class="dgui-destaques">' + dest.map((d) => `<li>${ico(d)}<span>${txt(d.texto)}</span></li>`).join('') + '</ul>');
+    }
+    if (c.detalhe) {
+      html += faixa(c, 'analise', 'doc', dest.length ? 'Análise completa' : txt(c.titulo || 'Leitura do especialista'), '',
+        `<div class="dgui-leitura-txt">${textoSimples(c.detalhe)}</div>`);
+    }
+    return html;
+  }
+
   /* ── Escolha: o agente pede uma decisão e mostra as opções numa lista para tocar, como o
      Claude faz. Um toque manda a opção como resposta; "Outra resposta" leva ao campo. ── */
   const LETRAS = 'ABCDEFGH';
@@ -426,10 +456,10 @@
       const temGrafico = resto.some((it) => it && (it.tipo === 'grafico' || it.tipo === 'gráfico'));
       const dados = temGrafico ? resto.filter(ehTab).map((it) => tabela(Object.assign({}, it, { _recolhida: true }))).join('') : '';
       if (dados) resto = resto.filter((it) => !ehTab(it));
-      const pe = dados ? `<div class="dgui-dados">${dados}</div>` : '';
-      if (c._semTitulo) return grade(resto, fundo) + pe + leituras.map(leitura).join('');
-      return `<div class="dgui-painel">${c.titulo ? `<div class="dgui-painel-tit">${txt(c.titulo)}</div>` : ''}${grade(resto, fundo)}${rodape(c)}${pe}</div>` +
-        leituras.map(leitura).join('');
+      const faixas = leituras.map(leituraEmFaixas).join('') + dados;
+      const pe = faixas ? `<div class="dgui-dados">${faixas}</div>` : '';
+      if (c._semTitulo) return grade(resto, fundo) + pe;
+      return `<div class="dgui-painel">${c.titulo ? `<div class="dgui-painel-tit">${txt(c.titulo)}</div>` : ''}${grade(resto, fundo)}${rodape(c)}${pe}</div>`;
     }
     return aviso('tipo "' + String(c.tipo || '').slice(0, 20) + '" desconhecido (use kpi, tabela, grafico ou painel)');
   }
@@ -778,7 +808,7 @@
     if (!comp) return;
     const abre = !comp.classList.contains('dgui-aberta');
     comp.classList.toggle('dgui-aberta', abre);
-    const rola = comp.querySelector('.dgui-tabela-rola'); if (rola) rola.hidden = !abre;
+    const rola = comp.querySelector('.dgui-tabela-rola, .dgui-faixa-corpo'); if (rola) rola.hidden = !abre;
     comp.querySelectorAll('[data-dgui-dados]').forEach((b) => {
       if (b.classList.contains('dgui-dados-abre')) b.setAttribute('aria-expanded', String(abre));
       else { const r = (abre ? 'Fechar' : 'Abrir') + ' os dados'; b.title = r; b.setAttribute('aria-label', r); }

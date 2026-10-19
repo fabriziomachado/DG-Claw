@@ -97,10 +97,22 @@ test('leitura mostra destaques e recolhe o detalhe, com texto escapado', () => {
   assert.ok(!h.includes('concentra <b>'));
 });
 
-test('a leitura sai do cartão do painel e fica logo abaixo dele', () => {
-  const h = dgui.blocoParaHtml(bloco({ tipo: 'painel', titulo: 'P', itens: [{ tipo: 'kpi', valor: '1' }, { tipo: 'leitura', destaques: ['x'] }] }));
-  const fimPainel = h.indexOf('</div><div class="dgui-leitura">');
-  assert.ok(fimPainel > 0, 'a leitura vem depois do fechamento do painel');
+test('no painel, a leitura vira faixas fechadas no pé do cartão, antes dos Dados (19/10/2026)', () => {
+  const h = dgui.blocoParaHtml(bloco({ tipo: 'painel', titulo: 'P', itens: [
+    { tipo: 'grafico', formato: 'barras', categorias: ['a'], series: [{ nome: 's', valores: [1] }] },
+    { tipo: 'tabela', colunas: ['a'], linhas: [['1']] },
+    { tipo: 'leitura', destaques: ['x', 'y'], detalhe: 'texto longo' }] }));
+  assert.ok(!h.includes('class="dgui-leitura"'), 'a leitura não fica como bloco solto');
+  const leit = h.indexOf('Leitura do especialista'), anal = h.indexOf('Análise completa'), dados = h.indexOf('<b>Dados</b>');
+  assert.ok(leit > 0 && anal > leit && dados > anal, 'ordem: leitura, análise completa, dados');
+  assert.ok(h.includes('2 destaques'));
+  assert.equal((h.match(/class="dgui-faixa-corpo" hidden/g) || []).length, 2, 'as duas faixas da leitura chegam fechadas');
+  assert.ok(h.lastIndexOf('</div>') > dados, 'tudo dentro do cartão');
+});
+
+test('fora de um painel, a leitura continua um bloco aberto', () => {
+  const h = dgui.blocoParaHtml(bloco({ tipo: 'leitura', destaques: ['x'] }));
+  assert.ok(h.includes('class="dgui-leitura"'));
 });
 
 test('normaliza: painel em formato alternativo (componentes, kpi com itens, dados [{rotulo,valor}], leitura texto, sugestões) desenha sem erro', () => {

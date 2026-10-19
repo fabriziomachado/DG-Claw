@@ -24,6 +24,7 @@ const { criarCofreAgente } = require('./lib/cofre-agente');
 const { criarCofreRotas } = require('./lib/cofre-rotas');
 const { criarPaineisVivos } = require('./lib/paineis-vivos');
 const { criarMencoes } = require('./lib/mencoes');
+const { criarFeedback } = require('./lib/feedback');
 const { criarAlertas } = require('./lib/alertas');
 const { criarFoco } = require('./lib/foco');
 const { criarVoz } = require('./lib/voz');
@@ -111,6 +112,7 @@ function criarServidor(opcoes) {
   // A conversa como a tela vê: depois do último /clear (o antes fica em Histórico > Arquivadas).
   const mencoes = criarMencoes({ config, registro, conversa, log });
   mencoes.retoma();
+  const feedback = criarFeedback({ config, conversa, log });
   const threadTela = async (agente) => mencoes.junta(agente.slug, arquivoConversa.visivel(agente.slug, await conversa.thread(agente)));
   const historico = criarHistorico({ registro, log, conversa, arquivoConversa });
   const paineisVivos = opcoes.paineisVivos || criarPaineisVivos({ registro, log });
@@ -490,6 +492,17 @@ function criarServidor(opcoes) {
       if (acao === 'stream' && m === 'GET') return stream(req, res, url, agente);
       if (acao === 'wait' && m === 'GET') return esperar(req, res, url, agente);
       if (acao === 'send' && m === 'POST') return enviar(req, res, agente);
+      // 👍 / 👎 numa resposta (lib/feedback.js); GET devolve os votos desta conversa
+      if (acao === 'feedback') {
+        if (sessao.via === 'caixa') return H.erroJson(res, 403, 'O 👍 👎 é do dono, no navegador.');
+        if (m === 'GET') return H.enviaJson(res, 200, { ok: true, votos: feedback.votos(agente.slug) });
+        if (m === 'POST') {
+          const corpo = await lerEnvio(req, res);
+          if (!corpo) return undefined;
+          const r = await feedback.votar(agente, await conversa.thread(agente), { mensagem: String(corpo.mensagem || ''), tipo: String(corpo.tipo || '') });
+          return H.enviaJson(res, r.status, r.corpo);
+        }
+      }
       // @mencionar outro agente na conversa deste (lib/mencoes.js); só o dono, no navegador
       if (acao === 'mencao' && m === 'POST') {
         if (sessao.via === 'caixa') return H.erroJson(res, 403, 'Mencionar outro agente é coisa do dono, no navegador.');

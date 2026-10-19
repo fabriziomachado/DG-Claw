@@ -982,3 +982,7 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 /* "N novas mensagens" (19/10/2026) */
 .novas-sep{display:flex;align-items:center;gap:10px;margin:10px 0 4px;color:var(--dg-azul-forte);font-size:12px;font-weight:600}
 .novas-sep::before,.novas-sep::after{content:"";flex:1;height:1px;background:color-mix(in srgb,var(--dg-azul) 45%,transparent)}
+
+/* 👍 👎 (19/10/2026): mesmo peso dos outros ícones; marcado fica no tom do texto */
+.acoes .ac-voto.on{color:var(--dg-texto)}
+.acoes .ac-voto.on svg{fill:currentColor;fill-opacity:.18}

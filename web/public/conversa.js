@@ -1649,8 +1649,22 @@ const ICONE_ACAO = {
   copiar: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/></svg>',
   ok:     '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   ouvir:  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
+  bom: '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 10v10H4.5a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1zM7 10l4-7a2.2 2.2 0 0 1 2.6 2.6L13 9h5.4a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.2 20H7"/></svg>',
+  ruim: '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 14V4h2.5a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1zM17 14l-4 7a2.2 2.2 0 0 1-2.6-2.6L11 15H5.6a2 2 0 0 1-2-2.3l1.2-7A2 2 0 0 1 6.8 4H17"/></svg>',
   responder: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H12"/></svg>'
 };
+/* 👍 / 👎 (19/10/2026, ideia 5): discretos, no estilo do ChatGPT. O voto fica no servidor (vale em todo
+   aparelho) e vira recado ao agente: 👍 ele guarda o que funcionou; 👎 ele pergunta o que melhorar. */
+let votos = {};
+api(API + '/feedback').then(d => { votos = (d && d.votos) || {}; if (carregouUmaVez) render({ semRolar: true }); }).catch(() => {});
+async function vota(m, tipo) {
+  const novo = votos[m.id] === tipo ? '' : tipo;
+  const antes = votos[m.id];
+  if (novo) votos[m.id] = novo; else delete votos[m.id];
+  render({ semRolar: true });
+  try { await api(API + '/feedback', { method: 'POST', body: { mensagem: m.id, tipo: novo } }); }
+  catch (e) { if (antes) votos[m.id] = antes; else delete votos[m.id]; render({ semRolar: true }); mostraErro('Não consegui registrar: ' + e.message); }
+}
 function htmlAcoes(m, hora) {
   hora = hora || '';
   if (!m || m.pendente || !legendaUtil(m) || ehVisual(m.media)) return hora ? `<div class="acoes so-hora">${hora}</div>` : '';
@@ -1658,6 +1672,8 @@ function htmlAcoes(m, hora) {
          `<button type="button" class="ac" data-ac="copiar" title="Copiar" aria-label="Copiar a resposta">${ICONE_ACAO.copiar}</button>` +
          `<button type="button" class="ac ac-ouvir" data-ac="ouvir" title="Ouvir em voz alta" aria-label="Ouvir a resposta em voz alta">${ICONE_ACAO.ouvir}</button>` +
          `<button type="button" class="ac" data-ac="responder" title="Responder citando" aria-label="Responder citando esta mensagem">${ICONE_ACAO.responder}</button>` +
+         (m.origin === 'agente' ? `<button type="button" class="ac ac-voto${votos[m.id] === 'bom' ? ' on' : ''}" data-ac="bom" title="Boa resposta" aria-label="Boa resposta" aria-pressed="${votos[m.id] === 'bom'}">${ICONE_ACAO.bom}</button>` +
+           `<button type="button" class="ac ac-voto${votos[m.id] === 'ruim' ? ' on' : ''}" data-ac="ruim" title="Resposta ruim" aria-label="Resposta ruim" aria-pressed="${votos[m.id] === 'ruim'}">${ICONE_ACAO.ruim}</button>` : '') +
          hora + '</div>';
 }
 wrap.addEventListener('click', async ev => {
@@ -1668,6 +1684,7 @@ wrap.addEventListener('click', async ev => {
   const texto = m ? legendaUtil(m) : '';
   if (!texto) return;
   if (b.dataset.ac === 'responder') { comecaResposta(m); return; }
+  if (b.dataset.ac === 'bom' || b.dataset.ac === 'ruim') { vota(m, b.dataset.ac); return; }
   if (b.dataset.ac === 'copiar') {
     try {
       await navigator.clipboard.writeText(texto);

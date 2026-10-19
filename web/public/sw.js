@@ -5,7 +5,7 @@
    abrir rápido e para o app instalado ter o que mostrar. NUNCA mexe em /api/,
    /p/, /login, /sair nem nas páginas de conversa (/a/...): conteúdo da conversa,
    painéis e sessão passam direto para a rede, sem cópia nenhuma. */
-const VERSAO = 'dgclaw-estaticos-v59';
+const VERSAO = 'dgclaw-estaticos-v60';
 const ESTATICOS = [
   '/tema.css', '/tema.js', '/dgui.css', '/dgui.js', '/historico.css', '/historico.js', '/conversa.css', '/chat.css', '/conversa.js', '/icones-topo.js', '/menu-lado.js', '/menu-lado.css', '/casca.js', '/casca.css', '/login-cartao.js', '/trilha-tela.js', '/vendor/highlight-11.9.0.min.js', '/rolagem.js', '/tour.js',
   '/onboarding.js', '/onboarding.css',

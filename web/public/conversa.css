@@ -1071,3 +1071,6 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 #chipsSessao .cs-chip b{color:var(--dg-texto);font-weight:600}
 #chipsSessao .cs-chip.pede{border-color:var(--dg-pedido-borda);background:var(--dg-pedido-fundo);color:var(--dg-pedido-texto)}
 #chipsSessao .cs-chip.fim{opacity:.75}
+/* celular: os atalhos do topo (Painel, Sessões, Tutorial) já estão no menu; a fileira de agentes fica
+   com a largura toda (19/10/2026, pedido do dono). Ler e Contínua (voz) continuam. */
+@media(max-width:700px){header #btnPainel,header #btnSessoes,header #btnTutorial{display:none!important}}

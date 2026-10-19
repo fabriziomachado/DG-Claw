@@ -86,3 +86,5 @@ html.casca #cabecalho.com-fileira .btn{width:40px;min-width:40px;height:40px;min
 html.casca #cabecalho.com-fileira .btn:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
 html.casca #cabecalho.com-fileira #btnSessoes .lbl{display:none}
 html.casca #cabecalho.com-fileira{gap:4px}
+/* celular: Sessões e Tutorial saem do topo (estão no menu); a fileira fica com a largura toda */
+@media(max-width:700px){html.casca #cabecalho #btnSessoes,html.casca #cabecalho #btnTutorial{display:none!important}}

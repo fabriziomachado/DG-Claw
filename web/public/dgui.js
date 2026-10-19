@@ -36,7 +36,9 @@
     compartilhar: svgIco('<path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 12v6.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V12"/>'),
     ampliar: svgIco('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
     fechar: svgIco('<path d="M6 6l12 12M18 6L6 18"/>'),
-    ok: svgIco('<path d="M5 12.5l4.5 4.5L19 7.5"/>')
+    ok: svgIco('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
+    tabela: svgIco('<rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10"/>'),
+    abre: svgIco('<path d="m9 6 6 6-6 6"/>')
   };
   function ferramentas(tipo) {
     const b = (acao, rotulo) => `<button type="button" class="dgui-acao" data-dgui-acao="${acao}" title="${rotulo}" aria-label="${rotulo}">${ICO[acao]}</button>`;
@@ -90,8 +92,20 @@
       return a ? ` style="text-align:${a}"` : '';
     };
     const ordena = c.ordenavel !== false;
-    return `<div class="dgui-tabela dgui-comp" data-dgui="${chave(c)}">` + ferramentas('tabela') + (c.titulo ? `<div class="dgui-tit">${txt(c.titulo)}</div>` : '') +
-      `<div class="dgui-tabela-rola"><table${ordena ? ' data-dgui-ordena="1"' : ''}><thead><tr>` +
+    const k = chave(c);
+    // Tabela que acompanha um gráfico no painel (19/10/2026, proposta B do dono): fica fechada num
+    // rodapé fino do cartão ("Dados · título"), com copiar e baixar à mão; tocar abre ali mesmo.
+    const recolhida = !!c._recolhida;
+    const aberta = recolhida && dadosAbertos.has(k);
+    const b = (acao, rotulo) => `<button type="button" class="dgui-acao" data-dgui-acao="${acao}" title="${rotulo}" aria-label="${rotulo}">${ICO[acao]}</button>`;
+    const cab = recolhida
+      ? `<div class="dgui-dados-cab"><button type="button" class="dgui-dados-abre" data-dgui-dados aria-expanded="${aberta}">${ICO.tabela}` +
+        `<span class="dgui-dados-rot"><b>Dados</b> · ${c.titulo ? txt(c.titulo) : linhas.length + (linhas.length === 1 ? ' linha' : ' linhas')}</span></button>` +
+        b('copiar', 'Copiar para o Excel') + b('baixar', 'Baixar planilha (CSV)') +
+        `<button type="button" class="dgui-acao dgui-dados-seta" data-dgui-dados aria-label="${aberta ? 'Fechar' : 'Abrir'} os dados" title="${aberta ? 'Fechar' : 'Abrir'} os dados">${ICO.abre}</button></div>`
+      : ferramentas('tabela') + (c.titulo ? `<div class="dgui-tit">${txt(c.titulo)}</div>` : '');
+    return `<div class="dgui-tabela dgui-comp${recolhida ? ' dgui-recolhida' : ''}${aberta ? ' dgui-aberta' : ''}" data-dgui="${k}">` + cab +
+      `<div class="dgui-tabela-rola"${recolhida && !aberta ? ' hidden' : ''}><table${ordena ? ' data-dgui-ordena="1"' : ''}><thead><tr>` +
       cols.map((col, i) => `<th${alinha(i)}${ordena ? ` data-col="${i}" tabindex="0" aria-sort="none"` : ''}>${txt(col.nome)}${ordena ? '<span class="dgui-ord" aria-hidden="true"></span>' : ''}</th>`).join('') +
       '</tr></thead><tbody>' +
       linhas.map((l) => '<tr>' + cols.map((_, i) => {
@@ -385,6 +399,7 @@
 
   function chaveTexto(t) { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); }
 
+  const dadosAbertos = new Set();   // tabelas recolhidas que a pessoa abriu (sobrevive ao redesenho)
   function aviso(m) { return `<div class="dgui-aviso">Não consegui desenhar este componente: ${esc(m)}.</div>`; }
 
   function componente(c, fundo) {
@@ -405,9 +420,15 @@
         ? Object.assign({}, it, { fonte: c.fonte, atualizado: it.atualizado || c.atualizado, _semRodape: true }) : it));
       // a leitura do especialista sai do cartão e fica logo abaixo dele, como bloco próprio
       const leituras = herda.filter((it) => it && it.tipo === 'leitura');
-      const resto = herda.filter((it) => !(it && it.tipo === 'leitura'));
-      if (c._semTitulo) return grade(resto, fundo) + leituras.map(leitura).join('');
-      return `<div class="dgui-painel">${c.titulo ? `<div class="dgui-painel-tit">${txt(c.titulo)}</div>` : ''}${grade(resto, fundo)}${rodape(c)}</div>` +
+      let resto = herda.filter((it) => !(it && it.tipo === 'leitura'));
+      // com gráfico no painel, a tabela são os dados dele: vai fechada para o pé do cartão
+      const ehTab = (it) => it && it.tipo === 'tabela';
+      const temGrafico = resto.some((it) => it && (it.tipo === 'grafico' || it.tipo === 'gráfico'));
+      const dados = temGrafico ? resto.filter(ehTab).map((it) => tabela(Object.assign({}, it, { _recolhida: true }))).join('') : '';
+      if (dados) resto = resto.filter((it) => !ehTab(it));
+      const pe = dados ? `<div class="dgui-dados">${dados}</div>` : '';
+      if (c._semTitulo) return grade(resto, fundo) + pe + leituras.map(leitura).join('');
+      return `<div class="dgui-painel">${c.titulo ? `<div class="dgui-painel-tit">${txt(c.titulo)}</div>` : ''}${grade(resto, fundo)}${rodape(c)}${pe}</div>` +
         leituras.map(leitura).join('');
     }
     return aviso('tipo "' + String(c.tipo || '').slice(0, 20) + '" desconhecido (use kpi, tabela, grafico ou painel)');
@@ -753,6 +774,17 @@
     const antes = btn.innerHTML; btn.innerHTML = ICO.ok; btn.classList.add('feito');
     setTimeout(() => { btn.innerHTML = antes; btn.classList.remove('feito'); }, 1500);
   }
+  function alternaDados(comp) {
+    if (!comp) return;
+    const abre = !comp.classList.contains('dgui-aberta');
+    comp.classList.toggle('dgui-aberta', abre);
+    const rola = comp.querySelector('.dgui-tabela-rola'); if (rola) rola.hidden = !abre;
+    comp.querySelectorAll('[data-dgui-dados]').forEach((b) => {
+      if (b.classList.contains('dgui-dados-abre')) b.setAttribute('aria-expanded', String(abre));
+      else { const r = (abre ? 'Fechar' : 'Abrir') + ' os dados'; b.title = r; b.setAttribute('aria-label', r); }
+    });
+    if (abre) dadosAbertos.add(comp.dataset.dgui); else dadosAbertos.delete(comp.dataset.dgui);
+  }
   async function age(btn) {
     const comp = btn.closest('.dgui-comp'); if (!comp) return;
     const c = registro.get(comp.dataset.dgui); const acao = btn.dataset.dguiAcao;
@@ -838,6 +870,8 @@
       if (!ev.target.closest) return;
       const th = ev.target.closest('table[data-dgui-ordena] th[data-col]');
       if (th) { ordena(th); return; }
+      const dd = ev.target.closest('[data-dgui-dados]');
+      if (dd) { alternaDados(dd.closest('.dgui-comp')); return; }
       const acao = ev.target.closest('[data-dgui-acao]');
       if (acao) { age(acao); return; }
       const atu = ev.target.closest('[data-dgui-vivo-atu]');

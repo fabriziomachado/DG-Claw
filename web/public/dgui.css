@@ -232,3 +232,21 @@ th[aria-sort="descending"] .dgui-ord::after{content:"▼";color:var(--dg-azul)}
 .dg-passos b{display:block;font-size:15px;font-weight:600;line-height:1.4;margin-bottom:1px}
 .dg-passos small{display:block;font-size:13px;color:var(--dg-texto-2);line-height:1.45;margin-bottom:6px}
 .dg-passos .cod{margin:6px 0 0}
+
+/* Dados do gráfico no pé do cartão (19/10/2026, proposta B): a tabela chega fechada numa faixa fina,
+   "Dados · título", com copiar e baixar à mão; tocar abre ali mesmo, colada nas bordas do cartão. */
+.dgui-painel .dgui-dados{margin:0 -14px -14px;border-top:1px solid var(--dg-borda)}
+.dgui-dados .dgui-recolhida + .dgui-recolhida{border-top:1px solid var(--dg-borda)}
+.dgui-dados-cab{display:flex;align-items:center;gap:2px;padding:6px 8px 6px 6px}
+.dgui-dados-abre{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:6px 8px;border:0;border-radius:8px;background:transparent;
+  font:inherit;font-size:13px;color:var(--dg-texto-3);text-align:left;cursor:pointer}
+.dgui-dados-abre:hover{color:var(--dg-texto-2)}
+.dgui-dados-abre svg{flex:0 0 16px;width:16px;height:16px;color:var(--dg-texto-3)}
+.dgui-dados-rot{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dgui-dados-rot b{font-weight:600;color:var(--dg-texto-2)}
+.dgui-dados-seta svg{transition:transform .15s}
+.dgui-aberta .dgui-dados-seta svg{transform:rotate(90deg)}
+.dgui-recolhida .dgui-tabela-rola{border:0;border-top:1px solid var(--dg-borda);border-radius:0}
+.dgui-recolhida .dgui-tabela-rola th:first-child,.dgui-recolhida .dgui-tabela-rola td:first-child{padding-left:14px}
+.dgui-painel .dgui-dados:last-child .dgui-recolhida:last-child .dgui-tabela-rola{border-radius:0 0 15px 15px}
+@media (prefers-reduced-motion:reduce){.dgui-dados-seta svg{transition:none}}

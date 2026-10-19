@@ -420,6 +420,8 @@ function setEstado(txt, ehErro) {
    cabeçalho segue contando o que o app faz (gravando, enviando, erro). A foto
    fica em window.atividadeFoto. */
 const atividadeEl = $('atividade');
+// dica e folha de "sessão em paralelo" enquanto o agente trabalha (sessao-paralela.js)
+if (window.DGSessaoParalela) window.DGSessaoParalela.inicia({ agente: AGENTE, atividade: atividadeEl, entrada });
 const atvNomeEl = atividadeEl && atividadeEl.querySelector('.atv-nome');
 const atvSepEl = atividadeEl && atividadeEl.querySelector('.atv-sep');
 const atvAcaoEl = atividadeEl && atividadeEl.querySelector('.atv-acao');

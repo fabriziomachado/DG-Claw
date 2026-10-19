@@ -361,6 +361,28 @@
     });
   }
 
+  /* ── Passos (19/10/2026): passo a passo na própria conversa, numerado e ligado por uma linha fina.
+     Cada item: { titulo, texto, codigo, lingua }. O código sai no mesmo bloco da conversa (barra com a
+     língua e o Copiar, cores de sintaxe pelo highlight.js da página). */
+  const NOME_LINGUA = { bash: 'Bash', sh: 'Shell', shell: 'Shell', js: 'JavaScript', javascript: 'JavaScript', ts: 'TypeScript', py: 'Python', python: 'Python', php: 'PHP', sql: 'SQL', json: 'JSON', yaml: 'YAML', html: 'HTML', css: 'CSS' };
+  const ICO_COPIA = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/></svg>';
+  function htmlCodigo(cod, lingua) {
+    const l = String(lingua || '').toLowerCase();
+    const h = raiz.hljs;
+    let cor = null;
+    if (h && l && h.getLanguage(l)) { try { cor = h.highlight(cod, { language: l, ignoreIllegals: true }).value; } catch (_) { cor = null; } }
+    return `<div class="cod"><div class="cod-bar"><span class="cod-lingua">${esc(NOME_LINGUA[l] || l || 'texto')}</span>` +
+      `<button type="button" class="codcopia" aria-label="Copiar o código" title="Copiar o código">${ICO_COPIA}<span>Copiar</span></button></div>` +
+      `<pre${cor != null ? ' class="hljs"' : ''}>${cor != null ? cor : esc(cod)}</pre></div>`;
+  }
+  function passos(c) {
+    const itens = (Array.isArray(c.itens) ? c.itens : []).filter((x) => x && typeof x === 'object').slice(0, 20);
+    if (!itens.length) return aviso('passos sem "itens"');
+    return (c.titulo ? `<div class="dgui-painel-tit">${txt(c.titulo)}</div>` : '') + '<ol class="dg-passos">' + itens.map((it) =>
+      `<li><b>${txt(it.titulo || '')}</b>${it.texto ? `<small>${txt(it.texto)}</small>` : ''}` +
+      (typeof it.codigo === 'string' && it.codigo.trim() ? htmlCodigo(it.codigo.replace(/\s+$/, ''), it.lingua) : '') + '</li>').join('') + '</ol>';
+  }
+
   function chaveTexto(t) { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); }
 
   function aviso(m) { return `<div class="dgui-aviso">Não consegui desenhar este componente: ${esc(m)}.</div>`; }
@@ -374,6 +396,7 @@
     if (c.tipo === 'leitura') return leitura(c);
     if (c.tipo === 'escolha') return escolha(c);
     if (c.tipo === 'carrossel') return carrossel(c, fundo);
+    if (c.tipo === 'passos') return passos(c);
     if (c.tipo === 'painel' && c.vivo && !c._vivoDentro && fundo === 0) return painelVivo(c, fundo);
     if (c.tipo === 'painel' && Array.isArray(c.filtros) && c.filtros.length && c.variantes && typeof c.variantes === 'object') return painelComFiltros(c, fundo);
     if (c.tipo === 'painel') {

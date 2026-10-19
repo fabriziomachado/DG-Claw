@@ -154,3 +154,19 @@ carrossel em vez de tudo empilhado. Um cartão por opção; no celular desliza c
 - Até 12 cartões. `imagem` só aceita endereço do próprio DG Claw (começando com `/`).
 - Imagens (prints, fotos, propostas desenhadas): mande cada uma com `send_file`, uma seguida da
   outra, cada uma com a sua legenda. A conversa junta imagens seguidas num carrossel sozinha.
+
+## Passos (passo a passo com comandos)
+
+Instrução com etapas, cada uma com um comando ou trecho para copiar, vai num bloco `passos` na
+própria mensagem (nunca num visual com caixinha). A conversa numera, liga os passos com uma linha
+fina e mostra cada código no bloco padrão (língua no topo, Copiar, cores de sintaxe).
+
+```json
+{"tipo":"passos","itens":[
+  {"titulo":"Crie o usuário só de túnel","texto":"Sem senha e sem shell.","codigo":"sudo adduser --disabled-password dgclaw-tunel","lingua":"bash"},
+  {"titulo":"Teste o túnel","texto":"Num terminal abra o túnel; no outro, conecte.","codigo":"ssh -N -L 3307:10.0.0.5:3306 dgclaw-tunel@servidor","lingua":"bash"}
+]}
+```
+
+- `codigo` e `lingua` são opcionais (passo só de texto também vale). Quebras de linha no código como `\n`.
+- Um comando solto, sem etapas: bloco de código comum na mensagem (```bash ... ```).

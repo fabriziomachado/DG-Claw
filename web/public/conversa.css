@@ -1009,3 +1009,18 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 .eq-ag.on{border-color:var(--dg-entrega-borda);color:var(--dg-entrega-texto)}
 .eq-ag.off{opacity:.45}
 .eq-ag .men-foto{flex-basis:20px;width:20px;height:20px}
+
+/* bloco de código com cara de código-fonte (19/10/2026): barra no topo, fundo próprio, sem quebrar linha */
+.cod{position:relative;margin:10px 0 6px;border:1px solid var(--dg-borda);border-radius:12px;overflow:hidden;background:var(--dg-codigo)}
+.cod-bar{display:flex;align-items:center;gap:8px;min-height:32px;padding:2px 4px 2px 12px;background:var(--dg-superficie-2);border-bottom:1px solid var(--dg-borda)}
+.cod-bar .cod-lingua{padding:0;font:600 11.5px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;letter-spacing:0;text-transform:none;color:var(--dg-texto-2)}
+.cod .codcopia{position:static;margin-left:auto;width:auto;height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:5px;
+  border:0;border-radius:7px;background:transparent;color:var(--dg-texto-2);font:500 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;cursor:pointer}
+.cod .codcopia svg{width:14px;height:14px}
+.cod .codcopia:hover{background:var(--dg-superficie);color:var(--dg-texto)}
+.cod .codcopia.ok{background:transparent;color:var(--dg-entrega-texto)}
+.cod pre,.cod.com-lingua pre{margin:0;padding:10px 12px;white-space:pre;overflow-x:auto;overflow-wrap:normal;word-break:normal;
+  font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--dg-texto);-webkit-overflow-scrolling:touch}
+.cod-diff pre{padding:8px 0}
+.cod-diff pre span{padding:0 12px;min-height:1.6em}
+.vist{display:inline-flex;align-items:center;gap:6px}.vist .ico-vis,.dovisual .ico-vis{color:var(--dg-texto-3);flex:0 0 auto;vertical-align:-2px}

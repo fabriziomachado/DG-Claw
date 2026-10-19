@@ -28,6 +28,10 @@ do mesmo sistema.
    tela/variante, mandadas uma seguida da outra (a conversa junta em carrossel). Cada imagem com uma
    legenda curta do que mostra.
 
+8. **Comando ou texto para copiar fica na mensagem, nunca num visual.** Um trecho: bloco de código com a
+   linguagem (```bash). Vários em etapas: o componente `passos` do bloco dgui. O bloco de código da conversa
+   já tem a barra com a língua, o Copiar e as cores de sintaxe.
+
 ## Paleta (variáveis do tema.css)
 
 | Uso | Variável |

@@ -220,3 +220,15 @@ th[aria-sort="descending"] .dgui-ord::after{content:"▼";color:var(--dg-azul)}
 .dg-car-fotos .mid img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;object-position:top}
 .dg-car-fotos .midcx{display:block}
 .dg-car-fotos .lupa,.dg-car-fotos .midfb{display:none}
+
+/* passos (19/10/2026): numerados, ligados por uma linha fina */
+.dg-passos{list-style:none;margin:4px 0;padding:0;counter-reset:dgp}
+.dg-passos>li{position:relative;padding:0 0 16px 34px;counter-increment:dgp}
+.dg-passos>li::before{content:counter(dgp);position:absolute;left:0;top:1px;width:22px;height:22px;border-radius:50%;border:1px solid var(--dg-borda);background:var(--dg-superficie);
+  font-size:12px;font-weight:650;display:flex;align-items:center;justify-content:center;color:var(--dg-texto-2)}
+.dg-passos>li::after{content:"";position:absolute;left:11px;top:27px;bottom:4px;width:1px;background:var(--dg-borda)}
+.dg-passos>li:last-child{padding-bottom:4px}
+.dg-passos>li:last-child::after{display:none}
+.dg-passos b{display:block;font-size:15px;font-weight:600;line-height:1.4;margin-bottom:1px}
+.dg-passos small{display:block;font-size:13px;color:var(--dg-texto-2);line-height:1.45;margin-bottom:6px}
+.dg-passos .cod{margin:6px 0 0}

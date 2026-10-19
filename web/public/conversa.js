@@ -1167,6 +1167,7 @@ function htmlDiff(cod) {
     return `<span class="${c}">${esc(x)}\n</span>`;
   }).join('');
 }
+const ICO_VISUAL = '<svg class="ico-vis" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 9h17"/></svg>';
 const ICONE_COPIAR = '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">' +
   '<rect x="8" y="8" width="12" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/>' +
   '<path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" ' +
@@ -1246,11 +1247,11 @@ function paragrafos(txt, fmt) {
     if (!cod) continue;
     const diff = ehDiff(lingua, cod);
     const cor = diff ? null : htmlSintaxe(lingua, cod);
-    const rotulo = !diff && lingua && lingua !== 'text' && lingua !== 'plaintext'
-      ? `<div class="cod-lingua">${esc(SINTAXE_NOME[lingua] || lingua)}</div>` : '';
-    html += `<div class="cod${diff ? ' cod-diff' : ''}${rotulo ? ' com-lingua' : ''}">${rotulo}<button type="button" class="codcopia" ` +
-            `aria-label="Copiar o texto do bloco" title="Copiar o texto do bloco">` +
-            `${ICONE_COPIAR}</button><pre${cor != null ? ' class="hljs"' : ''}>${diff ? htmlDiff(cod) : (cor != null ? cor : esc(cod))}</pre></div>`;
+    // bloco de código com cara de código-fonte (19/10/2026): barra no topo com a língua e o Copiar
+    const nomeLingua = diff ? 'diff' : lingua && lingua !== 'text' && lingua !== 'plaintext' ? (SINTAXE_NOME[lingua] || lingua) : 'texto';
+    html += `<div class="cod${diff ? ' cod-diff' : ''}"><div class="cod-bar"><span class="cod-lingua">${esc(nomeLingua)}</span>` +
+            `<button type="button" class="codcopia" aria-label="Copiar o código" title="Copiar o código">${ICONE_COPIAR}<span>Copiar</span></button></div>` +
+            `<pre${cor != null ? ' class="hljs"' : ''}>${diff ? htmlDiff(cod) : (cor != null ? cor : esc(cod))}</pre></div>`;
   }
   return html;
 }
@@ -1585,7 +1586,7 @@ function htmlCorpo(m) {
   const dv = ehDono(m) ? separaDoVisual(leg) : null;
   if (dv) {
     leg = dv.texto;
-    doVisual = `<div class="dovisual">📊 do visual${dv.titulo ? ': ' + esc(dv.titulo) : ''}</div>`;
+    doVisual = `<div class="dovisual">${ICO_VISUAL} do visual${dv.titulo ? ': ' + esc(dv.titulo) : ''}</div>`;
   }
   // [ver a criação] só vira botão em mensagem de quem não é o dono (o texto já sai escapado de paragrafos)
   let htmlLeg = leg ? paragrafos(leg, m.fmt) : '';
@@ -1992,7 +1993,7 @@ function urlVisual(md) {
 function htmlVisual(m, md) {
   const tit = tituloProvisorio(md.nome);
   return `<div class="visb"><div class="vish">` +
-    `<span class="vist">📊 <span class="visn" data-visn="${esc(md.id)}">${esc(tit)}</span></span>` +
+    `<span class="vist">${ICO_VISUAL}<span class="visn" data-visn="${esc(md.id)}">${esc(tit)}</span></span>` +
     `<button type="button" class="visfull" data-visfull="${esc(md.id)}" ` +
     `title="Abrir em tela cheia" aria-label="Abrir o visual em tela cheia">⛶</button>` +
     `${botaoBaixaMidia(md, ROTULO_MIDIA.document)}</div>` +
@@ -2267,7 +2268,7 @@ window.addEventListener('message', ev => {
     const desc = typeof d.descricao === 'string' ? d.descricao.trim().slice(0, 300) : '';
     if (tit) {
       est.titulo = tit;
-      if (est.cheia) { if (visTelaNome) visTelaNome.textContent = '📊 ' + tit; }
+      if (est.cheia) { if (visTelaNome) visTelaNome.textContent = tit; }
       else {
         const n = est.caixa.parentElement.querySelector('.visn');
         if (n) n.textContent = tit;
@@ -2353,7 +2354,7 @@ function abreTelaVisual(md) {
   const jaAberta = visTelaAberta();
   limpaTelaVisual();
   midias[md.id] = md;
-  visTelaNome.textContent = '📊 ' + tituloProvisorio(md.nome);
+  visTelaNome.textContent = tituloProvisorio(md.nome);
   visTelaBaixa.innerHTML = botaoBaixaMidia(md, ROTULO_MIDIA.document);
   const est = { md, caixa: visTelaCorpo, iframe: null, win: null, pronto: false, falhou: false,
                 noViewport: true, relogio: null, tarja: null, cheia: true };
@@ -2956,12 +2957,15 @@ wrap.addEventListener('click', ev => {
   if (!bt) return;
   ev.preventDefault();
   ev.stopPropagation();
-  const pre = bt.parentElement ? bt.parentElement.querySelector('pre') : null;
+  const cx = bt.closest('.cod');
+  const pre = cx ? cx.querySelector('pre') : (bt.parentElement ? bt.parentElement.querySelector('pre') : null);
   if (!pre) return;
   copiaTexto(pre.textContent).then(ok => {
     if (!ok) return;
+    const tx = bt.querySelector('span');
     bt.classList.add('ok');
-    setTimeout(() => bt.classList.remove('ok'), 1600);
+    if (tx) tx.textContent = 'Copiado';
+    setTimeout(() => { bt.classList.remove('ok'); if (tx) tx.textContent = 'Copiar'; }, 1600);
   });
 }, true);
 

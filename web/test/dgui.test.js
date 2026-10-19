@@ -155,3 +155,15 @@ test('carrossel: um cartão por item, conteúdo dgui dentro, "Escolher esta" e i
   assert.ok(/dgui-kpi-valor">1</.test(h) && (h.match(/<i/g) || []).length >= 2);
   assert.ok(D.blocoParaHtml('dgui\n{"tipo":"carrossel","itens":[]}').includes('Não consegui desenhar'));
 });
+
+test('passos: numerados com o código no bloco da conversa (barra com língua e Copiar)', () => {
+  const D = require('../public/dgui.js');
+  const h = D.blocoParaHtml('dgui\n' + JSON.stringify({ tipo: 'passos', itens: [
+    { titulo: 'Crie o usuário', texto: 'Sem shell.', codigo: 'sudo adduser x', lingua: 'bash' },
+    { titulo: 'Teste', codigo: 'ssh -N x' },
+  ] }));
+  assert.equal((h.match(/<li>/g) || []).length, 2);
+  assert.ok(h.includes('class="dg-passos"') && h.includes('class="cod-bar"') && h.includes('>Bash<') && h.includes('>Copiar<'));
+  assert.ok(h.includes('sudo adduser x') && h.includes('>texto<'));
+  assert.ok(!/Continue a análise/.test(h), 'passos não ganha perguntas sugeridas');
+});

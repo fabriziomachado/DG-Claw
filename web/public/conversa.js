@@ -1607,6 +1607,23 @@ function fotoDoDono(m) {
   return !!(m && ehDono(m) && !m.pendente && m.media && m.media.disponivel && m.media.thumb &&
             !ehVisual(m.media) && (m.media.kind === 'photo' || m.media.kind === 'image' || m.media.kind === 'video'));
 }
+/* Imagens que o agente manda em sequência (19/10/2026): um carrossel, com a legenda de cada uma */
+function fotoDoAgente(m) {
+  return !!(m && !ehDono(m) && m.media && m.media.disponivel && m.media.thumb && !ehVisual(m.media) &&
+            (m.media.kind === 'photo' || m.media.kind === 'image'));
+}
+function htmlFotosAgente(grupo, troca) {
+  const n = grupo.length;
+  const slides = grupo.map((m, i) => {
+    const md = m.media; midias[md.id] = md;
+    const leg = legendaUtil(m);
+    return `<div class="dg-car-sl" data-msg="${esc(m.id)}"><span class="midcx"><button class="mid" data-mid="${esc(md.id)}" aria-label="Abrir a imagem ${i + 1} de ${n}">` +
+      `<img loading="lazy" alt="" src="${esc(md.url || md.thumb)}" onerror="this.src='${esc(md.thumb)}'"></button></span>` +
+      `<div class="dg-car-tx"><div class="dg-car-k">${i + 1} de ${n}</div>${leg ? `<div class="dg-car-d">${esc(leg)}</div>` : ''}</div></div>`;
+  });
+  const ultimo = grupo[n - 1];
+  return `<div class="row her${troca}" data-msg="${esc(grupo[0].id)}"><div class="bub">${window.dgui.htmlCarrossel(slides, 'dg-car-fotos')}</div>${htmlAcoes(ultimo, htmlHora(ultimo))}</div>`;
+}
 function htmlFotosDono(grupo, troca) {
   const fotos = grupo.map(m => `<span class="mfoto-item" data-msg="${esc(m.id)}">${htmlMidia(m)}</span>`).join('');
   const textos = grupo.map(m => {
@@ -1783,6 +1800,19 @@ function render(opt) {
       itens.push([m.id + (grupo.length > 1 ? '~' + grupo.length : ''), htmlFotosDono(grupo, troca)]);
       anterior = lado;
       continue;
+    }
+    if (lado === 'her' && fotoDoAgente(m) && window.dgui && window.dgui.htmlCarrossel) {
+      const grupo = [m];
+      while (bi + 1 < blocos.length) {
+        const prox = blocos[bi + 1].msg;
+        if (!prox || !fotoDoAgente(prox) || prox.dia !== m.dia || prox.ep - grupo[grupo.length - 1].ep > 300) break;
+        grupo.push(prox); bi++;
+      }
+      if (grupo.length > 1) {
+        itens.push([m.id + '~car' + grupo.length, htmlFotosAgente(grupo, troca)]);
+        anterior = lado;
+        continue;
+      }
     }
     itens.push([m.id, `<div class="row ${lado}${ehVisual(m.media) ? ' vis' : ''}${troca}" data-msg="${esc(m.id)}">` +
                       `<div class="bub">${htmlCorpo(m)}</div>${lado === 'her' ? htmlAcoes(m, htmlHora(m)) : htmlHora(m)}</div>`]);

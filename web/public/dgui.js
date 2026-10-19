@@ -294,6 +294,72 @@
       `<button type="button" class="dgui-op dgui-op-outra" data-dgui-outra="1"><span class="dgui-op-letra">✎</span><span class="dgui-op-txt"><b>Outra resposta</b><small>escrever do meu jeito</small></span></button>` +
       '</div></div>';
   }
+  /* ── Carrossel (19/10/2026, pedido do dono): variantes, propostas ou cenários lado a lado, um
+     cartão por vez. Cada item: { titulo, detalhe, imagem (só do próprio DG Claw, "/..."), conteudo
+     (um componente ou uma lista deles), recomendada }. Com "escolher": true, cada cartão tem
+     "Escolher esta", que chega ao agente como a resposta do dono. O deslizar é rolagem nativa
+     (scroll-snap); as setas e os pontinhos são do controlador ligaCarrosseis. */
+  function htmlCarrossel(slides, extraCls) {
+    const n = slides.length;
+    return `<div class="dg-car${extraCls ? ' ' + extraCls : ''}" data-dg-car="${n}">` +
+      `<div class="dg-car-trilho" tabindex="0" aria-roledescription="carrossel">${slides.join('')}</div>` +
+      (n > 1 ? `<button type="button" class="dg-car-seta ant" data-dg-car-ir="-1" aria-label="Anterior" hidden>${svgIco('<path d="m15 6-6 6 6 6"/>')}</button>` +
+        `<button type="button" class="dg-car-seta prox" data-dg-car-ir="1" aria-label="Próximo">${svgIco('<path d="m9 6 6 6-6 6"/>')}</button>` +
+        `<div class="dg-car-pts" aria-hidden="true">${Array.from({ length: n }, (_, i) => `<i${i ? '' : ' class="on"'}></i>`).join('')}</div>` : '') +
+      '</div>';
+  }
+  function carrossel(c, fundo) {
+    const itens = (Array.isArray(c.itens) ? c.itens : []).filter((x) => x && typeof x === 'object').slice(0, 12);
+    if (!itens.length) return aviso('carrossel sem "itens"');
+    const n = itens.length;
+    const slides = itens.map((it, i) => {
+      const img = typeof it.imagem === 'string' && /^\/(?!\/)/.test(it.imagem) ? `<img class="dg-car-img" loading="lazy" alt="" src="${esc(it.imagem)}">` : '';
+      const cont = it.conteudo ? `<div class="dg-car-cont-int">${componente(Array.isArray(it.conteudo) ? it.conteudo : it.conteudo, (fundo || 0) + 1)}</div>` : '';
+      const titulo = String(it.titulo || 'Opção ' + (i + 1));
+      return `<div class="dg-car-sl${it.recomendada ? ' rec' : ''}" role="group" aria-label="${txt(i + 1 + ' de ' + n + ': ' + titulo)}">${img}${cont}` +
+        `<div class="dg-car-tx"><div class="dg-car-k">${i + 1} de ${n}${it.recomendada ? ' · <span>recomendada</span>' : ''}</div>` +
+        `<div class="dg-car-t">${txt(titulo)}</div>${it.detalhe ? `<div class="dg-car-d">${txt(it.detalhe)}</div>` : ''}` +
+        (c.escolher ? `<button type="button" class="dg-car-esc" data-dgui-opcao="${esc(('Escolho: ' + titulo).slice(0, 200))}">Escolher esta</button>` : '') +
+        '</div></div>';
+    });
+    return (c.titulo ? `<div class="dgui-painel-tit">${txt(c.titulo)}</div>` : '') + htmlCarrossel(slides);
+  }
+  // Pontinhos, contador e setas acompanham a rolagem do trilho (qualquer .dg-car da página)
+  function ligaCarrosseis(doc) {
+    const atual = (tr) => {
+      const sl = tr.children; if (!sl.length) return 0;
+      const x = tr.scrollLeft + 4; let i = 0;
+      for (let k = 0; k < sl.length; k++) if (sl[k].offsetLeft - tr.offsetLeft <= x) i = k;
+      if (tr.scrollLeft + tr.clientWidth >= tr.scrollWidth - 4) i = sl.length - 1;
+      return i;
+    };
+    const pinta = (car) => {
+      const tr = car.querySelector('.dg-car-trilho'); if (!tr) return;
+      const i = atual(tr), n = tr.children.length;
+      car.querySelectorAll('.dg-car-pts i').forEach((p, k) => p.classList.toggle('on', k === i));
+      const a = car.querySelector('.dg-car-seta.ant'), b = car.querySelector('.dg-car-seta.prox');
+      if (a) a.hidden = i === 0; if (b) b.hidden = i >= n - 1;
+    };
+    doc.addEventListener('scroll', (ev) => {
+      const tr = ev.target && ev.target.classList && ev.target.classList.contains('dg-car-trilho') ? ev.target : null;
+      if (tr) pinta(tr.closest('.dg-car'));
+    }, true);
+    doc.addEventListener('click', (ev) => {
+      const b = ev.target.closest && ev.target.closest('[data-dg-car-ir]'); if (!b) return;
+      const car = b.closest('.dg-car'), tr = car && car.querySelector('.dg-car-trilho'); if (!tr) return;
+      const i = Math.max(0, Math.min(tr.children.length - 1, atual(tr) + Number(b.dataset.dgCarIr)));
+      const alvo = tr.children[i];
+      tr.scrollTo({ left: alvo.offsetLeft - tr.offsetLeft, behavior: 'smooth' });
+    });
+    doc.addEventListener('keydown', (ev) => {
+      const tr = ev.target && ev.target.classList && ev.target.classList.contains('dg-car-trilho') ? ev.target : null;
+      if (!tr || (ev.key !== 'ArrowLeft' && ev.key !== 'ArrowRight')) return;
+      ev.preventDefault();
+      const btn = tr.closest('.dg-car').querySelector('[data-dg-car-ir="' + (ev.key === 'ArrowLeft' ? '-1' : '1') + '"]');
+      if (btn) btn.click();
+    });
+  }
+
   function chaveTexto(t) { let h = 5381; for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h.toString(36); }
 
   function aviso(m) { return `<div class="dgui-aviso">Não consegui desenhar este componente: ${esc(m)}.</div>`; }
@@ -306,6 +372,7 @@
     if (c.tipo === 'grafico' || c.tipo === 'gráfico') return grafico(c);
     if (c.tipo === 'leitura') return leitura(c);
     if (c.tipo === 'escolha') return escolha(c);
+    if (c.tipo === 'carrossel') return carrossel(c, fundo);
     if (c.tipo === 'painel' && c.vivo && !c._vivoDentro && fundo === 0) return painelVivo(c, fundo);
     if (c.tipo === 'painel' && Array.isArray(c.filtros) && c.filtros.length && c.variantes && typeof c.variantes === 'object') return painelComFiltros(c, fundo);
     if (c.tipo === 'painel') {
@@ -741,6 +808,7 @@
     setInterval(vivoProcura, 60000);
     raiz.document.addEventListener('visibilitychange', olha);
   }
+  if (raiz.document) ligaCarrosseis(raiz.document);
   if (raiz.document) {
     raiz.document.addEventListener('click', (ev) => {
       if (!ev.target.closest) return;
@@ -806,7 +874,7 @@
       for (const b of cx.querySelectorAll('[data-dgui-opcao]')) if (b.dataset.dguiOpcao === v) b.classList.add('escolhida');
     }
   }
-  const api = { normaliza, restauraEscolhas, blocoParaHtml, numero, csvDe, tsvDe, pngDe, svgParaImagem, registro };
+  const api = { htmlCarrossel, normaliza, restauraEscolhas, blocoParaHtml, numero, csvDe, tsvDe, pngDe, svgParaImagem, registro };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   raiz.dgui = api;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -194,6 +194,16 @@ if (navigator.standalone === true ||
     if (perto && chat) chat.scrollTop = chat.scrollHeight;
   }
   function agenda(){ if (!agendado) { agendado = true; requestAnimationFrame(ajusta); } }
+  /* O iPhone às vezes deixa a tela deslizada para cima depois do teclado, sem
+     avisar a volta. Aí as janelas por cima (Compartilhados, visor, menu) abriam
+     com o topo atrás do relógio, o X sem pegar o toque e um vão embaixo
+     (19/10/2026). Qualquer toque sem campo em foco devolve a tela ao zero. */
+  document.addEventListener('click', function(){
+    var ativo = document.activeElement;
+    var digitando = !!ativo && (ativo.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ativo.tagName));
+    if (!digitando && (window.scrollY || vv.offsetTop)) { try { window.scrollTo(0, 0); } catch(e){} agenda(); }
+  }, true);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) agenda(); });
   vv.addEventListener('resize', agenda);
   vv.addEventListener('scroll', agenda);
   window.addEventListener('orientationchange', function(){ setTimeout(ajusta, 300); });

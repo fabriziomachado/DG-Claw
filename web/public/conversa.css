@@ -462,7 +462,8 @@ html[data-tema="escuro"] .row.alerta-pedido .bub{border-color:#e5bd4c;background
 #acervoPainel{position:fixed;inset:0 0 0 auto;width:min(100%,540px);z-index:90;background:var(--dg-fundo);color:var(--dg-texto);
   display:flex;flex-direction:column;border-left:1px solid var(--dg-borda);box-shadow:0 0 0 100vw var(--dg-sobreposicao)}
 #acervoPainel[hidden]{display:none}
-#acervoPainel header{position:static;display:flex;align-items:center;gap:2px;padding:8px 8px 8px 16px;min-height:56px;box-sizing:border-box}
+#acervoPainel header{position:static;display:flex;align-items:center;gap:2px;padding:8px 8px 8px 16px;min-height:56px;box-sizing:border-box;
+  padding-top:calc(8px + env(safe-area-inset-top));padding-right:max(8px,env(safe-area-inset-right))}
 #acervoPainel header b{flex:1;font-size:16px;font-weight:650}
 #acervoPainel button{font:inherit;color:inherit;background:transparent;border:0;cursor:pointer}
 #acervoPainel .ac-ico{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:var(--dg-texto-2)}
@@ -472,7 +473,7 @@ html[data-tema="escuro"] .row.alerta-pedido .bub{border-color:#e5bd4c;background
 #acervoPainel nav [aria-selected="true"]{color:var(--dg-texto);font-weight:600;border-bottom-color:var(--dg-texto)}
 #acervoEstado{font-size:12.5px;color:var(--dg-texto-3);margin:10px 16px 2px;overflow-wrap:anywhere}
 #acervoEstado:empty{display:none}
-#acervoLista{flex:1;min-height:0;overflow:auto;padding:8px 12px 16px;overscroll-behavior:contain}
+#acervoLista{flex:1;min-height:0;overflow:auto;padding:8px 12px calc(16px + env(safe-area-inset-bottom));overscroll-behavior:contain}
 #acervoLista .acgrade{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
 #acervoLista .acitem{min-width:0;position:relative}
 #acervoLista .acgrade .acitem{margin-bottom:4px}

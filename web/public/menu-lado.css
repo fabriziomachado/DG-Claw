@@ -192,7 +192,7 @@ aside#menu .pe{margin-top:auto;padding-top:6px}
    Topo enxuto: foto pequena e nome numa linha (trocar de agente fica na fileira do cabeçalho, e o
    Tutorial vai para o rodapé). Os itens em quatro grupos que fecham. Configurações e Sair viram
    ícones no rodapé. */
-aside#menu{padding-top:14px;gap:8px}
+aside#menu{padding-top:calc(14px + env(safe-area-inset-top));padding-bottom:calc(10px + env(safe-area-inset-bottom));gap:8px}
 .ml-marca{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:10px;align-items:center;text-align:left;
   padding:0 6px 4px}
 .ml-moldura{grid-row:1/3;width:40px;height:40px;margin:0}

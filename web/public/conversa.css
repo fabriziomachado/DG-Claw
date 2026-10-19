@@ -996,3 +996,16 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 #tarefaChip{display:flex;align-items:flex-start;gap:8px;margin:0 6px 8px}
 #tarefaChip .tf-cartao{flex:1;min-width:0;margin:0}
 .bub a.tf-cartao,.bub a.tf-cartao b{color:var(--dg-texto);text-decoration:none}
+
+/* @todos / @vários: seletor Avisar | Pedir e cartões (19/10/2026) */
+#modoEquipe{display:flex;width:max-content;align-items:center;gap:2px;margin:0 6px 8px 10px;padding:2px;border:1px solid var(--dg-borda);border-radius:999px;background:var(--dg-superficie);align-self:flex-start}
+#modoEquipe[hidden]{display:none}
+#modoEquipe button{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border:0;border-radius:999px;background:transparent;color:var(--dg-texto-2);font:inherit;font-size:12.5px;cursor:pointer}
+#modoEquipe button.on{background:var(--dg-superficie-2);color:var(--dg-texto);font-weight:600}
+.men-todos{background:var(--dg-azul);font-size:13px}
+.eq .men-cab svg{flex:0 0 auto;color:var(--dg-texto-3)}
+.eq-ags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.eq-ag{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--dg-texto-2);border:1px solid var(--dg-borda);border-radius:999px;padding:2px 9px 2px 2px}
+.eq-ag.on{border-color:var(--dg-entrega-borda);color:var(--dg-entrega-texto)}
+.eq-ag.off{opacity:.45}
+.eq-ag .men-foto{flex-basis:20px;width:20px;height:20px}

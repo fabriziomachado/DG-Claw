@@ -60,6 +60,13 @@ function criarMencoes({ config, registro, conversa, log = () => {}, agora = Date
     const extra = [];
     for (const m of itens) {
       if (m.ep <= (t.corte || 0)) continue;
+      if (m.tipo === 'aviso' || m.tipo === 'pedido') {
+        const rot = m.para && m.para.length && m.para[0] !== 'todos' ? m.paraNomes.map((n) => '@' + n).join(' ') : '@todos';
+        extra.push({ id: 'menq-' + m.id, ep: m.ep, origin: 'dono', text: rot + ' ' + m.texto, kind: 'text', media: null, fmt: 'text', reacoes: [], cita: null, via: 'mencao', quem: 'pessoa', mencaoPergunta: { varios: true } });
+        extra.push({ id: 'menr-' + m.id, ep: m.epResposta || m.ep + 0.001, origin: 'mencao', text: m.resposta || '', kind: 'text', media: null, fmt: 'text', reacoes: [], cita: null, via: 'mencao', quem: m.donoPor || 'dono',
+          mencao: { tipo: m.tipo, para: m.para, paraNomes: m.paraNomes, texto: m.texto, estado: m.estado, donoPor: m.donoPor || null, donoNome: m.donoNome || null, motivo: m.motivo || null, avisoId: m.avisoId || null } });
+        continue;
+      }
       extra.push({ id: 'menq-' + m.id, ep: m.ep, origin: 'dono', text: '@' + m.paraNome + ' ' + m.pergunta, kind: 'text', media: null, fmt: 'text', reacoes: [], cita: null, via: 'mencao', quem: 'pessoa', mencaoPergunta: { para: m.para } });
       extra.push({ id: 'menr-' + m.id, ep: m.epResposta || m.ep + 0.001, origin: 'mencao', text: m.resposta || '', kind: 'text', media: null, fmt: 'text', reacoes: [], cita: null, via: 'mencao', quem: m.para,
         mencao: { para: m.para, paraNome: m.paraNome, deNome: m.deNome, estado: m.estado, motivo: m.motivo || null } });
@@ -115,17 +122,98 @@ function criarMencoes({ config, registro, conversa, log = () => {}, agora = Date
     return { status: 200, corpo: { ok: true, id, para: para.slug } };
   }
 
+  /* ── @todos / @vários: Avisar e Pedir (19/10/2026) ──────────────────────────────
+     Avisar: a tela posta o aviso no quadro (POST /api/v1/avisos, autor "dono") e registra aqui o cartão.
+     Pedir: o pedido fica aqui; cada agente recebe um <plataforma recado="pedido">; o primeiro que chamar
+     POST /api/v1/pedidos/<id>/pegar (pela caixa) fica com ele, os outros recebem 409. Ao terminar, ele
+     chama POST /api/v1/pedidos/<id>/entregar {resposta}, e a resposta vira o cartão na conversa onde o dono
+     pediu. Sem ninguém pegar em 20 minutos, o cartão diz isso. */
+  const participantes = () => (registro.estado().agentes || []).filter((a) => a.tipo !== 'admin');
+  function nomesDe(para) {
+    if (!para || !para.length || para[0] === 'todos') return participantes().map((a) => a.nome);
+    return para.map((s) => (registro.obter(s) || { nome: s }).nome);
+  }
+  function registrarAviso(de, { texto, para, avisoId }) {
+    const id = crypto.randomBytes(8).toString('hex');
+    const lista = Array.isArray(para) && para.length ? para : ['todos'];
+    const item = { id, tipo: 'aviso', texto: String(texto || '').slice(0, 300), para: lista, paraNomes: nomesDe(lista), avisoId: avisoId || null, ep: agora() / 1000, estado: 'avisado' };
+    grava(de.slug, ler(de.slug).itens.concat(item));
+    return { status: 200, corpo: { ok: true, id } };
+  }
+  const SEM_DONO_MS = 20 * 60 * 1000;
+  async function pedir(de, { texto, para }) {
+    const t = String(texto || '').trim();
+    if (!t) return { status: 400, corpo: { ok: false, erro: 'Escreva o pedido depois do @todos.' } };
+    if (t.length > LIMITE_PERGUNTA) return { status: 413, corpo: { ok: false, erro: `O pedido passou de ${LIMITE_PERGUNTA} caracteres.` } };
+    const lista = Array.isArray(para) && para.length && para[0] !== 'todos' ? para.filter((s) => { const a = registro.obter(s); return a && a.tipo !== 'admin'; }) : ['todos'];
+    const alvos = lista[0] === 'todos' ? participantes() : lista.map((s) => registro.obter(s));
+    if (!alvos.length) return { status: 400, corpo: { ok: false, erro: 'Nenhum agente para receber o pedido.' } };
+    const id = crypto.randomBytes(8).toString('hex');
+    const item = { id, tipo: 'pedido', texto: t, para: lista, paraNomes: alvos.map((a) => a.nome), de: de.slug, deNome: de.nome, ep: agora() / 1000, estado: 'aberto', donoPor: null };
+    grava(de.slug, ler(de.slug).itens.concat(item));
+    indicePedidos.set(id, de.slug);
+    const recado = (a) => `<plataforma recado="pedido" id="${id}">Pedido do dono para a equipe (${alvos.map((x) => x.nome).join(', ')}): "${t}"\n\n` +
+      `Se for da sua área e você puder fazer agora, PEGUE antes de começar: dgclaw-api POST /api/v1/pedidos/${id}/pegar\n` +
+      `- Se a resposta for ok, o pedido é seu: crie a tarefa na Mesa (dgclaw-mesa criar --origem "dono, pedido para a equipe: ${t.slice(0, 60).replace(/"/g, "'")}"), faça, e no fim entregue o resultado em poucas linhas com: dgclaw-api POST /api/v1/pedidos/${id}/entregar '{"resposta":"..."}'. Pode pedir ajuda a outro agente pelo quadro de avisos.\n` +
+      `- Se vier 409 (outro já pegou) ou se não for com você: não faça nada e não escreva ao dono por causa deste recado.`;
+    await Promise.all(alvos.map(async (a) => {
+      try { await conversa.entregar(a, recado(a), { cru: true }); } catch (e) { log('aviso', `Pedido ${id}: não entreguei a ${a.slug} (${e.message}).`); }
+    }));
+    setTimeout(() => {
+      const m = ler(de.slug).itens.find((x) => x.id === id);
+      if (m && m.estado === 'aberto') atualiza(de.slug, id, { estado: 'sem_dono', motivo: 'ninguém pegou em 20 minutos' });
+    }, SEM_DONO_MS).unref?.();
+    return { status: 200, corpo: { ok: true, id } };
+  }
+  const indicePedidos = new Map();   // id -> slug da conversa onde nasceu
+  function achaPedido(id) {
+    if (!indicePedidos.has(id)) {
+      let nomes = [];
+      try { nomes = fs.readdirSync(pasta).filter((n) => n.endsWith('.json')); } catch (_) { /* vazio */ }
+      for (const n of nomes) { const slug = n.slice(0, -5); for (const m of ler(slug).itens) if (m.tipo === 'pedido') indicePedidos.set(m.id, slug); }
+    }
+    const slug = indicePedidos.get(id);
+    const m = slug ? ler(slug).itens.find((x) => x.id === id) : null;
+    return m ? { slug, m } : null;
+  }
+  function pegar(agenteSlug, id) {
+    const p = achaPedido(id);
+    if (!p) return { status: 404, corpo: { ok: false, erro: 'Não existe esse pedido.' } };
+    const { slug, m } = p;
+    if (m.para[0] !== 'todos' && !m.para.includes(agenteSlug)) return { status: 403, corpo: { ok: false, erro: 'Esse pedido não é para você.' } };
+    if (m.donoPor && m.donoPor !== agenteSlug) return { status: 409, corpo: { ok: false, erro: `O ${m.donoNome || m.donoPor} já pegou esse pedido. Não faça nada.`, donoPor: m.donoPor } };
+    if (m.estado === 'feito') return { status: 409, corpo: { ok: false, erro: 'Esse pedido já foi feito.' } };
+    const ag = registro.obter(agenteSlug);
+    atualiza(slug, id, { donoPor: agenteSlug, donoNome: ag ? ag.nome : agenteSlug, estado: 'fazendo', epPegou: agora() / 1000 });
+    return { status: 200, corpo: { ok: true, id, texto: m.texto, mensagem: 'O pedido é seu. Faça e entregue com /entregar.' } };
+  }
+  function entregarPedido(agenteSlug, id, { resposta }) {
+    const p = achaPedido(id);
+    if (!p) return { status: 404, corpo: { ok: false, erro: 'Não existe esse pedido.' } };
+    const { slug, m } = p;
+    if (m.donoPor !== agenteSlug) return { status: 403, corpo: { ok: false, erro: 'Só quem pegou o pedido entrega.' } };
+    const r = String(resposta || '').trim();
+    if (!r) return { status: 400, corpo: { ok: false, erro: 'Mande a resposta em "resposta".' } };
+    atualiza(slug, id, { estado: 'feito', resposta: r.slice(0, LIMITE_RESPOSTA), epResposta: agora() / 1000 });
+    return { status: 200, corpo: { ok: true } };
+  }
+
   /** Retoma as esperas que estavam no meio quando o Web reiniciou. */
   function retoma() {
     let nomes = [];
     try { nomes = fs.readdirSync(pasta).filter((n) => n.endsWith('.json')); } catch (_) { return; }
     for (const n of nomes) {
       const slug = n.slice(0, -5);
-      for (const m of ler(slug).itens) if (m.estado === 'perguntando') espera(slug, m.id).catch(() => {});
+      for (const m of ler(slug).itens) if (!m.tipo && m.estado === 'perguntando') espera(slug, m.id).catch(() => {});
+      for (const m of ler(slug).itens) if (m.tipo === 'pedido' && m.estado === 'aberto') {
+        const falta = SEM_DONO_MS - (agora() - m.ep * 1000);
+        if (falta <= 0) atualiza(slug, m.id, { estado: 'sem_dono', motivo: 'ninguém pegou em 20 minutos' });
+        else setTimeout(() => { const x = ler(slug).itens.find((y) => y.id === m.id); if (x && x.estado === 'aberto') atualiza(slug, m.id, { estado: 'sem_dono', motivo: 'ninguém pegou em 20 minutos' }); }, falta).unref?.();
+      }
     }
   }
 
-  return { criar, junta, retoma, ler };
+  return { criar, junta, retoma, ler, registrarAviso, pedir, pegar, entregarPedido };
 }
 
 module.exports = { criarMencoes };

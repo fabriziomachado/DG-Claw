@@ -4351,12 +4351,33 @@ function marcaDivisor() {
 const mencionaveis = () => agentesMenu.filter(a => a.tipo !== 'admin' && a.id !== AGENTE.id);
 const fotoAg = a => { const img = a && (a.avatar_img || (/^https:\/\//i.test(a.avatar || '') ? a.avatar : '')); return img ? `<img src="${esc(img)}" alt="">` : esc((a && (a.avatar || a.nome) || '?').slice(0, 1)); };
 function destacaMencao(html, m) {
+  if (m.mencaoPergunta.varios) return html.replace(/(^|>)((?:@[^\s<]+\s)+)/, (_, a, b) => a + b.trim().split(/\s+/).map(x => `<span class="mencao-nome">${x}</span>`).join(' ') + ' ');
   const a = agentesMenu.find(x => x.id === m.mencaoPergunta.para);
   if (!a) return html;
   const marca = esc('@' + a.nome);
   return html.replace(marca, `<span class="mencao-nome">${marca}</span>`);
 }
+function htmlEquipe(m) {
+  const me = m.mencao;
+  const chips = (me.paraNomes || []).map(n => {
+    const a = agentesMenu.find(x => x.nome === n) || { nome: n };
+    const st = me.tipo === 'pedido' && me.donoNome ? (me.donoNome === n ? ' on' : ' off') : '';
+    return `<span class="eq-ag${st}"><span class="men-foto" style="background:${esc(a.cor || '#2f9e5e')}">${fotoAg(a)}</span>${esc(n)}</span>`;
+  }).join('');
+  const quem = me.para && me.para[0] !== 'todos' ? (me.paraNomes || []).length + ' agentes' : 'todos';
+  let cab;
+  if (me.tipo === 'aviso') cab = `${ICO_AVISAR}<span>Aviso seu para ${quem} · no quadro de avisos</span>`;
+  else if (me.estado === 'aberto') cab = `${ICO_PEDIR}<span>Pedido seu para ${quem} · esperando alguém pegar</span><i class="men-gira" aria-hidden="true"></i>`;
+  else if (me.estado === 'fazendo') cab = `${ICO_PEDIR}<span>Pedido seu · <b>${esc(me.donoNome || '')}</b> pegou e está fazendo</span><i class="men-gira" aria-hidden="true"></i>`;
+  else if (me.estado === 'feito') cab = `${ICO_PEDIR}<span>Pedido seu · <b>${esc(me.donoNome || '')}</b> fez</span>`;
+  else cab = `${ICO_PEDIR}<span>Pedido seu · ${esc(me.motivo || 'ninguém pegou')}</span>`;
+  const corpo = me.tipo === 'pedido' && me.estado === 'feito' && m.text ? `<div class="men-txt">${htmlCorpo(Object.assign({}, m, { origin: 'agente', mencao: null }))}</div>` : '';
+  return `<div class="row her men eq" data-msg="${esc(m.id)}"><div class="men-cartao"><div class="men-cab">${cab}` +
+    (me.tipo === 'aviso' ? '<a class="men-abrir" href="/avisos">quadro</a>' : '') + `</div>` +
+    (me.tipo === 'aviso' || me.estado !== 'feito' ? `<div class="eq-ags">${chips}</div>` : '') + corpo + '</div></div>';
+}
 function htmlMencao(m) {
+  if (m.mencao && (m.mencao.tipo === 'aviso' || m.mencao.tipo === 'pedido')) return htmlEquipe(m);
   const me = m.mencao, a = agentesMenu.find(x => x.id === me.para) || { nome: me.paraNome };
   const cab = me.estado === 'respondida' ? `<b>${esc(a.nome)}</b> respondeu, a pedido ${EH_ADMIN ? 'seu' : 'do ' + esc(AGENTE.nome)}`
     : me.estado === 'falhou' ? `<b>${esc(a.nome)}</b> não respondeu${me.motivo ? ': ' + esc(me.motivo) : ''}`
@@ -4378,21 +4399,66 @@ function menTrecho() {
 }
 function menPinta() {
   const t = menTrecho();
-  const lista = t ? mencionaveis().filter(a => a.nome.toLowerCase().startsWith(t.q) || a.id.startsWith(t.q)) : [];
+  const lista = t ? [{ id: 'todos', nome: 'todos', todos: true }].concat(mencionaveis()).filter(a => a.nome.toLowerCase().startsWith(t.q) || a.id.startsWith(t.q)) : [];
   if (!lista.length) { menLista.hidden = true; return; }
   menSel = Math.min(menSel, lista.length - 1);
   menLista.innerHTML = lista.map((a, i) => `<button type="button" role="option" class="men-op${i === menSel ? ' on' : ''}" data-men="${esc(a.id)}">` +
-    `<span class="men-foto" style="background:${esc(a.cor || '#2f9e5e')}">${fotoAg(a)}</span><span>${esc(a.nome)}</span>` +
-    `<small>${esc(a.subtitulo || a.papel || '')}</small></button>`).join('');
+    (a.todos ? `<span class="men-foto men-todos" aria-hidden="true">@</span><span>todos</span><small>avisar ou pedir a todos os agentes</small>`
+      : `<span class="men-foto" style="background:${esc(a.cor || '#2f9e5e')}">${fotoAg(a)}</span><span>${esc(a.nome)}</span><small>${esc(a.subtitulo || a.papel || '')}</small>`) +
+    `</button>`).join('');
   menLista.hidden = false;
 }
 function menEscolhe(id) {
-  const a = mencionaveis().find(x => x.id === id), t = menTrecho();
+  const a = id === 'todos' ? { id: 'todos', nome: 'todos' } : mencionaveis().find(x => x.id === id), t = menTrecho();
   if (!a || !t) return;
   const fim = entrada.selectionStart || 0;
   entrada.value = entrada.value.slice(0, t.de) + '@' + a.nome + ' ' + entrada.value.slice(fim);
   const pos = t.de + a.nome.length + 2;
-  entrada.setSelectionRange(pos, pos); entrada.focus(); menLista.hidden = true; ajustaCampo();
+  entrada.setSelectionRange(pos, pos); entrada.focus(); menLista.hidden = true; ajustaCampo(); pintaModo();
+}
+/* @todos ou dois ou mais @nomes (19/10/2026): Avisar (aviso seu no quadro) ou Pedir (o primeiro que puder faz).
+   O seletor pequeno aparece acima do campo só nesses casos. */
+let modoEquipe = 'pedir';
+const modoEl = document.createElement('div');
+modoEl.id = 'modoEquipe'; modoEl.hidden = true; modoEl.setAttribute('role', 'radiogroup'); modoEl.setAttribute('aria-label', 'Avisar ou pedir');
+const ICO_AVISAR = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4h3l6 4V6L7 10z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg>';
+const ICO_PEDIR = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 11V5.5a1.5 1.5 0 0 1 3 0V11M11 10V4.5a1.5 1.5 0 0 1 3 0V10M14 10.5V6a1.5 1.5 0 0 1 3 0v7a6 6 0 0 1-6 6h-.5a6 6 0 0 1-5-2.7L3.6 13a1.5 1.5 0 0 1 2.4-1.8L8 13.5"/></svg>';
+document.querySelector('.barra').insertBefore(modoEl, document.querySelector('.barra .linha1'));
+function alvosEquipe(t) {
+  const r = /^((?:@\S+\s+)+)/.exec(t);
+  if (!r) return null;
+  const nomes = r[1].trim().split(/\s+/).map(x => x.slice(1).toLowerCase());
+  if (nomes.length === 1 && nomes[0] === 'todos') return { para: ['todos'], resto: t.slice(r[1].length).trim() };
+  if (nomes.length < 2 || nomes.includes('todos')) return null;
+  const ags = nomes.map(n => mencionaveis().find(a => a.nome.toLowerCase() === n || a.id === n));
+  if (ags.some(a => !a)) return null;
+  return { para: [...new Set(ags.map(a => a.id))], resto: t.slice(r[1].length).trim() };
+}
+function pintaModo() {
+  const alvo = !EH_ADMIN && alvosEquipe(entrada.value);
+  modoEl.hidden = !alvo;
+  if (!alvo) return;
+  modoEl.innerHTML = [['avisar', 'Avisar', ICO_AVISAR], ['pedir', 'Pedir', ICO_PEDIR]].map(([k, r, ic]) =>
+    `<button type="button" role="radio" aria-checked="${modoEquipe === k}" data-modo="${k}"${modoEquipe === k ? ' class="on"' : ''} title="${k === 'avisar' ? 'Só informa: ninguém responde' : 'O primeiro agente que puder faz'}">${ic}${r}</button>`).join('');
+}
+modoEl.addEventListener('mousedown', ev => ev.preventDefault());
+modoEl.addEventListener('click', ev => { const b = ev.target.closest('[data-modo]'); if (b) { modoEquipe = b.dataset.modo; pintaModo(); } });
+entrada.addEventListener('input', pintaModo);
+async function enviaEquipe(t) {
+  const alvo = alvosEquipe(t);
+  if (!alvo || !alvo.resto) return false;
+  modoEl.hidden = true;
+  try {
+    if (modoEquipe === 'avisar') {
+      if (alvo.resto.length > 280) { mostraErro('O aviso tem ' + alvo.resto.length + ' caracteres; o quadro aceita até 280. Encurte e mande de novo.'); entrada.value = t; ajustaCampo(); pintaModo(); return true; }
+      const d = await api('/api/v1/avisos', { method: 'POST', body: { texto: alvo.resto, tipo: 'decisao', para: alvo.para } });
+      const avisoId = d && (d.aviso ? d.aviso.id : d.id);
+      await api(API + '/aviso', { method: 'POST', body: { texto: alvo.resto, para: alvo.para, avisoId } });
+    } else {
+      await api(API + '/pedido', { method: 'POST', body: { texto: alvo.resto, para: alvo.para } });
+    }
+  } catch (e) { mostraErro('Não consegui ' + (modoEquipe === 'avisar' ? 'avisar' : 'pedir') + ': ' + e.message); entrada.value = t; ajustaCampo(); pintaModo(); }
+  return true;
 }
 entrada.addEventListener('input', () => { menSel = 0; menPinta(); });
 entrada.addEventListener('keydown', ev => {
@@ -4449,6 +4515,7 @@ function enviarDoCampo() {
   vozNoCampo = false;
   if (lcInterceptaLogin(t)) return;   // /login abre o cartão e não vai ao agente
   menLista.hidden = true;
+  if (!EH_ADMIN && alvosEquipe(t)) { fimResposta(); enviaEquipe(t); return; }
   if (!EH_ADMIN && /^@\S+\s/.test(t) && mencionaveis().some(a => t.toLowerCase().startsWith('@' + a.nome.toLowerCase() + ' '))) { fimResposta(); enviaMencao(t); return; }
   enviarTexto(comResposta(comTarefa(t)));
 }

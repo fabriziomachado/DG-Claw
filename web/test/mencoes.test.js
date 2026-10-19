@@ -36,3 +36,30 @@ test('menções: pergunta vai ao mencionado, a resposta volta como cartão e o a
   assert.notEqual(tela.versao, 7, 'a versão muda para o stream mandar de novo');
   assert.equal(entregues[0][0], 'help'); assert.match(entregues[0][1], /^<plataforma recado="mencao"/); assert.match(entregues[0][1], /c_help/); assert.equal(entregues[0][2].cru, true);
 });
+
+test('pedido para a equipe: todos recebem, só o primeiro pega, só ele entrega, e o cartão acompanha', async () => {
+  const agentes = { help: { slug: 'help', nome: 'Help' }, data: { slug: 'data', nome: 'Data' }, tech: { slug: 'tech', nome: 'Tech' }, admin: { slug: 'admin', nome: 'Admin', tipo: 'admin' } };
+  const registro = { obter: (s) => agentes[s] || null, estado: () => ({ agentes: Object.values(agentes) }) };
+  const entregues = [];
+  const conversa = { entregar: async (a, t) => { entregues.push([a.slug, t]); return { status: 200 }; }, thread: async () => ({ msgs: [] }), atividade: async () => ({}) };
+  const m = criarMencoes({ config: { dataDir: pastaTemp('ped') }, registro, conversa });
+  const r = await m.pedir(agentes.help, { texto: 'total de inadimplentes por curso' });
+  assert.equal(r.status, 200);
+  assert.deepEqual(entregues.map((e) => e[0]).sort(), ['data', 'help', 'tech'], 'o Admin não recebe');
+  assert.match(entregues[0][1], new RegExp(`/api/v1/pedidos/${r.corpo.id}/pegar`));
+  const id = r.corpo.id;
+  assert.equal(m.pegar('data', id).status, 200);
+  const outro = m.pegar('tech', id);
+  assert.equal(outro.status, 409); assert.match(outro.corpo.erro, /Data já pegou/);
+  assert.equal(m.entregarPedido('tech', id, { resposta: 'x' }).status, 403);
+  assert.equal(m.entregarPedido('data', id, { resposta: '1.284 alunos' }).status, 200);
+  const tela = m.junta('help', { msgs: [], versao: 1 });
+  assert.equal(tela.msgs[0].text, '@todos total de inadimplentes por curso');
+  assert.equal(tela.msgs[1].mencao.tipo, 'pedido'); assert.equal(tela.msgs[1].mencao.estado, 'feito'); assert.equal(tela.msgs[1].mencao.donoPor, 'data');
+  assert.equal(tela.msgs[1].text, '1.284 alunos');
+  const av = m.registrarAviso(agentes.help, { texto: 'feriado amanhã', para: ['data', 'help'], avisoId: 12 });
+  assert.equal(av.status, 200);
+  const t2 = m.junta('help', { msgs: [], versao: 1 });
+  assert.equal(t2.msgs[2].text, '@Data @Help feriado amanhã');
+  assert.equal(t2.msgs[3].mencao.tipo, 'aviso');
+});

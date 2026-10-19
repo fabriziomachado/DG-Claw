@@ -119,6 +119,7 @@ function criarServidor(opcoes) {
   // Foto trocada pelo dono no menu: vale por cima da foto da criação e do avatar do registro.
   const avatares = criarAvatares({ dataDir: config.dataDir, registro, log });
   caixa.permitir('/api/v1/avisos');
+  caixa.permitir('/api/v1/pedidos');
 
   let versaoJsCache = { ts: 0, valor: '0' };
   /** Versão da tela: mtime de conversa.js. A tela compara com a que carregou e se recarrega sozinha. */
@@ -444,6 +445,16 @@ function criarServidor(opcoes) {
     if (p === '/api/v1/integracoes' || p.startsWith('/api/v1/integracoes/')) {
       if (await integracoes.tratar(req, res, url, sessao)) return undefined;
     }
+    // Pedido para a equipe (lib/mencoes.js): o agente pega e entrega pela caixa (dgclaw-api)
+    const mp = /^\/api\/v1\/pedidos\/([a-f0-9]{16})\/(pegar|entregar)$/.exec(p);
+    if (mp) {
+      if (m !== 'POST') return H.erroJson(res, 405, 'Use POST.');
+      if (sessao.via !== 'caixa' || !sessao.agente) return H.erroJson(res, 403, 'Só um agente pega ou entrega um pedido, pela caixa dele.');
+      const corpo = mp[2] === 'entregar' ? await lerEnvio(req, res) : (req.resume(), {});
+      if (!corpo) return undefined;
+      const r = mp[2] === 'pegar' ? mencoes.pegar(sessao.agente, mp[1]) : mencoes.entregarPedido(sessao.agente, mp[1], corpo);
+      return H.enviaJson(res, r.status, r.corpo);
+    }
     if (p.startsWith('/api/v1/paineis/')) {
       if (await paineisVivos.tratar(req, res, url, sessao)) return undefined;
     }
@@ -503,6 +514,14 @@ function criarServidor(opcoes) {
           return H.enviaJson(res, r.status, r.corpo);
         }
       }
+      // @todos / @vários (lib/mencoes.js): o cartão do aviso e o pedido para a equipe; só o dono
+      if ((acao === 'aviso' || acao === 'pedido') && m === 'POST') {
+        if (sessao.via === 'caixa') return H.erroJson(res, 403, 'Isso é coisa do dono, no navegador.');
+        const corpo = await lerEnvio(req, res);
+        if (!corpo) return undefined;
+        const r = acao === 'aviso' ? mencoes.registrarAviso(agente, corpo) : await mencoes.pedir(agente, corpo);
+        return H.enviaJson(res, r.status, r.corpo);
+      }
       // @mencionar outro agente na conversa deste (lib/mencoes.js); só o dono, no navegador
       if (acao === 'mencao' && m === 'POST') {
         if (sessao.via === 'caixa') return H.erroJson(res, 403, 'Mencionar outro agente é coisa do dono, no navegador.');
@@ -520,7 +539,7 @@ function criarServidor(opcoes) {
       if (acao === 'upload' && m === 'POST') return upload(req, res, agente);
       if (acao === 'comandos' && m === 'GET') return H.enviaJson(res, 200, Object.assign({ ok: true, agente: agente.slug }, await comandos.catalogo(agente)));
       if (acao === 'comando' && m === 'POST') return comandoPost(req, res, agente);
-      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'mencao', 'upload', 'permissao', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
+      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'mencao', 'aviso', 'pedido', 'upload', 'permissao', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
     }
 
     mm = /^\/api\/v1\/media\/([0-9a-f]{16})\/visual$/.exec(p);

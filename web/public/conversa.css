@@ -1074,3 +1074,13 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 /* celular: os atalhos do topo (Painel, Sessões, Tutorial) já estão no menu; a fileira de agentes fica
    com a largura toda (19/10/2026, pedido do dono). Ler e Contínua (voz) continuam. */
 @media(max-width:700px){header #btnPainel,header #btnSessoes,header #btnTutorial{display:none!important}}
+/* App instalado no iPhone (19/10/2026): com a barra de status translúcida, o iOS às vezes mede a tela
+   sem a altura do relógio, e tudo que vai "até embaixo" (bottom:0) parava antes do fim, com um vão
+   embaixo do campo. 100lvh é a altura inteira do aparelho; o max() mantém o tamanho certo onde o
+   iOS mede direito. Com teclado aberto vale a altura medida (html.vv), que vem depois. */
+@media (pointer:coarse){
+  html.pwa:not(.vv) body{bottom:auto;height:max(100lvh,100%)}
+  html.pwa #acervoPainel,html.pwa #lightbox,html.pwa #visTela,html.pwa aside#menu,html.pwa #overlayMenu,html.pwa .nas-modal{
+    bottom:auto;height:max(100lvh,100%)}
+  html.pwa{background:var(--dg-fundo)}
+}

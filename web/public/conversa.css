@@ -961,9 +961,20 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 @media(max-width:700px){header #btnPainel{display:none!important}}
 
 /* responder citando (19/10/2026): a mensagem citada fica presa acima do campo até enviar ou cancelar */
-#respChip{display:flex;align-items:flex-start;gap:8px;margin:0 6px 8px}
+/* citação presa ao campo (proposta B, 19/10/2026): uma linha no topo da mesma caixa do campo,
+   com divisória; a caixa (.linha1) perde os cantos de cima enquanto ela aparece */
+#respChip{display:flex;align-items:center;gap:8px;padding:6px 8px 6px 16px;font-size:13px;color:var(--dg-texto-2);
+  background:var(--dg-superficie);border:1px solid var(--dg-borda);border-bottom:0;border-radius:22px 22px 0 0;margin-bottom:-6px}
 #respChip[hidden]{display:none}
-#respChip .cita{flex:1;min-width:0;margin:0}
+#respChip .resp-ic{flex:0 0 15px;color:var(--dg-texto-3)}
+#respChip .resp-tx{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#respChip .resp-tx b{color:var(--dg-texto);font-weight:600}
+#respChip .resp-x{display:grid;place-items:center;padding:0}
+#respChip:not([hidden]) + .linha1{border-top-left-radius:0;border-top-right-radius:0}
+/* o ↩ da mensagem que está sendo respondida fica aceso */
+.acao-resp-on{background:var(--dg-superficie-2)!important;color:var(--dg-texto)!important}
+.barra:has(#respChip:not([hidden])) .linha1:focus-within,.barra:has(#respChip:not([hidden]) + .linha1:focus-within) #respChip{
+  border-color:color-mix(in srgb,var(--dg-borda) 70%,var(--dg-texto-3))}
 .resp-x{flex:0 0 28px;width:28px;height:28px;border:0;border-radius:50%;background:transparent;color:var(--dg-texto-3);cursor:pointer;font-size:13px}
 .resp-x:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
 .cita[data-ir-msg]{cursor:pointer}

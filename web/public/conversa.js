@@ -1708,7 +1708,7 @@ function htmlAcoes(m, hora) {
   return `<div class="acoes" data-acoes="${esc(m.id)}">` +
          `<button type="button" class="ac" data-ac="copiar" title="Copiar" aria-label="Copiar a resposta">${ICONE_ACAO.copiar}</button>` +
          `<button type="button" class="ac ac-ouvir" data-ac="ouvir" title="Ouvir em voz alta" aria-label="Ouvir a resposta em voz alta">${ICONE_ACAO.ouvir}</button>` +
-         `<button type="button" class="ac" data-ac="responder" title="Responder citando" aria-label="Responder citando esta mensagem">${ICONE_ACAO.responder}</button>` +
+         `<button type="button" class="ac${respondendo && respondendo.id === m.id ? ' acao-resp-on' : ''}" data-ac="responder" title="Responder citando" aria-label="Responder citando esta mensagem">${ICONE_ACAO.responder}</button>` +
          (m.origin === 'agente' ? `<button type="button" class="ac ac-voto${votos[m.id] === 'bom' ? ' on' : ''}" data-ac="bom" title="Boa resposta" aria-label="Boa resposta" aria-pressed="${votos[m.id] === 'bom'}">${ICONE_ACAO.bom}</button>` +
            `<button type="button" class="ac ac-voto${votos[m.id] === 'ruim' ? ' on' : ''}" data-ac="ruim" title="Resposta ruim" aria-label="Resposta ruim" aria-pressed="${votos[m.id] === 'ruim'}">${ICONE_ACAO.ruim}</button>` : '') +
          hora + '</div>';
@@ -1720,7 +1720,7 @@ wrap.addEventListener('click', async ev => {
   const m = msgs.find(x => x.id === id);
   const texto = m ? legendaUtil(m) : '';
   if (!texto) return;
-  if (b.dataset.ac === 'responder') { comecaResposta(m); return; }
+  if (b.dataset.ac === 'responder') { comecaResposta(m); acendeResp(m.id); return; }
   if (b.dataset.ac === 'bom' || b.dataset.ac === 'ruim') { vota(m, b.dataset.ac); return; }
   if (b.dataset.ac === 'copiar') {
     try {
@@ -4347,19 +4347,31 @@ async function falar(texto) {
    para a direita no celular, prende a mensagem acima do campo; o envio sai com "↩ [id] trecho" na
    primeira linha, que o servidor transforma em citação (tocar nela leva até a original). */
 let respondendo = null;   // { id, texto, origin }
+const ICO_RESP_CAMPO = '<svg class="resp-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H12"/></svg>';
+const ICO_X_CAMPO = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
 const respChip = document.createElement('div');
 respChip.id = 'respChip'; respChip.hidden = true;
-document.querySelector('.barra').insertBefore(respChip, document.querySelector('.barra').firstChild);
+// colada no topo da caixa do campo (.linha1), como uma linha dela (proposta B, 19/10/2026)
+document.querySelector('.linha1').before(respChip);
 function comecaResposta(m) {
   const t = String(legendaUtil(m) || m.text || '').replace(/\s+/g, ' ').trim();
   if (!t) return;
   respondendo = { id: m.id, texto: t.length > 120 ? t.slice(0, 119) + '…' : t, origin: m.origin };
-  respChip.innerHTML = `<div class="cita"><b>${ehDono(m) ? 'Você' : esc(AGENTE.nome)}</b>${esc(respondendo.texto)}</div>` +
-    `<button type="button" class="resp-x" aria-label="Não responder citando" title="Cancelar">✕</button>`;
+  respChip.innerHTML = `${ICO_RESP_CAMPO}<span class="resp-tx">Respondendo a <b>${ehDono(m) ? 'você' : esc(AGENTE.nome)}</b>: ${esc(respondendo.texto)}</span>` +
+    `<button type="button" class="resp-x" aria-label="Não responder citando" title="Cancelar">${ICO_X_CAMPO}</button>`;
+  // outros itens (menções, modo equipe) entram antes da caixa depois; a citação volta a ficar colada nela
+  document.querySelector('.barra .linha1').before(respChip);
   respChip.hidden = false;
   entrada.focus();
 }
-function fimResposta() { respondendo = null; respChip.hidden = true; respChip.innerHTML = ''; }
+function fimResposta() { respondendo = null; respChip.hidden = true; respChip.innerHTML = ''; acendeResp(null); }
+// o botão ↩ da mensagem citada fica aceso enquanto a citação está no campo
+function acendeResp(id) {
+  for (const b of wrap.querySelectorAll('.acao-resp-on')) b.classList.remove('acao-resp-on');
+  if (!id) return;
+  const el = wrap.querySelector('.acoes[data-acoes="' + CSS.escape(id) + '"] [data-ac="responder"]');
+  if (el) el.classList.add('acao-resp-on');
+}
 respChip.addEventListener('click', ev => { if (ev.target.closest('.resp-x')) fimResposta(); });
 function comResposta(t) {
   if (!respondendo || !/^[a-f0-9]{8,40}$/.test(respondendo.id)) { fimResposta(); return t; }

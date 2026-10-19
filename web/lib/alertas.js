@@ -9,7 +9,8 @@ function marcar(m) {
   return tag ? { ...m, text: m.text.slice(tag[0].length), alerta: tag[1].toLowerCase() } : m;
 }
 
-function criarAlertas(arquivo, conversa) {
+/* aoNovo(item): chamado depois de gravar cada alerta que ainda não existia (a vigia transforma em aviso). */
+function criarAlertas(arquivo, conversa, aoNovo) {
   function ler() {
     try {
       const d = JSON.parse(fs.readFileSync(arquivo, 'utf8'));
@@ -35,18 +36,22 @@ function criarAlertas(arquivo, conversa) {
     if (!marcadas.length) return;
     const d = ler();
     let mudou = false;
+    const novos = [];
     const porId = new Map(d.itens.filter(a => a.conversa === conversa).map(a => [a.id, a]));
     for (const m of marcadas) {
       const id = crypto.createHash('sha256').update(JSON.stringify([conversa, m.ep, m.origin, m.via])).digest('hex').slice(0, 24);
       const antigo = porId.get(id);
       if (!antigo) {
         const item = { id, conversa, tipo: m.alerta, mensagem: m, vistoEm: null };
-        d.itens.push(item); porId.set(id, item); mudou = true;
+        d.itens.push(item); porId.set(id, item); mudou = true; novos.push(item);
       } else if (JSON.stringify(antigo.mensagem) !== JSON.stringify(m)) {
         antigo.mensagem = m; antigo.tipo = m.alerta; mudou = true;
       }
     }
     if (mudou) salvar(d);
+    if (aoNovo) for (const item of novos) {
+      try { aoNovo(item); } catch (e) { console.error(`alertas: o aviso do alerta ${item.id} falhou: ${e.message}`); }
+    }
   }
   function listar() {
     return ler().itens.filter(a => a.conversa === conversa && !a.vistoEm)

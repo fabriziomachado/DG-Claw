@@ -26,6 +26,7 @@ const { criarPaineisVivos } = require('./lib/paineis-vivos');
 const { criarMencoes } = require('./lib/mencoes');
 const { criarFeedback } = require('./lib/feedback');
 const { criarAlertas } = require('./lib/alertas');
+const { criarVigiaAlertas } = require('./lib/vigia-alertas');
 const { criarFoco } = require('./lib/foco');
 const { criarVoz } = require('./lib/voz');
 const { criarSigilo } = require('./lib/sigilo');
@@ -84,7 +85,9 @@ function criarServidor(opcoes) {
   const midia = criarMidia({ dataDir: config.dataDir, log, registro, publicDir: config.publicDir });
   const leitor = criarLeitor({ log, tz: config.tz, canalTelegram: config.canalTelegram, midia });
   const leitorRollout = criarLeitorRollout({ log, tz: config.tz, midia });
-  const alertas = agente => criarAlertas(path.join(config.dataDir, 'alertas', agente.slug + '.json'), agente.chat_id);
+  let vigiaAlertas = null;   // criada depois do push; o alerta novo de qualquer conversa vira aviso no celular
+  const alertas = agente => criarAlertas(path.join(config.dataDir, 'alertas', agente.slug + '.json'), agente.chat_id,
+    item => { if (vigiaAlertas) vigiaAlertas.aoNovo(agente, item); });
   const comandos = criarComandos({ runner, log, agora: opcoes.agora });
   const conversa = criarConversa({ comandos, alertas, config, runner, leitor, leitorRollout, midia, log, agora: opcoes.agora, gravaToken: opcoes.gravaToken });
   const compartilhados = criarCompartilhados(conversa);
@@ -99,6 +102,8 @@ function criarServidor(opcoes) {
   const push = criarPush({ dataDir: config.dataDir, log, agora: opcoes.agora, enviarHttp: opcoes.enviarPush });
   try { push.garantirChaves(); } catch (e) { log('erro', e.message); }
   const lembretes = criarLembretes({ config, registro, runner, push, log, agora: opcoes.agora });
+  vigiaAlertas = criarVigiaAlertas({ registro, conversa, alertas, push, log, agora: opcoes.agora });
+  if (!opcoes.semVigiaAlertas) vigiaAlertas.iniciar();
   caixa.permitir('/api/v1/lembretes');
   // Modo foco: o agente chega pela caixa (dgclaw-api), o retrato vai para a casa dele e o PUT do agente avisa o celular.
   const foco = criarFoco({ dir: path.join(config.dataDir, 'foco'), tz: config.tz, log, registro, gravaRetrato: opcoes.gravaRetrato || caixa.gravaRetrato, push: opcoes.push || push, quemChamou: opcoes.quemChamou || quemChamou });
@@ -928,7 +933,7 @@ function criarServidor(opcoes) {
         });
       });
     },
-    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); avisos.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
+    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); vigiaAlertas.parar(); avisos.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
   };
 }
 

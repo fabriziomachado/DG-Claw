@@ -2,8 +2,15 @@
 
 O DG Claw Web manda avisos para o celular e o computador do dono mesmo com a tela
 fechada. É o Web Push padrão (VAPID + `aes128gcm`, RFC 8291 e 8292), feito só com
-`node:crypto`, sem biblioteca nova. Quem usa hoje: os [lembretes](LEMBRETES.md). Qualquer
-frente pode usar (veja "Para quem constrói uma frente nova").
+`node:crypto`, sem biblioteca nova. Quem usa hoje: os [lembretes](LEMBRETES.md), a Mesa, o foco
+e a **vigia de alertas** (`lib/vigia-alertas.js`, 19/10/2026): toda mensagem de agente marcada
+`[PEDIDO]` ou `[ENTREGA]` vira aviso ("<agente> precisa da sua decisão" / "<agente>: entrega pronta"),
+com o número de alertas não vistos no ícone do app. Qualquer frente pode usar (veja "Para quem
+constrói uma frente nova").
+
+**iPhone:** a Apple recusa o aviso (403 `BadJwtToken`) quando o contato do VAPID é falso, como o
+padrão `mailto:dgclaw@localhost`. Ponha o endereço do painel em `DGCLAW_PUSH_SUB` no
+`/etc/dgclaw/web.env` (ex.: `DGCLAW_PUSH_SUB=https://painel.seudominio.com.br`) e reinicie o Web.
 
 - **Android e computador:** funciona no navegador (Chrome, Edge, Firefox) depois de ativar.
 - **iPhone:** só com o DG Claw **instalado na tela de início** (iOS 16.4 ou mais novo). No
@@ -57,6 +64,7 @@ O service worker (`web/public/sw.js`) recebe o JSON e mostra:
 | `imagem` | opcional, caminho do próprio Web. Android e Chrome mostram; o iPhone ignora |
 | `acoes` | opcional, até 2 botões: `[{"acao":"feito","titulo":"✅ Feito","post":"/api/v1/lembretes/oc_x/feito"}]`. Tocar no botão faz o `POST` (com a sessão do aparelho) sem abrir a tela; se o `POST` falhar, abre a `url` para o dono resolver lá |
 | `exigir_interacao` | `true` deixa a notificação na tela até alguém tocar (onde o sistema aceita) |
+| `contador` | opcional, inteiro: o número no ícone do app (`setAppBadge` no service worker; 0 apaga). A vigia de alertas manda o total de pedidos e entregas não vistos |
 
 ## Para quem constrói uma frente nova
 

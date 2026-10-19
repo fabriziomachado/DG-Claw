@@ -133,3 +133,17 @@ test('enquadrar foto: a folha traz o controle com rótulo e a dica em português
   const textos = js.slice(js.indexOf('function folhaFoto')).match(/'[^'\n]*[a-zà-ú][^'\n]*'/g) || [];
   for (const t of textos) assert.doesNotMatch(t, /[—–]/, t);
 });
+
+test('grupos do menu: cada página no seu grupo, "Como funciona" no rodapé e poder novo em Trabalho (19/10/2026)', () => {
+  assert.deepEqual(M.GRUPOS.map(g => g.id), ['trabalho', 'agente', 'conexoes', 'saude']);
+  assert.equal(M.grupoDe('conversa'), 'trabalho');
+  assert.equal(M.grupoDe('sessoes'), 'trabalho');
+  assert.equal(M.grupoDe('skills'), 'agente');
+  assert.equal(M.grupoDe('cofre'), 'conexoes');
+  assert.equal(M.grupoDe('integracoes'), 'conexoes');
+  assert.equal(M.grupoDe('costs'), 'saude');
+  assert.equal(M.grupoDe('como'), '');
+  assert.equal(M.grupoDe('posts'), 'trabalho');
+  // toda aba fixa do painel tem lugar (num grupo ou no rodapé)
+  for (const [chave] of M.ABAS_PAINEL) assert.ok(M.GRUPOS.some(g => g.chaves.includes(chave)) || chave === 'como', chave);
+});

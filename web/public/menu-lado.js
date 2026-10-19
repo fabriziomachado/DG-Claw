@@ -24,6 +24,23 @@
   ];
 
 
+  /* Grupos do menu (19/10/2026, proposta A do dono): 19 itens soltos viraram quatro grupos que fecham.
+     Trabalho nasce aberto; os outros, fechados, com quantos itens têm. O grupo da página aberta abre
+     sozinho e o menu lembra o que a pessoa abriu. Item que não está aqui (poderes do painel) vai para
+     Trabalho; "Como funciona" sai da lista e vira ícone no rodapé do menu. */
+  const GRUPOS = [
+    { id: 'trabalho', nome: 'Trabalho', chaves: ['conversa', 'mesa', 'sessoes', 'lembretes', 'avisos'] },
+    { id: 'agente', nome: 'O agente', chaves: ['identity', 'personality', 'skills', 'rotinas', 'memory', 'arquivos'] },
+    { id: 'conexoes', nome: 'Conexões', chaves: ['integracoes', 'apps', 'cofre'] },
+    { id: 'saude', nome: 'Saúde', chaves: ['status', 'operations', 'costs', 'socorro'] },
+  ];
+  const NO_RODAPE = ['como'];
+  function grupoDe(chave) {
+    if (NO_RODAPE.includes(chave)) return '';
+    const g = GRUPOS.find(x => x.chaves.includes(chave));
+    return g ? g.id : 'trabalho';
+  }
+
   /* Entradas fixas do menu: a tela de lembretes e a de avisos (valem para qualquer agente). */
   const LINK_LEMBRETES = { nome: 'Lembretes', ico: '⏰', href: '/lembretes' };
   /* Entrada fixa: as integrações de todos os agentes (conectores, plugins, skills, chaves, canais). */
@@ -79,7 +96,7 @@
       alvo: '#mlMoldura', antes: abre, titulo: 'O menu do agente',
       oque: 'A foto, o nome e as páginas de ' + nome + ', sempre no lado esquerdo. No computador ele fica aberto o tempo todo; no celular abre pelo botão ☰.',
       como: (o.naConversa ? 'O item Conversa (esta tela) fica no alto.' : 'O item Conversa, no alto, leva de volta ao chat.') +
-        ' Os outros itens levam à Mesa, às Sessões de trabalho dele, aos Lembretes, aos Avisos, às Integrações e às páginas do painel dele. Tocar na foto abre a troca de foto. O Tutorial, aqui em cima, repete esta visita.',
+        ' Os itens ficam em quatro grupos (Trabalho, O agente, Conexões e Saúde); tocar no nome do grupo abre ou fecha, e o menu lembra a sua escolha. Tocar na foto abre a troca de foto. No rodapé ficam o tema, instalar o app, como funciona, este tutorial e sair. No celular, dá para abrir o menu arrastando o dedo da borda esquerda.',
       porque: 'Assim a conversa e o painel de cada agente ficam no mesmo lugar, sem link escondido.',
     }];
     if (o.comTroca) {
@@ -170,7 +187,7 @@
     return '';
   }
 
-  if (!raiz.document) return { ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, linkSessoes, itemAgente, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar, recorteQuadrado, problemaArquivo, ZOOM_MAX, escalaCobre, limitaAjuste, ajusteInicial, moveAjuste, zoomNoPonto, recorteDoAjuste };
+  if (!raiz.document) return { GRUPOS, grupoDe, ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, linkSessoes, itemAgente, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar, recorteQuadrado, problemaArquivo, ZOOM_MAX, escalaCobre, limitaAjuste, ajusteInicial, moveAjuste, zoomNoPonto, recorteDoAjuste };
 
   /* ── Parte com DOM ─────────────────────────────────────────────────────── */
   const $ = id => document.getElementById(id);
@@ -326,6 +343,7 @@
       el.classList.toggle('ativo', ativo);
       if (ativo) el.setAttribute('aria-current', 'page'); else el.removeAttribute('aria-current');
     });
+    pintaGrupos();
   }
 
   /* Troca os itens extras do painel (Sessões, Posts...): chamado de novo quando o que está ligado muda. */
@@ -337,6 +355,7 @@
     painel.insertAdjacentHTML('beforeend', links.map(l => `<a class="ml-tab" data-extra="1" href="${esc(l.href)}">` +
       `<span class="ml-ico" aria-hidden="true">${esc(l.ico)}</span>${esc(l.nome)}</a>`).join(''));
     painel.hidden = !painel.children.length;
+    agrupa();
     marca(chaveAtiva);
   }
 
@@ -403,6 +422,176 @@
     // escolher uma página fecha a gaveta (a navegação em seguida troca a tela)
     $('mlTabs').addEventListener('click', ev => { if (ev.target.closest('a')) opcoes.fecha(); });
     pintaInstalar();
+    agrupa();
+    montaRodape(ag);
+    marca(chaveAtiva);
+    ligaDeslizar();
+  }
+
+  /* ── Grupos (ver GRUPOS) ──────────────────────────────────────────────── */
+  const CHAVE_GRUPOS = 'dgclaw:menu-grupos';
+  const ICO_GRUPO = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>';
+  function gruposSalvos() {
+    try { return JSON.parse(localStorage.getItem(CHAVE_GRUPOS) || '{}') || {}; } catch (_) { return {}; }
+  }
+  /* Põe cada item do menu no seu grupo. Idempotente: roda de novo quando os extras do painel chegam.
+     Move o item inteiro (com o <div data-tour> em volta, quando há), então o tour e o resto seguem achando. */
+  function agrupa() {
+    const nav = $('mlTabs');
+    if (!nav) return;
+    for (const g of GRUPOS) {
+      if (nav.querySelector(`.ml-grupo[data-grupo="${g.id}"]`)) continue;
+      nav.insertAdjacentHTML('beforeend', `<section class="ml-grupo" data-grupo="${g.id}">` +
+        `<button type="button" class="ml-gcab" aria-expanded="false">${ICO_GRUPO}<span>${esc(g.nome)}</span><span class="ml-gqt"></span></button>` +
+        '<div class="ml-gitens"></div></section>');
+    }
+    const unidades = [...nav.querySelectorAll('.ml-tab')].map(el => {
+      const pai = el.parentElement;
+      const un = pai && pai.matches('div[data-tour]') && pai.id !== 'mlPainel' ? pai : el;
+      const chave = el.id === 'gmIrConversa' ? 'conversa' : chaveDoHref(el.getAttribute('href') || '');
+      return { el, un, chave };
+    });
+    for (const g of GRUPOS) {
+      const lista = nav.querySelector(`.ml-grupo[data-grupo="${g.id}"] .ml-gitens`);
+      const daqui = unidades.filter(u => grupoDe(u.chave) === g.id);
+      daqui.sort((x, y) => (g.chaves.indexOf(x.chave) + 1 || 99) - (g.chaves.indexOf(y.chave) + 1 || 99));
+      daqui.forEach(u => lista.appendChild(u.un));
+    }
+    unidades.filter(u => !grupoDe(u.chave)).forEach(u => { u.un.hidden = true; });
+    const painel = $('mlPainel');
+    if (painel) painel.hidden = true;
+    pintaGrupos();
+  }
+  function pintaGrupos() {
+    const salvos = gruposSalvos();
+    document.querySelectorAll('#mlTabs .ml-grupo').forEach(sec => {
+      const id = sec.dataset.grupo, itens = sec.querySelector('.ml-gitens');
+      const qt = [...itens.children].filter(x => !x.hidden).length;
+      sec.hidden = !qt;
+      const temAtivo = !!itens.querySelector('.ml-tab.ativo');
+      const aberto = temAtivo || (id in salvos ? !!salvos[id] : id === 'trabalho');
+      sec.classList.toggle('aberto', aberto);
+      itens.hidden = !aberto;
+      const cab = sec.querySelector('.ml-gcab');
+      cab.setAttribute('aria-expanded', String(aberto));
+      sec.querySelector('.ml-gqt').textContent = aberto ? '' : String(qt);
+    });
+  }
+  document.addEventListener('click', ev => {
+    const cab = ev.target.closest ? ev.target.closest('#mlTabs .ml-gcab') : null;
+    if (!cab) return;
+    const sec = cab.closest('.ml-grupo'), salvos = gruposSalvos();
+    salvos[sec.dataset.grupo] = !sec.classList.contains('aberto');
+    try { localStorage.setItem(CHAVE_GRUPOS, JSON.stringify(salvos)); } catch (_) { /* sem armazenamento: vale até recarregar */ }
+    // fechar o grupo da página aberta também vale: a regra "abre sozinho" é só na chegada
+    if (!salvos[sec.dataset.grupo]) { sec.classList.remove('aberto'); sec.querySelector('.ml-gitens').hidden = true; cab.setAttribute('aria-expanded', 'false');
+      sec.querySelector('.ml-gqt').textContent = String([...sec.querySelector('.ml-gitens').children].filter(x => !x.hidden).length); return; }
+    pintaGrupos();
+  });
+
+  /* ── Rodapé do menu: tema, instalar, como funciona, tutorial e sair viram ícones ── */
+  const ico18 = d => '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+  const ICO_RODAPE = {
+    auto: ico18('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.5v17A8.5 8.5 0 0 0 12 3.5z" fill="currentColor"/>'),
+    claro: ico18('<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/>'),
+    escuro: ico18('<path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/>'),
+    instalar: ico18('<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/>'),
+    como: ico18('<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v14a1.5 1.5 0 0 0-1.5-1.5h-5A1.5 1.5 0 0 1 4 17zM20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v14a1.5 1.5 0 0 1 1.5-1.5h5a1.5 1.5 0 0 0 1.5-1.5z"/>'),
+    tutorial: ico18('<circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6M12 17h.01"/>'),
+    sair: ico18('<path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4M10 16l4-4-4-4M14 12H4"/>'),
+  };
+  const NOME_TEMA = { auto: 'automático', claro: 'claro', escuro: 'escuro' };
+  function montaRodape(ag) {
+    const pe = document.querySelector('aside#menu .pe');
+    if (!pe || $('mlRodape')) return;
+    const como = document.querySelector('#mlTabs .ml-tab[href*="#aba=como"]');
+    const bt = (id, rot, svg) => `<button type="button" class="ml-rb" id="${id}" title="${rot}" aria-label="${rot}">${svg}</button>`;
+    pe.insertAdjacentHTML('afterbegin', '<div class="ml-rodape" id="mlRodape">' +
+      bt('mlRbTema', 'Tema', ICO_RODAPE.auto) + bt('mlRbInstalar', 'Instalar o app', ICO_RODAPE.instalar) +
+      (como ? `<a class="ml-rb" href="${esc(como.getAttribute('href'))}" title="Como funciona" aria-label="Como funciona">${ICO_RODAPE.como}</a>` : '') +
+      bt('mlRbTutorial', 'Tutorial do menu', ICO_RODAPE.tutorial) + '<span class="ml-resp"></span></div>');
+    const rod = $('mlRodape'), form = $('formSair');
+    if (form) {
+      const sair = form.querySelector('button');
+      if (sair) { sair.className = 'ml-rb'; sair.title = 'Sair'; sair.setAttribute('aria-label', 'Sair'); sair.innerHTML = ICO_RODAPE.sair; }
+      rod.appendChild(form);
+    }
+    // a caixa de ajuda da instalação continua aparecendo, agora logo acima do rodapé
+    const ajuda = $('mlInstalarAjuda');
+    if (ajuda) pe.insertBefore(ajuda, rod);
+    $('mlRbInstalar').onclick = () => $('mlInstalar').click();
+    $('mlRbTutorial').onclick = () => { const t = $('gmTutorial'); if (t) t.click(); };
+    $('mlRbTema').onclick = () => {
+      if (!raiz.DGTema) return;
+      const ordem = ['auto', 'claro', 'escuro'], atual = raiz.DGTema.preferencia();
+      raiz.DGTema.escolhe(ordem[(ordem.indexOf(atual) + 1) % ordem.length]);
+    };
+    pintaRodape();
+  }
+  function pintaRodape() {
+    const b = $('mlRbTema');
+    if (b) {
+      const pref = raiz.DGTema ? raiz.DGTema.preferencia() : 'auto';
+      b.innerHTML = ICO_RODAPE[pref] || ICO_RODAPE.auto;
+      b.title = 'Tema: ' + (NOME_TEMA[pref] || pref) + ' (toque para trocar)';
+      b.setAttribute('aria-label', b.title);
+    }
+    const inst = $('mlRbInstalar'), orig = $('mlInstalar');
+    if (inst && orig) inst.hidden = orig.hidden;
+  }
+  document.addEventListener('dgtema', pintaRodape);
+
+  /* ── Celular: o menu desliza com o dedo ───────────────────────────────────
+     Arrastar da borda esquerda puxa o menu, que acompanha o dedo; arrastar para a esquerda (no menu ou
+     no véu) fecha. Soltar depois de um terço do caminho, ou num gesto rápido, completa; antes, volta.
+     Abrir e fechar de verdade é o clique no ☰ e no véu, então cada tela segue com a própria lógica. */
+  let deslizarLigado = false;
+  function ligaDeslizar() {
+    if (deslizarLigado) return;
+    deslizarLigado = true;
+    const menu = document.querySelector('aside#menu'), veu = $('overlayMenu');
+    if (!menu || !veu) return;
+    const gaveta = () => !(raiz.matchMedia && matchMedia('(min-width:1100px)').matches);
+    let g = null;   // { modo: 'abrir'|'fechar', x0, y0, t0, w, dx, decidido }
+    window.addEventListener('touchstart', ev => {
+      if (!gaveta() || ev.touches.length !== 1 || $('tourCaixa') || document.querySelector('.ml-fs-veu:not([hidden])')) { g = null; return; }
+      const t = ev.touches[0], aberto = menu.classList.contains('abre');
+      if (!aberto && t.clientX <= 22) g = { modo: 'abrir' };
+      else if (aberto && (menu.contains(ev.target) || ev.target === veu)) g = { modo: 'fechar' };
+      else { g = null; return; }
+      Object.assign(g, { x0: t.clientX, y0: t.clientY, t0: Date.now(), w: menu.getBoundingClientRect().width || 300, dx: 0, decidido: false });
+    }, { passive: true, capture: true });
+    window.addEventListener('touchmove', ev => {
+      if (!g) return;
+      const t = ev.touches[0], dx = t.clientX - g.x0, dy = t.clientY - g.y0;
+      if (!g.decidido) {
+        if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+        // gesto mais vertical que horizontal (rolar a lista do menu): não é com a gente
+        if (Math.abs(dy) > Math.abs(dx) || (g.modo === 'fechar' && dx > 0)) { g = null; return; }
+        g.decidido = true;
+        menu.style.transition = 'none';
+        veu.style.transition = 'none';
+        veu.style.display = 'block';
+      }
+      ev.stopPropagation();
+      g.dx = dx;
+      const pos = g.modo === 'abrir' ? Math.min(0, -g.w + Math.max(0, dx)) : Math.min(0, dx);
+      menu.style.transform = `translateX(${pos}px)`;
+      veu.style.opacity = String(Math.max(0, Math.min(1, 1 + pos / g.w)));
+    }, { passive: true, capture: true });
+    const solta = () => {
+      if (!g) return;
+      const feito = g.decidido, modo = g.modo, dx = g.dx, v = Math.abs(dx) / Math.max(1, Date.now() - g.t0), w = g.w;
+      g = null;
+      if (!feito) return;
+      menu.style.transition = ''; menu.style.transform = '';
+      veu.style.transition = ''; veu.style.opacity = ''; veu.style.display = '';
+      const passou = Math.abs(dx) > w / 3 || v > 0.5;
+      if (modo === 'abrir' && passou && dx > 0) $('btnMenu').click();
+      if (modo === 'fechar' && passou && dx < 0) veu.click();
+    };
+    window.addEventListener('touchend', solta, { capture: true });
+    window.addEventListener('touchcancel', solta, { capture: true });
   }
 
   /* ── Trocar a foto do agente (18/10/2026) ─────────────────────────────────
@@ -783,5 +972,5 @@
   // o seletor nasce com a casca (que monta depois); pinta assim que ele existir
   (function espera(n) { if (document.querySelector('#mlTema [data-tema-op]')) pintaTema(); else if (n > 0) setTimeout(() => espera(n - 1), 200); })(25);
 
-  return { ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, linkSessoes, itemAgente, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar, recorteQuadrado, problemaArquivo, ZOOM_MAX, escalaCobre, limitaAjuste, ajusteInicial, moveAjuste, zoomNoPonto, recorteDoAjuste, inicia, marca, extras, abreFolhaFoto };
+  return { GRUPOS, grupoDe, ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, linkSessoes, itemAgente, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar, recorteQuadrado, problemaArquivo, ZOOM_MAX, escalaCobre, limitaAjuste, ajusteInicial, moveAjuste, zoomNoPonto, recorteDoAjuste, inicia, marca, extras, abreFolhaFoto };
 });

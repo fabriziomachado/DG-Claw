@@ -978,3 +978,7 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 .men-gira{width:12px;height:12px;border-radius:50%;border:2px solid var(--dg-borda);border-top-color:var(--dg-texto-2);animation:men-gira .9s linear infinite}
 @keyframes men-gira{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.men-gira{animation:none}}
+
+/* "N novas mensagens" (19/10/2026) */
+.novas-sep{display:flex;align-items:center;gap:10px;margin:10px 0 4px;color:var(--dg-azul-forte);font-size:12px;font-weight:600}
+.novas-sep::before,.novas-sep::after{content:"";flex:1;height:1px;background:color-mix(in srgb,var(--dg-azul) 45%,transparent)}

@@ -335,6 +335,7 @@ document.addEventListener('dgavatar', ev => {
   const outros = agentesMenu.filter(a => a.id !== AGENTE.id);
   async function badges() {
     if (document.hidden) return;
+    let total = 0;
     for (const a of outros) {
       let lista = [];
       try {
@@ -342,6 +343,7 @@ document.addEventListener('dgavatar', ev => {
         if (!r.ok) continue;
         lista = ((await r.json()) || {}).alertas || [];
       } catch (_) { continue; }
+      total += lista.length;
       const el = nav.querySelector('[data-avt="' + CSS.escape(a.id) + '"]');
       if (!el) continue;
       let b = el.querySelector('.fil-badge');
@@ -352,6 +354,8 @@ document.addEventListener('dgavatar', ev => {
       b.textContent = lista.length > 9 ? '9+' : String(lista.length);
       el.setAttribute('aria-label', 'Conversar com ' + a.nome + ' (' + lista.length + ' aviso' + (lista.length > 1 ? 's' : '') + ' não visto' + (lista.length > 1 ? 's' : '') + ')');
     }
+    avisosOutros = total;
+    pintaBadgeApp();
   }
   badges(); setInterval(badges, 30000);
   document.addEventListener('visibilitychange', badges);
@@ -1784,6 +1788,8 @@ function render(opt) {
   const fotoAtv = window.atividadeFoto && window.atividadeFoto.agentes ? window.atividadeFoto.agentes[AGENTE.id] : null;
   const trabalhandoAgora = !!(fotoAtv && fotoAtv.estado === 'trabalhando' && streamAberto);
   const ultDono = todas.reduce((a, x) => (ehDono(x) && typeof x.ep === 'number' && x.ep > a ? x.ep : a), 0);
+  let divisorPosto = false;
+  if (divisorEp != null && ultDono > divisorEp) divisorEp = null;   // você já escreveu depois: a linha sai
   for (let bi = 0; bi < blocos.length; bi++) {
     const bloco = blocos[bi];
     const m = bloco.msg || bloco.trilha[0];
@@ -1791,6 +1797,10 @@ function render(opt) {
       dia = m.dia;
       itens.push(['dia:' + dia, `<div class="dia"><span>${esc(dia)}</span></div>`]);
       anterior = null;
+    }
+    if (divisorEp != null && !divisorPosto && m.ep >= divisorEp && !ehDono(m)) {
+      divisorPosto = true;
+      itens.push(['novas-sep', `<div class="novas-sep" role="separator"><span>${divisorN === 1 ? '1 nova mensagem' : divisorN + ' novas mensagens'}</span></div>`]);
     }
     if (bloco.trilha) {
       if (trabalhandoAgora && m.ep > ultDono) continue;
@@ -2436,8 +2446,11 @@ async function carregar(primeiraVez) {
     msgs.sort((a, b) => a.ep - b.ep);
     carregouUmaVez = true;
     limpaPendentes();
+    if (primeiraVez) marcaDivisor();
     render();
-    if (primeiraVez) {
+    const sep = primeiraVez && divisorEp != null ? wrap.querySelector('.novas-sep') : null;
+    if (sep) rolagem.mostra(sep, { block: 'start' });
+    else if (primeiraVez) {
       rolagem.aoFim();
       // conversa curta ou página que não encheu a tela: já pede as antigas
       verificaBordas();
@@ -4260,6 +4273,27 @@ wrap.addEventListener('click', ev => {
     }
   });
 })();
+/* Número no ícone do app e no título da aba (19/10/2026, ideia 3): avisos não vistos de todos os agentes
+   (os desta conversa vêm de alertasLista; os outros, da conferência da fileira a cada 30 s). */
+let avisosOutros = 0;
+function pintaBadgeApp() {
+  let n = avisosOutros;
+  try { n += alertasLista.length; } catch (_) { /* a lista desta conversa ainda não nasceu */ }
+  document.title = (n ? '(' + n + ') ' : '') + AGENTE.nome + ' - DG Claw';
+  try {
+    if (n && navigator.setAppBadge) navigator.setAppBadge(n).catch(() => {});
+    else if (!n && navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {});
+  } catch (_) { /* sem suporte a badge: fica só o título */ }
+}
+/* "N novas mensagens" (ideia 3): ao abrir, uma linha antes da primeira mensagem do agente que você ainda
+   não tinha visto (o mesmo marcador do ✓✓ azul), e a tela abre nela em vez de no fim. Some quando você
+   escreve. */
+let divisorEp = null, divisorN = 0;
+function marcaDivisor() {
+  const novas = vistoAteEp > 0 ? msgs.filter(m => !ehDono(m) && m.origin !== 'trilha' && typeof m.ep === 'number' && m.ep > vistoAteEp) : [];
+  divisorEp = novas.length ? novas[0].ep : null;
+  divisorN = novas.length;
+}
 /* @mencionar outro agente (19/10/2026, ideia 1): "@" no campo abre a lista dos outros agentes (o Admin
    fica de fora); a mensagem que começa com "@Nome" vai ao agente citado por POST /mencao, e a resposta
    dele volta aqui num cartão (lib/mencoes.js), e este agente recebe a resposta para continuar. */
@@ -4701,6 +4735,7 @@ function contagensFiltro() {
            temEntregas: msgs.some(m => m.alerta === 'entrega') };
 }
 function desenhaAlertas() {
+  pintaBadgeApp();
   alertasCaixa.hidden = true;   // a pilha lateral antiga não aparece mais
   const c = contagensFiltro();
   // o Histórico fica sempre à mão nos agentes (o Admin não guarda histórico pesquisável)

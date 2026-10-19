@@ -29,7 +29,7 @@
      sozinho e o menu lembra o que a pessoa abriu. Item que não está aqui (poderes do painel) vai para
      Trabalho; "Como funciona" sai da lista e vira ícone no rodapé do menu. */
   const GRUPOS = [
-    { id: 'trabalho', nome: 'Trabalho', chaves: ['conversa', 'mesa', 'sessoes', 'lembretes', 'avisos'] },
+    { id: 'trabalho', nome: 'Trabalho', chaves: ['caixa', 'conversa', 'mesa', 'sessoes', 'lembretes', 'avisos'] },
     { id: 'agente', nome: 'O agente', chaves: ['identity', 'personality', 'skills', 'rotinas', 'memory', 'arquivos'] },
     { id: 'conexoes', nome: 'Conexões', chaves: ['integracoes', 'apps', 'cofre'] },
     { id: 'saude', nome: 'Saúde', chaves: ['status', 'operations', 'costs', 'socorro'] },
@@ -47,6 +47,8 @@
   const LINK_INTEGRACOES = { nome: 'Integrações', ico: '⧉', href: '/integracoes' };
 
   const LINK_AVISOS = { nome: 'Avisos', ico: '🔔', href: '/avisos' };
+  /* Caixa de entrada (19/10/2026): tudo que espera o dono, de todos os agentes; o número em vermelho é o do ícone do app. */
+  const LINK_CAIXA = { nome: 'Caixa de entrada', ico: '📥', href: '/caixa' };
 
   /* Sessões é item fixo para todo agente com painel (a tela fica no painel dele). Devolve o link do menu e os
      endereços que o menu consulta (config: a aba está ligada? pedidos: quantas sessões esperam o dono), ou null. */
@@ -75,6 +77,7 @@
     if (caminho === '/lembretes') return 'lembretes';
     if (caminho === '/integracoes') return 'integracoes';
     if (caminho === '/avisos') return 'avisos';
+    if (caminho === '/caixa') return 'caixa';
     if (/^\/a\/[^/]+$/.test(caminho)) return 'conversa';
     return '';
   }
@@ -187,7 +190,7 @@
     return '';
   }
 
-  if (!raiz.document) return { GRUPOS, grupoDe, ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, linkSessoes, itemAgente, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar, recorteQuadrado, problemaArquivo, ZOOM_MAX, escalaCobre, limitaAjuste, ajusteInicial, moveAjuste, zoomNoPonto, recorteDoAjuste };
+  if (!raiz.document) return { GRUPOS, grupoDe, LINK_CAIXA, ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, linkSessoes, itemAgente, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar, recorteQuadrado, problemaArquivo, ZOOM_MAX, escalaCobre, limitaAjuste, ajusteInicial, moveAjuste, zoomNoPonto, recorteDoAjuste };
 
   /* ── Parte com DOM ─────────────────────────────────────────────────────── */
   const $ = id => document.getElementById(id);
@@ -390,6 +393,9 @@
       `<span class="ml-ico" aria-hidden="true">${LINK_LEMBRETES.ico}</span>${LINK_LEMBRETES.nome}</a></div>` +
       `<div data-tour="gm-integracoes"><a class="ml-tab" href="${comAgente(LINK_INTEGRACOES.href, ag.id)}">` +
       `<span class="ml-ico" aria-hidden="true">${LINK_INTEGRACOES.ico}</span>${LINK_INTEGRACOES.nome}</a></div>`);
+    $('mlTabs').insertAdjacentHTML('afterbegin', `<div data-tour="gm-caixa"><a class="ml-tab" id="mlCaixa" href="${comAgente(LINK_CAIXA.href, ag.id)}">` +
+      `<span class="ml-ico" aria-hidden="true">${LINK_CAIXA.ico}</span>${LINK_CAIXA.nome}<span class="ml-n" hidden></span></a></div>`);
+    ligaCaixa();
     $('mlTabs').insertAdjacentHTML('beforeend', `<div data-tour="gm-avisos"><a class="ml-tab" href="${comAgente(LINK_AVISOS.href, ag.id)}">` +
       `<span class="ml-ico" aria-hidden="true">${LINK_AVISOS.ico}</span>${LINK_AVISOS.nome}</a></div>`);
     // a Mesa já está no HTML com href="/mesa": passa a levar o agente junto
@@ -426,6 +432,30 @@
     montaRodape(ag);
     marca(chaveAtiva);
     ligaDeslizar();
+  }
+
+  /* ── Contagem da Caixa de entrada: pedidos e entregas não vistos + lembretes tocando ── */
+  let caixaLigada = false;
+  async function atualizaCaixa() {
+    const el = $('mlCaixa');
+    if (!el || document.hidden) return;
+    try {
+      const pega = u => fetch(u, { credentials: 'same-origin', cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).catch(() => null);
+      const [cx, lb] = await Promise.all([pega('/api/v1/caixa'), pega('/api/v1/lembretes')]);
+      if (!cx) return;
+      const n = (cx.total || 0) + ((lb && lb.insistindo) ? lb.insistindo.length : 0);
+      const b = el.querySelector('.ml-n');
+      b.textContent = n > 99 ? '99+' : String(n);
+      b.hidden = !n;
+      el.title = n ? 'Caixa de entrada: ' + n + (n === 1 ? ' item esperando você' : ' itens esperando você') : 'Caixa de entrada';
+    } catch (e) { console.warn('menu-lado: não atualizei a contagem da caixa de entrada:', e.message); }
+  }
+  function ligaCaixa() {
+    if (caixaLigada) return;
+    caixaLigada = true;
+    atualizaCaixa();
+    setInterval(atualizaCaixa, 30000);
+    document.addEventListener('visibilitychange', atualizaCaixa);
   }
 
   /* ── Grupos (ver GRUPOS) ──────────────────────────────────────────────── */
@@ -952,6 +982,7 @@
     '•': ico('<circle cx="12" cy="12" r="2.5"/>'),
     '🔔': ico('<path d="M4 10v4h3l6 4V6L7 10z"/><path d="M16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11"/>'),
     '🖥': ico('<rect x="3.5" y="4.5" width="17" height="11.5" rx="2"/><path d="M9 20h6M12 16v4"/>'),
+    '📥': ico('<path d="M4 13h4l1.5 2.5h5L16 13h4"/><path d="M5.5 5h13L20 13v5.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5V13z"/>'),
   };
   // o tema usa ◐ também: lá vira sol e lua, não carinha
   const ICONE_TEMA = ico('<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/>');
@@ -972,5 +1003,5 @@
   // o seletor nasce com a casca (que monta depois); pinta assim que ele existir
   (function espera(n) { if (document.querySelector('#mlTema [data-tema-op]')) pintaTema(); else if (n > 0) setTimeout(() => espera(n - 1), 200); })(25);
 
-  return { GRUPOS, grupoDe, ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, linkSessoes, itemAgente, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar, recorteQuadrado, problemaArquivo, ZOOM_MAX, escalaCobre, limitaAjuste, ajusteInicial, moveAjuste, zoomNoPonto, recorteDoAjuste, inicia, marca, extras, abreFolhaFoto };
+  return { GRUPOS, grupoDe, ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, linkSessoes, itemAgente, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar, recorteQuadrado, problemaArquivo, ZOOM_MAX, escalaCobre, limitaAjuste, ajusteInicial, moveAjuste, zoomNoPonto, recorteDoAjuste, inicia, marca, extras, abreFolhaFoto, atualizaCaixa };
 });

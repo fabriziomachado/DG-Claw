@@ -1,0 +1,48 @@
+/* caixa.css: a Caixa de entrada (19/10/2026). Paleta do tema.css, cartões discretos, um destaque por cartão. */
+html.casca body.cx-pag{margin:0;background:var(--dg-fundo);color:var(--dg-texto);font:15px/1.45 var(--fonte,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif)}
+.cx-main{max-width:720px;margin:0 auto;padding:12px 14px calc(32px + env(safe-area-inset-bottom));box-sizing:border-box}
+.cx-filtros{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;padding:2px 0 12px}
+.cx-filtros::-webkit-scrollbar{display:none}
+.cx-chip{flex:0 0 auto;min-height:34px;padding:0 14px;border-radius:999px;border:1px solid var(--dg-borda);background:transparent;color:var(--dg-texto-2);
+  font:inherit;font-size:13.5px;cursor:pointer}
+.cx-chip .n{margin-left:6px;font-size:12px;color:var(--dg-texto-3)}
+.cx-chip.on{background:var(--dg-texto);border-color:var(--dg-texto);color:var(--dg-fundo);font-weight:600}
+.cx-chip.on .n{color:inherit;opacity:.7}
+.cx-msg{margin:0 0 10px;padding:9px 12px;border-radius:10px;font-size:13.5px;background:var(--dg-superficie-2);color:var(--dg-texto-2)}
+.cx-msg.erro{background:var(--dg-erro-fundo);color:var(--dg-erro-texto)}
+.cx-lista{display:flex;flex-direction:column;gap:10px}
+.cx-sec{display:flex;align-items:center;gap:6px;margin:10px 2px 0;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dg-texto-3)}
+.cx-sec .q{margin-left:auto;letter-spacing:0}
+.cx-card{background:var(--dg-superficie);border:1px solid var(--dg-borda);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;
+  transition:opacity .25s, transform .25s}
+.cx-card.pede{border-color:var(--dg-pedido-borda)}
+.cx-card.saindo{opacity:0;transform:translateX(16px)}
+.cx-l1{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--dg-texto-2);min-width:0}
+.cx-av{width:24px;height:24px;flex:0 0 24px;border-radius:50%;overflow:hidden;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:600}
+.cx-av img{width:100%;height:100%;object-fit:cover;display:block}
+.cx-av.ico{background:var(--dg-superficie-2);color:var(--dg-texto-2)}
+.cx-l1 b{color:var(--dg-texto);font-weight:600;white-space:nowrap}
+.cx-tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--dg-superficie-2);color:var(--dg-texto-2);white-space:nowrap}
+.cx-tag.pedido{background:var(--dg-pedido-fundo);color:var(--dg-pedido-texto)}
+.cx-tag.entrega{background:var(--dg-entrega-fundo);color:var(--dg-entrega-texto)}
+.cx-tag.lembrete{background:color-mix(in srgb,var(--dg-azul) 16%,transparent);color:var(--dg-azul-forte)}
+.cx-quando{margin-left:auto;font-size:12px;color:var(--dg-texto-3);white-space:nowrap}
+.cx-tx{font-size:14.5px;color:var(--dg-texto);overflow-wrap:anywhere}
+.cx-perg{font-size:13.5px;color:var(--dg-texto-2)}
+.cx-ops{display:flex;flex-direction:column;gap:6px}
+.cx-op{display:flex;flex-direction:column;align-items:flex-start;gap:1px;width:100%;padding:8px 12px;border:1px solid var(--dg-borda);border-radius:12px;background:transparent;
+  color:var(--dg-texto);font:inherit;font-size:14px;text-align:left;cursor:pointer}
+.cx-op:hover{background:var(--dg-superficie-2)}
+.cx-op small{font-size:12.5px;color:var(--dg-texto-3)}
+.cx-op .rec{font-size:11px;font-weight:600;color:var(--dg-entrega-texto);margin-left:6px}
+.cx-acoes{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.cx-bt{min-height:32px;padding:0 14px;border-radius:999px;border:1px solid var(--dg-borda);background:transparent;color:var(--dg-texto);font:inherit;font-size:13px;font-weight:600;
+  cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+.cx-bt:hover{background:var(--dg-superficie-2)}
+.cx-bt.pri{background:var(--dg-texto);border-color:var(--dg-texto);color:var(--dg-fundo)}
+.cx-bt.pri:hover{opacity:.88}
+.cx-bt:disabled{opacity:.5;cursor:wait}
+.cx-fraco{font-size:12.5px;color:var(--dg-texto-3)}
+.cx-vazio{text-align:center;padding:48px 16px;color:var(--dg-texto-3);font-size:14px}
+.cx-vazio svg{display:block;margin:0 auto 10px;color:var(--dg-texto-3)}
+@media(prefers-reduced-motion:reduce){.cx-card{transition:none}}

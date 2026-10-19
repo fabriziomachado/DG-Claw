@@ -231,3 +231,7 @@ aside#menu .pe .conta{display:none}
 .ml-rb[hidden]{display:none}
 .ml-rb:focus-visible{outline:2px solid var(--dg-azul);outline-offset:1px}
 aside#menu .pe .ml-ajuda{margin:0 4px 8px}
+/* número da Caixa de entrada: vermelho, como no ícone do app (19/10/2026) */
+.ml-tab .ml-n{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#e0453a;color:#fff;
+  font-size:11.5px;font-weight:700;line-height:20px;text-align:center;box-sizing:border-box}
+.ml-tab .ml-n[hidden]{display:none}

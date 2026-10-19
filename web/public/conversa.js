@@ -2778,16 +2778,57 @@ window.addEventListener('popstate', () => {
   }
 });
 
-const ICONE_DOC = { document: '📄', photo: '🖼️', video: '🎬', audio: '🎤', voice: '🎤' };
-
+const ICO_ARQUIVO = '<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3.5H7.5A2 2 0 0 0 5.5 5.5v13a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V8z"/><path d="M14 3.5V8h4.5M9 13h6M9 16.5h4"/></svg>';
 function cartaoDoc(md) {
-  const ico = ICONE_DOC[md.kind] || '📦';
   const tam = md.bytes ? tamanhoHumano(md.bytes) : '';
-  return `<div class="vcard"><div class="ico" aria-hidden="true">${ico}</div>` +
+  return `<div class="vcard"><div class="ico">${ICO_ARQUIVO}</div>` +
     `<b>${esc(md.nome || 'arquivo')}</b>` +
-    `<small>${esc(tam)}${tam ? ' · ' : ''}Esse tipo de arquivo não abre aqui dentro.</small>` +
-    `<a href="${esc(md.url)}" target="_blank" rel="noopener">Abrir em outra aba</a>` +
-    `<a class="sec" href="${esc(md.url)}" download="${esc(md.nome || '')}">Baixar</a></div>`;
+    `<small>${esc(tam)}${tam ? ' · ' : ''}Esse tipo de arquivo não tem prévia aqui.</small>` +
+    `<div class="vcard-acoes"><a class="pri" href="${esc(md.url)}" download="${esc(md.nome || '')}">Baixar</a>` +
+    `<a href="${esc(md.url)}" target="_blank" rel="noopener">Abrir em outra aba</a></div></div>`;
+}
+/* Arquivos de texto abrem formatados no visor: .md vira texto com títulos e listas; código, json,
+   csv e txt vão no bloco de código da conversa (com Copiar e cores de sintaxe). */
+const RX_TEXTO_LEGIVEL = /\.(md|markdown|txt|log|json|csv|tsv|ya?ml|toml|ini|env|sql|sh|bash|py|js|mjs|ts|php|html?|css|xml)$/i;
+function ehTextoLegivel(md) { return !!(md && md.url && RX_TEXTO_LEGIVEL.test(md.nome || '') && !ehVisual(md) && (!md.bytes || md.bytes <= 512 * 1024)); }
+// o Copiar dos blocos de código também funciona dentro do visor (ele fica fora do #wrap)
+lbCorpo.addEventListener('click', ev => {
+  const bt = ev.target.closest ? ev.target.closest('.codcopia') : null;
+  if (!bt) return;
+  const pre = bt.closest('.cod') && bt.closest('.cod').querySelector('pre');
+  if (!pre) return;
+  copiaTexto(pre.textContent).then(ok => { if (!ok) return; const tx = bt.querySelector('span'); bt.classList.add('ok'); if (tx) tx.textContent = 'Copiado'; setTimeout(() => { bt.classList.remove('ok'); if (tx) tx.textContent = 'Copiar'; }, 1600); });
+});
+/* No visor, o .md ganha títulos (# a ###), que a conversa não usa; fora dos blocos de
+   código o resto segue o mesmo paragrafos() das mensagens. */
+function mdComTitulos(t) {
+  const pedacos = String(t).split(/(```[\s\S]*?```)/);
+  return pedacos.map((p, i) => {
+    if (i % 2) return paragrafos(p, 'markdown');
+    return p.split(/^(#{1,6}[ \t]+.*)$/m).map((q, j) => {
+      if (!(j % 2)) return q.trim() ? paragrafos(q, 'markdown') : '';
+      const n = Math.min(/^#+/.exec(q)[0].length, 3) + 1;
+      return `<h${n} class="lb-tit">${esc(q.replace(/^#+[ \t]+/, '').replace(/[ \t]+#*$/, ''))}</h${n}>`;
+    }).join('');
+  }).join('');
+}
+
+async function abreTextoNoVisor(md) {
+  const caixa = lbCorpo.querySelector('.lb-texto');
+  try {
+    const r = await fetch(md.url, { credentials: 'same-origin' });
+    if (!r.ok) throw new Error('o servidor respondeu ' + r.status);
+    const t = (await r.text()).slice(0, 512 * 1024);
+    if (!caixa.isConnected) return;
+    const ext = ((/\.([a-z0-9]+)$/i.exec(md.nome || '') || [])[1] || '').toLowerCase();
+    if (ext === 'md' || ext === 'markdown') caixa.innerHTML = `<div class="lb-md">${mdComTitulos(t)}</div>`;
+    else {
+      const lingua = { txt: 'text', log: 'text', csv: 'text', tsv: 'text', env: 'ini', yml: 'yaml', htm: 'html', mjs: 'javascript', js: 'javascript', ts: 'typescript', py: 'python', sh: 'bash' }[ext] || ext;
+      caixa.innerHTML = `<div class="lb-md">${paragrafos('```' + lingua + '\n' + t.replace(/```/g, 'ˋˋˋ') + '\n```', 'markdown')}</div>`;
+    }
+  } catch (e) {
+    if (caixa.isConnected) lbCorpo.innerHTML = cartaoDoc(md);
+  }
 }
 
 /* Zoom só da FOTO aberta no visor (a página nunca amplia; ver sem-zoom.js).
@@ -2849,6 +2890,9 @@ function abreLightbox(mid, opt) {
   lbNome.textContent = md.nome || 'arquivo';
   lbBaixar.href = md.url;
   lbBaixar.setAttribute('download', md.nome || '');
+  const lbAbrir = document.getElementById('lbAbrir');
+  if (lbAbrir) lbAbrir.href = md.url;
+  lightbox.classList.toggle('lb-midia', md.kind === 'photo' || md.kind === 'video');
   const ehPdf = /\.pdf$/i.test(md.nome || '');
   if (md.kind === 'photo') {
     const img = document.createElement('img');
@@ -2871,6 +2915,10 @@ function abreLightbox(mid, opt) {
     f.src = md.url;
     f.title = md.nome || 'PDF';
     lbCorpo.appendChild(f);
+  } else if (ehTextoLegivel(md)) {
+    // texto, markdown, código, json, csv: abre formatado aqui mesmo (19/10/2026)
+    lbCorpo.innerHTML = '<div class="lb-texto"><p class="lb-carregando">Abrindo…</p></div>';
+    abreTextoNoVisor(md);
   } else {
     lbCorpo.innerHTML = cartaoDoc(md);
   }
@@ -4774,27 +4822,40 @@ const acPainel = $('acervoPainel'), acLista = $('acervoLista');
 let acAba = 'midias';
 const cacheMidias = DGMidias.criar({ conta: caps.conta, agente: AGENTE.id, base: API,
   mudou: aba => { if (aba === acAba) pintaAcervo(); } });
+const ICO_AC = (() => {
+  const s = (d, t = 16) => `<svg viewBox="0 0 24 24" width="${t}" height="${t}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  return { link: s('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>', 18),
+           arquivo: s('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>', 18),
+           play: '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>',
+           ir: s('<path d="M9 18l6-6-6-6"/>', 14) };
+})();
 function pintaAcervo() {
   if (acPainel.hidden) return;
   const d = cacheMidias.estado(acAba);
   $('acervoEstado').textContent = d.erro ? 'Não consegui atualizar: ' + d.erro :
-    (!d.carregou ? 'Carregando os itens recentes…' : d.itens.length + ' itens carregados' + (d.carregando ? ' · atualizando…' : '')) +
+    (!d.carregou ? 'Carregando os itens recentes…' : d.itens.length + (d.itens.length === 1 ? ' item' : ' itens') + (d.carregando ? ' · atualizando…' : '')) +
     (d.avisoCache ? ' · ' + d.avisoCache : '');
-  let html = acAba === 'midias' ? '<div class="acgrade">' : '';
+  let html = acAba === 'midias' ? '<div class="acgrade">' : '<div class="aclista">';
   for (const it of d.itens) {
+    const quando = esc(((it.dia || '') + ' ' + (it.hhmm || '')).trim());
     let corpo;
-    if (acAba === 'links') corpo = `<a class="aclinha" href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.dominio)}<small>${esc(it.url)}</small></a>`;
+    if (acAba === 'links') corpo = `<a class="aclinha" href="${esc(it.url)}" target="_blank" rel="noopener"><span class="ac-sim" aria-hidden="true">${ICO_AC.link}</span>` +
+      `<span class="ac-tx"><span>${esc(it.dominio)}</span><small>${quando} · ${esc(it.url)}</small></span></a>`;
     else {
       const md = it.media; midias[md.id] = md;
       const img = md.disponivel && md.thumb ? `<img src="${esc(md.thumb)}" loading="lazy" decoding="async" width="320" height="320" alt="${esc(md.nome)}" onerror="this.hidden=true">` : '';
-      corpo = `<button class="${acAba === 'midias' ? 'acfoto' : 'aclinha'}" data-midia="${esc(md.id)}">${esc(md.kind === 'video' ? '▶ ' : '📎 ')}${esc(md.nome)}${img}</button>`;
+      corpo = acAba === 'midias'
+        ? `<button class="acfoto" data-midia="${esc(md.id)}" aria-label="${esc(md.nome)}">${esc(md.nome)}${img}${md.kind === 'video' ? `<span class="ac-play" aria-hidden="true">${ICO_AC.play}</span>` : ''}</button>`
+        : `<button class="aclinha" data-midia="${esc(md.id)}"><span class="ac-sim" aria-hidden="true">${ICO_AC.arquivo}</span>` +
+          `<span class="ac-tx"><span>${esc(md.nome)}</span><small>${[quando, md.bytes ? tamanhoHumano(md.bytes) : ''].filter(Boolean).join(' · ')}</small></span></button>`;
     }
-    html += `<div class="acitem">${corpo}<button class="acir" data-origem="${esc(it.msg_id)}" title="Ir para a mensagem de origem">${esc(it.dia || '')} ${esc(it.hhmm || '')} ↪</button></div>`;
+    const ir = acAba === 'midias' ? `${quando}${ICO_AC.ir}` : ICO_AC.ir;
+    html += `<div class="acitem">${corpo}<button class="acir" data-origem="${esc(it.msg_id)}" title="Ir para a mensagem" aria-label="Ir para a mensagem">${ir}</button></div>`;
   }
-  if (acAba === 'midias') html += '</div>';
+  html += '</div>';
   if (d.erro) html += '<button class="acmais" data-tentar>Atualizar novamente</button>';
   if (d.proximo) html += `<button class="acmais" data-mais ${d.carregando ? 'disabled' : ''}>${d.carregando ? 'Carregando…' : 'Carregar anteriores'}</button>`;
-  else if (d.carregou && !d.itens.length) html += '<p>Nenhum item deste tipo na conversa disponível.</p>';
+  else if (d.carregou && !d.itens.length) html += '<p>Nada deste tipo na conversa ainda.</p>';
   acLista.innerHTML = html;
 }
 function abreAcervo(aba = acAba) {

@@ -76,24 +76,6 @@
   .av-retirada label{flex:1}
 }
 
-/* Visita guiada (tour.js): mesmas regras da conversa, com as variáveis daqui */
-#tourFundo{position:fixed;inset:0;z-index:90}
-#tourLuz{position:fixed;z-index:91;border-radius:10px;pointer-events:none;
-  box-shadow:0 0 0 9999px rgba(10,24,16,.66);outline:2px solid #fff}
-#tourCaixa{position:fixed;z-index:92;left:12px;right:12px;max-width:400px;margin:0 auto;background:var(--dg-superficie,#fff);
-  color:#0f1c14;border-radius:14px;padding:14px 16px;box-shadow:0 6px 28px rgba(0,0,0,.35);
-  font-size:14px;line-height:1.45;max-height:70dvh;overflow-y:auto}
-#tourCaixa:focus{outline:none}
-#tourCaixa h4{margin:0 0 2px;font-size:15.5px}
-#tourCaixa .tour-n{font-size:11.5px;color:#6c8172;margin-bottom:6px}
-#tourCaixa p{margin:0 0 6px}
-#tourCaixa p b{color:#1f7a45}
-#tourCaixa .tour-acoes{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap;position:sticky;bottom:0;background:#fff;padding:8px 0 0}
-#tourCaixa button{min-height:36px;padding:0 14px;border-radius:18px;border:1px solid #e1e8e3;
-  background:var(--dg-superficie,#fff);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;color:#38523f}
-#tourCaixa button.pri{background:#2f9e5e;border-color:#2f9e5e;color:#fff}
-#tourCaixa button:disabled{opacity:.4;cursor:default}
-#tourCaixa .tour-x{margin-right:auto}
 [hidden]{display:none !important}
 
 /* campos no tema escuro (18/10/2026) */

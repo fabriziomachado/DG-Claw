@@ -437,25 +437,6 @@
 #btnTutorial{font-size:13px}
 .sem-mic .linha1 .campo{margin-right:0}
 
-/* ── Visita guiada (tour.js) ── */
-#tourFundo{position:fixed;inset:0;z-index:90}
-#tourLuz{position:fixed;z-index:91;border-radius:10px;pointer-events:none;
-  box-shadow:0 0 0 9999px rgba(10,24,16,.66);outline:2px solid #fff}
-#tourCaixa{position:fixed;z-index:92;left:12px;right:12px;max-width:400px;margin:0 auto;background:var(--dg-superficie);
-  color:var(--txt);border-radius:14px;padding:14px 16px;box-shadow:0 6px 28px rgba(0,0,0,.35);
-  font-size:14px;line-height:1.45;max-height:70dvh;overflow-y:auto}
-#tourCaixa:focus{outline:none}
-#tourCaixa h4{margin:0 0 2px;font-size:15.5px}
-#tourCaixa .tour-n{font-size:11.5px;color:var(--muted);margin-bottom:6px}
-#tourCaixa p{margin:0 0 6px}
-#tourCaixa p b{color:#1f7a45}
-#tourCaixa .tour-acoes{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap;position:sticky;bottom:0;background:#fff;padding:8px 0 0}
-#tourCaixa button{min-height:36px;padding:0 14px;border-radius:18px;border:1px solid var(--line);
-  background:var(--dg-superficie);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--dg-texto-2)}
-#tourCaixa button.pri{background:var(--accent);border-color:var(--accent);color:#fff}
-#tourCaixa button:disabled{opacity:.4;cursor:default}
-#tourCaixa .tour-x{margin-right:auto}
-
 /* O atributo hidden sempre esconde, mesmo em elementos com display definido */
 [hidden]{display:none !important}
 
@@ -477,16 +458,44 @@ html[data-tema="escuro"] .row.alerta-pedido .bub{border-color:#e5bd4c;background
   html:not([data-tema="claro"]) .row.alerta-pedido .bub{border-color:#e5bd4c;background:#3c341b;color:#fff3c8}
 }
 
-/* Compartilhados: painel com rolagem própria e alvos de toque no celular. */
-#acervoPainel{position:fixed;inset:0 0 0 auto;width:min(100%,540px);z-index:90;background:var(--header);color:var(--txt);display:flex;flex-direction:column;box-shadow:0 0 0 100vw #0005}
-#acervoPainel[hidden]{display:none}#acervoPainel header{position:static;display:flex;gap:8px;padding:10px;border-bottom:1px solid var(--line)}
-#acervoPainel header b{flex:1}#acervoPainel button{min-height:44px;min-width:44px;font:inherit;color:inherit;background:transparent;border:1px solid var(--line);border-radius:8px;cursor:pointer}
-#acervoPainel nav{display:flex}#acervoPainel nav button{flex:1;border-radius:0}#acervoPainel [aria-selected="true"]{border-bottom:3px solid var(--accent)}
-#acervoEstado{font-size:13px;margin:10px;overflow-wrap:anywhere}#acervoLista{flex:1;min-height:0;overflow:auto;padding:8px;overscroll-behavior:contain}
-#acervoLista .acgrade{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}#acervoLista .acitem{min-width:0;position:relative;margin-bottom:6px}
-#acervoLista .acfoto{width:100%;aspect-ratio:1;overflow:hidden;position:relative}#acervoLista .acfoto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-#acervoLista .aclinha{display:block;width:100%;text-align:left;padding:10px;overflow-wrap:anywhere}#acervoLista .acir{font-size:12px;width:100%}#acervoLista small{display:block;color:var(--muted)}
-#acervoLista .acmais{display:block;margin:14px auto;padding:8px 18px}#who[role="button"],#av{cursor:pointer}
+/* Compartilhados: painel lateral da paleta, abas sublinhadas, ações em ícone de traço. */
+#acervoPainel{position:fixed;inset:0 0 0 auto;width:min(100%,540px);z-index:90;background:var(--dg-fundo);color:var(--dg-texto);
+  display:flex;flex-direction:column;border-left:1px solid var(--dg-borda);box-shadow:0 0 0 100vw var(--dg-sobreposicao)}
+#acervoPainel[hidden]{display:none}
+#acervoPainel header{position:static;display:flex;align-items:center;gap:2px;padding:8px 8px 8px 16px;min-height:56px;box-sizing:border-box}
+#acervoPainel header b{flex:1;font-size:16px;font-weight:650}
+#acervoPainel button{font:inherit;color:inherit;background:transparent;border:0;cursor:pointer}
+#acervoPainel .ac-ico{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;color:var(--dg-texto-2)}
+#acervoPainel .ac-ico:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
+#acervoPainel nav{display:flex;gap:4px;padding:0 12px;border-bottom:1px solid var(--dg-borda)}
+#acervoPainel nav button{min-height:40px;padding:0 10px;font-size:14px;color:var(--dg-texto-2);border-bottom:2px solid transparent;margin-bottom:-1px}
+#acervoPainel nav [aria-selected="true"]{color:var(--dg-texto);font-weight:600;border-bottom-color:var(--dg-texto)}
+#acervoEstado{font-size:12.5px;color:var(--dg-texto-3);margin:10px 16px 2px;overflow-wrap:anywhere}
+#acervoEstado:empty{display:none}
+#acervoLista{flex:1;min-height:0;overflow:auto;padding:8px 12px 16px;overscroll-behavior:contain}
+#acervoLista .acgrade{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+#acervoLista .acitem{min-width:0;position:relative}
+#acervoLista .acgrade .acitem{margin-bottom:4px}
+#acervoLista .acfoto{display:block;width:100%;aspect-ratio:1;overflow:hidden;position:relative;border-radius:10px;
+  background:var(--dg-superficie-2);color:var(--dg-texto-3);font-size:11.5px;padding:6px;text-align:left;overflow-wrap:anywhere}
+#acervoLista .acfoto img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#acervoLista .acfoto .ac-play{position:absolute;z-index:1;inset:auto auto 6px 6px;width:24px;height:24px;border-radius:50%;
+  display:grid;place-items:center;background:var(--dg-sobreposicao);color:#fff}
+#acervoLista .acgrade .acir{display:flex;align-items:center;gap:4px;width:100%;padding:4px 2px 0;font-size:11.5px;color:var(--dg-texto-3);
+  font-variant-numeric:tabular-nums}
+#acervoLista .acgrade .acir:hover{color:var(--dg-texto)}
+#acervoLista .aclista .acitem{display:flex;align-items:center;gap:4px;border-bottom:1px solid var(--dg-borda)}
+#acervoLista .aclista .acitem:last-child{border-bottom:0}
+#acervoLista .aclinha{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:10px 4px;text-align:left;color:var(--dg-texto);text-decoration:none}
+#acervoLista .aclinha .ac-tx{min-width:0;display:flex;flex-direction:column;gap:1px}
+#acervoLista .aclinha .ac-tx span{font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#acervoLista .aclinha small{display:block;font-size:12.5px;color:var(--dg-texto-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#acervoLista .aclinha .ac-sim{flex:0 0 36px;height:36px;border-radius:10px;display:grid;place-items:center;background:var(--dg-superficie-2);color:var(--dg-texto-2)}
+#acervoLista .aclista .acir{flex:0 0 36px;width:36px;height:36px;border-radius:50%;display:grid;place-items:center;color:var(--dg-texto-3)}
+#acervoLista .aclista .acir:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
+#acervoLista .acmais{display:block;margin:14px auto;min-height:34px;padding:0 16px;border:1px solid var(--dg-borda);border-radius:999px;font-size:13.5px;color:var(--dg-texto)}
+#acervoLista>p{color:var(--dg-texto-3);font-size:13.5px;text-align:center;margin:32px 16px}
+#who[role="button"],#av{cursor:pointer}
 
 /* ── Cartão "Conectar o seu Claude/Codex" (dentro da conversa, depois das mensagens) ── */
 .lc{position:relative;max-width:880px;margin:14px auto 4px;padding:14px;border:1px solid var(--accent);border-radius:16px;
@@ -1024,3 +1033,31 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 .cod-diff pre{padding:8px 0}
 .cod-diff pre span{padding:0 12px;min-height:1.6em}
 .vist{display:inline-flex;align-items:center;gap:6px}.vist .ico-vis,.dovisual .ico-vis{color:var(--dg-texto-3);flex:0 0 auto;vertical-align:-2px}
+
+/* visor de arquivos no design system (19/10/2026): fundo do tema, ícones de traço; foto e vídeo num fundo escuro */
+#lightbox{background:var(--dg-fundo);color:var(--dg-texto)}
+#lightbox.lb-midia{background:color-mix(in srgb,var(--dg-fundo) 12%,#000)}
+#lightbox .lbtopo{color:var(--dg-texto);border-bottom:1px solid var(--dg-borda);background:var(--dg-fundo)}
+#lightbox.lb-midia .lbtopo{background:transparent;border-color:transparent;color:#ececec}
+#lightbox .lbnome{opacity:1;font-weight:600;font-size:14px;color:inherit}
+#lightbox .lbtopo a,#lightbox .lbtopo button{width:40px;height:40px;min-height:0;padding:0;border:0;border-radius:50%;background:transparent;color:inherit;justify-content:center;opacity:.8}
+#lightbox .lbtopo a:hover,#lightbox .lbtopo button:hover{opacity:1;background:var(--dg-superficie-2)}
+#lightbox.lb-midia .lbtopo a:hover,#lightbox.lb-midia .lbtopo button:hover{background:rgba(255,255,255,.12)}
+#lbFechar{min-width:0;font-size:inherit}
+.lbcorpo p{color:var(--dg-texto-2)}
+.lbcorpo .vcard{background:var(--dg-superficie);color:var(--dg-texto);border:1px solid var(--dg-borda);border-radius:16px;box-shadow:none}
+.lbcorpo .vcard .ico{color:var(--dg-texto-3);font-size:0}
+.lbcorpo .vcard b{color:var(--dg-texto);font-weight:600}
+.lbcorpo .vcard small{color:var(--dg-texto-2)}
+.vcard-acoes{display:flex;justify-content:center;gap:8px;margin-top:16px;flex-wrap:wrap}
+.lbcorpo .vcard .vcard-acoes a{margin:0;min-height:38px;display:inline-flex;align-items:center;padding:0 16px;border-radius:999px;border:1px solid var(--dg-borda);background:transparent;color:var(--dg-texto);font-weight:500;font-size:14px}
+.lbcorpo .vcard .vcard-acoes a.pri{background:var(--dg-texto);border-color:var(--dg-texto);color:var(--dg-fundo);font-weight:600}
+.lb-texto{align-self:stretch;width:100%;max-width:820px;margin:0 auto;overflow-y:auto;padding:16px 16px 40px;box-sizing:border-box}
+.lb-md{font-size:15px;line-height:1.6;color:var(--dg-texto);overflow-wrap:anywhere}
+.lb-carregando{color:var(--dg-texto-3)}
+#lightbox .lbcorpo:has(.lb-texto){align-items:stretch;padding:0}
+.lb-md .lb-tit{margin:22px 0 8px;font-weight:650;line-height:1.3;color:var(--dg-texto)}
+.lb-md .lb-tit:first-child{margin-top:0}
+.lb-md h2.lb-tit{font-size:20px}
+.lb-md h3.lb-tit{font-size:16.5px}
+.lb-md h4.lb-tit{font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--dg-texto-2)}

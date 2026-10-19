@@ -94,7 +94,8 @@ body.ig *{box-sizing:border-box}
 .ig-caixa{position:relative;width:min(480px,100%);max-height:calc(100vh - 32px);overflow:auto;background:var(--dg-superficie);color:var(--dg-texto);
   border:1px solid var(--dg-borda);border-radius:16px;padding:20px;box-shadow:var(--dg-sombra)}
 .ig-caixa h2{margin:0 0 12px;font-size:18px;padding-right:36px}
-.ig-x{position:absolute;top:12px;right:12px;width:32px;height:32px;border:0;border-radius:50%;background:var(--dg-superficie-2);color:var(--dg-texto);cursor:pointer}
+.ig-x{position:absolute;top:10px;right:10px;width:36px;height:36px;border:0;border-radius:50%;background:transparent;color:var(--dg-texto-2);cursor:pointer;display:grid;place-items:center}
+.ig-x:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
 .ig-campo{display:flex;flex-direction:column;gap:4px;margin-bottom:12px;font-size:13.5px;font-weight:600}
 .ig-campo input{font:inherit;font-weight:400;min-height:40px;padding:0 12px;border-radius:10px;border:1px solid var(--dg-borda);background:var(--dg-fundo);color:var(--dg-texto)}
 .ig-campo small{font-weight:400;color:var(--dg-texto-3)}

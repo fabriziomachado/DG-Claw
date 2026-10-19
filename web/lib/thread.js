@@ -63,6 +63,7 @@ const PRAZO_COMPACTACAO_S = 600;
 const FALHA_COMPACT = /\b(error|erro|fail|falh|cancel|abort|not enough|cannot|could not)/i;
 const REMINDER = /<system-reminder>[\s\S]*?<\/system-reminder>/g;
 const ANEXO_LINHA = /^\[anexo:\s*(.+?)\]\s*$/gm;
+const RX_CITA = /^↩ ([^\n]{1,200})\n([\s\S]+)$/;
 const ROTULO_EMOJI = { photo: '📷 foto', video: '🎬 vídeo', audio: '🎤 áudio', document: '📄 arquivo' };
 const CHUNK = 4 * 1024 * 1024;
 
@@ -165,20 +166,20 @@ function criarMontagem({ tz, midia }) {
     return estado.ultimoEp;
   }
 
-  function monta(estado, agente, { ep, origin, text, kind, media, via, quem }) {
+  function monta(estado, agente, { ep, origin, text, kind, media, via, quem, cita }) {
     const { hhmm, dia } = fmtHoraDia(ep, tz);
     const caminho = media && media.id ? media.id : '';
     return marcar({
       id: crypto.createHash('sha1').update(`${ep}|${text}|${caminho}|${via}`).digest('hex').slice(0, 16),
       ep, hhmm, dia, origin, text, kind, media: media || null,
-      fmt: 'text', editada: false, reacoes: [], cita: null, via, quem,
+      fmt: 'text', editada: false, reacoes: [], cita: cita || null, via, quem,
     });
   }
 
   /** Cria 1..N mensagens a partir de texto + lista de caminhos de mídia (host). */
-  function empurra(estado, agente, { ep, origin, text, caminhos, via, quem }) {
+  function empurra(estado, agente, { ep, origin, text, caminhos, via, quem, cita }) {
     if (!caminhos.length) {
-      if (text) estado.eventos.push(monta(estado, agente, { ep, origin, text, kind: 'text', media: null, via, quem }));
+      if (text) estado.eventos.push(monta(estado, agente, { ep, origin, text, kind: 'text', media: null, via, quem, cita }));
       return;
     }
     caminhos.forEach((c, i) => {
@@ -198,7 +199,10 @@ function criarMontagem({ tz, midia }) {
       caminhos.push({ host, visto, nome: path.basename(host) });
       return '';
     }).replace(/\n{3,}/g, '\n\n').trim();
-    empurra(estado, agente, { ep, origin: 'dono', text: corpo, caminhos, via: 'plataforma', quem: dg.attrs.from || 'pessoa' });
+    // Resposta a um cartão de escolha (19/10/2026): a primeira linha "↩ <pergunta>" vira a citação do balão
+    const re = RX_CITA.exec(corpo);
+    const cita = re ? { origin: 'agente', texto: re[1].trim() } : null;
+    empurra(estado, agente, { ep, origin: 'dono', text: re ? re[2].trim() : corpo, caminhos, via: 'plataforma', quem: dg.attrs.from || 'pessoa', cita });
   }
 
   /** A fala do dono pelo WhatsApp: as marcas "[imagem salvo em ...]" viram anexo, o resto é o texto. */

@@ -1753,6 +1753,8 @@ function render(opt) {
     todas.push({ id: 'pend-' + p.n, ep: p.epLocal, dia: p.dia,
                  hhmm: p.hhmm, origin: 'dono', text: p.texto,
                  kind: p.kind || 'text', pendente: true, local: p });
+    const re = RX_CITA_LOCAL.exec(String(p.texto || ''));
+    if (re) Object.assign(todas[todas.length - 1], { text: re[2], cita: { origin: 'agente', texto: re[1] } });
   }
   // cartões "X nasceu às HH:MM" (onboarding.js): entram na ordem cronológica como qualquer item
   if (window.DGOnboarding && window.DGOnboarding.cartoes) {
@@ -2353,7 +2355,7 @@ function limpaPendentes() {
       m.ep >= piso &&
       ((p.path && m.media && m.media.path === p.path) ||
        (p.anexos && m.media && p.anexos.some(a => a.path === m.media.path)) ||
-       (p.texto && normaliza(m.text) === normaliza(p.casa || p.texto))));
+       (p.texto && normaliza(m.text) === normaliza(semCita(p.casa || p.texto)))));
     if (!achou) return true;
     consumidas.add(achou.id);
     soltaPrevias(p);
@@ -4211,8 +4213,13 @@ document.addEventListener('dgui-pergunta', ev => {
   const t = ev.detail && String(ev.detail.texto || '').trim();
   if (!t) return;
   destravarAudio();
-  enviarTexto(t);
+  // resposta a um cartão de escolha: a primeira linha cita a pergunta ("↩ Como seguimos?"); o servidor
+  // transforma em citação no balão, e o agente lê a que pergunta a resposta se refere
+  const perg = String(ev.detail.pergunta || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+  enviarTexto(perg ? '↩ ' + perg + '\n' + t : t);
 });
+const RX_CITA_LOCAL = /^↩ ([^\n]{1,200})\n([\s\S]+)$/;
+const semCita = t => { const r = RX_CITA_LOCAL.exec(String(t || '')); return r ? r[2] : t; };
 btnEnviar.onclick = () => {
   destravarAudio();
   if (gravando) { paraEEnvia(true); return; }

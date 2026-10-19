@@ -4460,15 +4460,18 @@ const filtrosEl = $('filtros'), filtroVazioEl = $('filtroVazio');
 let filtro = 'tudo';
 const vistosEnviados = new Set();
 function contagensFiltro() {
+  // o número de cada chip é o que ainda não foi visto (19/10/2026: "Entregas 4" com tudo lido confundia);
+  // o filtro Entregas continua mostrando todas as entregas da conversa
   return { nv: alertasLista.length, pedidos: alertasLista.filter(a => a.tipo === 'pedido').length,
-           entregas: msgs.filter(m => m.alerta === 'entrega').length };
+           entregas: alertasLista.filter(a => a.tipo === 'entrega').length,
+           temEntregas: msgs.some(m => m.alerta === 'entrega') };
 }
 function desenhaAlertas() {
   alertasCaixa.hidden = true;   // a pilha lateral antiga não aparece mais
   const c = contagensFiltro();
   // o Histórico fica sempre à mão nos agentes (o Admin não guarda histórico pesquisável)
   const temHist = !EH_ADMIN && !!window.DGHistorico;
-  filtrosEl.hidden = !(temHist || c.nv || c.entregas || filtro !== 'tudo');
+  filtrosEl.hidden = !(temHist || c.nv || c.temEntregas || filtro !== 'tudo');
   const chip = (k, rot, n, cls) => `<button type="button" class="filtro${filtro === k ? ' on' : ''}${cls ? ' ' + cls : ''}" data-filtro="${k}" aria-pressed="${filtro === k}">` +
     `${rot}${n ? ` <b>${n}</b>` : ''}</button>`;
   filtrosEl.innerHTML = chip('tudo', 'Tudo', 0) + chip('nao-vistas', 'Não vistas', c.nv) +

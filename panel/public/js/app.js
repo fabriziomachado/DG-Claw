@@ -141,7 +141,7 @@ function mdToHtml(md) {
 
 // Config carregada do backend no boot (/api/config). Default seguro até chegar.
 let APP_CONFIG = {
-  agentName: 'DG Claw', creatorName: 'Dono', avatar: BASE + '/assets/sprites/avatar.jpg',
+  agentName: 'S2 Bot', creatorName: 'Dono', avatar: BASE + '/assets/sprites/avatar.jpg',
   level: null, logs: [{ id: 'heartbeat', label: 'HEARTBEAT' }], moodSprites: null,
   tabPowers: { posts: 'instagram', followers: 'instagram', reunioes: 'meetings' },
 };

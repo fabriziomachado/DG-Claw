@@ -121,7 +121,7 @@ Logo depois da instalação, o sistema manda ao Admin um recado dentro do envelo
 `<plataforma recado="primeiro-boot">`. Esse envelope vem da própria instalação, não do dono. Ao
 recebê-lo, o Admin cumprimenta o dono com esta mensagem, pelo `mcp__dgchat__reply` no chat `c_admin`:
 
-> Oi! Eu sou o Admin do seu DG Claw. Cuido da máquina e crio os seus agentes, cada um na sua própria
+> Oi! Eu sou o Admin do seu S2 Bot. Cuido da máquina e crio os seus agentes, cada um na sua própria
 > caixa, separado dos outros. Vamos criar o primeiro? Toque em **Quero criar meu primeiro agente**, na
 > janela aqui do chat. Se preferir, me diga aqui mesmo como ele vai se chamar.
 

@@ -148,16 +148,16 @@ garantir_pular_aviso_bypass() {
     printf '%s\n' "$novo" | escrever_arquivo "$alvo" "${modo:-644}" "$quem"
 }
 
-# garantir_gancho_foco <runner.json> [slug]
-# Poe "node /opt/dgclaw/app/scripts/foco-hook.mjs" em .config.promptHooks do runner.json, sem
-# perder os outros itens nem o resto do arquivo. Por que: agentes criados antes do Modo foco nao
-# tem o gancho, e o `agente reparar` e o caminho para eles ganharem sem recriar.
-# - arquivo ausente: nao faz nada (o criar escreve ja com o gancho);
+# garantir_gancho_runner <runner.json> <slug> <comando> <rotulo>
+# Poe <comando> em .config.promptHooks do runner.json, sem perder os outros itens nem o resto do
+# arquivo. Por que: agentes criados antes de um gancho existir nao o tem, e o `agente reparar` e o
+# caminho para eles ganharem sem recriar.
+# - arquivo ausente: nao faz nada (o criar escreve ja com os ganchos);
 # - ja tem o gancho: nao toca no arquivo;
 # - JSON ilegivel (ou promptHooks que nao e lista): falha dizendo onde e o que fazer, sem sobrescrever;
 # - o runner so le o arquivo ao iniciar: avisa qual comando reinicia.
-garantir_gancho_foco() {
-    local alvo="$1" slug="${2:-<slug>}" gancho="node /opt/dgclaw/app/scripts/foco-hook.mjs" novo
+garantir_gancho_runner() {
+    local alvo="$1" slug="${2:-<slug>}" gancho="$3" rotulo="$4" novo
     [ -f "$alvo" ] || return 0
     if ! jq -e '(.config | type) == "object" and ((.config.promptHooks // []) | type) == "array"' "$alvo" >/dev/null 2>&1; then
         falha "o runner.json $alvo nao e um JSON valido com \"config\" e, se houver, \"promptHooks\" como lista; nao mexi nele." \
@@ -167,14 +167,26 @@ garantir_gancho_foco() {
         return 0
     fi
     if [ "$ENSAIO" = 1 ]; then
-        printf '   [ensaio] poria o gancho do Modo foco em promptHooks de %s (sem apagar o que ja existe)\n' "$alvo"
+        printf '   [ensaio] poria o gancho %s em promptHooks de %s (sem apagar o que ja existe)\n' "$rotulo" "$alvo"
         return 0
     fi
     novo="$(jq --arg g "$gancho" '.config.promptHooks = ((.config.promptHooks // []) + [$g])' "$alvo")" \
         || falha "o jq nao conseguiu acrescentar o gancho em $alvo." "confira se o arquivo e um JSON valido (jq . $alvo) e rode de novo."
     printf '%s\n' "$novo" | escrever_arquivo "$alvo" 444 0:0
-    ok "gancho do Modo foco acrescentado ao runner.json"
+    ok "gancho $rotulo acrescentado ao runner.json"
     info "ele entra quando o runner reiniciar: dgclaw agente reiniciar $slug"
+}
+
+# garantir_gancho_foco <runner.json> [slug]
+garantir_gancho_foco() {
+    garantir_gancho_runner "$1" "${2:-<slug>}" "node /opt/dgclaw/app/scripts/foco-hook.mjs" "do Modo foco"
+}
+
+# garantir_gancho_novidades <runner.json> [slug]
+# O aviso de novidades depois de atualizar (docs/NOVIDADES.md). Agente antigo, sem arquivo de visto,
+# recebe o aviso uma vez na primeira conversa depois que o runner reiniciar com o gancho.
+garantir_gancho_novidades() {
+    garantir_gancho_runner "$1" "${2:-<slug>}" "node /opt/dgclaw/app/scripts/novidades-hook.mjs" "de novidades"
 }
 
 # gerar_segredo <caminho> [uid:gid]
@@ -224,6 +236,54 @@ com_trava() {
             "espere ele terminar e rode de novo. Se nada estiver rodando, confira com: fuser $DG_TRAVA"
         "$@"
     ) 9>"$DG_TRAVA"
+}
+
+# definir_linha_env <arquivo> <CHAVE> <valor> [modo]
+# Poe CHAVE=valor num arquivo de configuracao (dgclaw.env, web.env...) sem reescrever o resto:
+# troca a linha no lugar se ela ja existe, acrescenta no fim se nao existe, e deixa TODAS as
+# outras linhas (inclusive as que a pessoa poe la, como chaves de API) na ordem em que estavam.
+# Regra do projeto: arquivo de configuracao que ja existe se edita linha a linha.
+definir_linha_env() {
+    local arq="$1" chave="$2" valor="$3" modo="${4:-644}"
+    if [ ! -f "$arq" ]; then
+        printf '%s=%s\n' "$chave" "$valor" | escrever_arquivo "$arq" "$modo"
+        return 0
+    fi
+    # O modo do arquivo que ja existe vence: web.env e 600 e nao pode virar 644 por aqui.
+    modo="$(stat -c '%a' "$arq")"
+    NOVO_K="$chave" NOVO_V="$valor" awk '
+        BEGIN {k = ENVIRON["NOVO_K"]; linha = k "=" ENVIRON["NOVO_V"]}
+        index($0, k "=") == 1 {if (!feito) print linha; feito = 1; next}
+        {print}
+        END {if (!feito) print linha}' "$arq" | escrever_arquivo "$arq" "$modo"
+}
+
+# git_do_clone <pasta> <argumentos do git...>: git em outro clone, sem pergunta de senha e sem
+# o bloqueio "dubious ownership" (o clone pode ser de outro usuario, e quem roda aqui e o root).
+git_do_clone() {
+    local repo="$1"; shift
+    GIT_TERMINAL_PROMPT=0 git -c safe.directory="$repo" -C "$repo" "$@"
+}
+
+# modelo_admin_sha_de_fabrica <sha256> <CLAUDE.md|AGENTS.md> <clone>
+# Sai com 0 se esse conteudo e exatamente o de alguma versao ja publicada do modelo do Admin
+# (a do clone agora ou qualquer uma do historico dele). E assim que se distingue o arquivo que
+# veio de fabrica (pode ser trocado pelo novo) do que a pessoa personalizou (nao pode).
+# Sem historico git (zip), so a versao do clone conta: o resto cai em "personalizado", o lado
+# seguro, porque nesse caso o instalador grava o novo ao lado, como <arquivo>.novo.
+modelo_admin_sha_de_fabrica() {
+    local sha="$1" nome="$2" repo="$3" atual rev
+    if [ -f "$repo/templates/admin/$nome" ]; then
+        atual="$(sha256sum <"$repo/templates/admin/$nome" | cut -d' ' -f1)"
+        if [ "$atual" = "$sha" ]; then return 0; fi
+    fi
+    git_do_clone "$repo" rev-parse --git-dir >/dev/null 2>&1 || return 1
+    while read -r rev; do
+        [ -n "$rev" ] || continue
+        atual="$(git_do_clone "$repo" show "$rev:templates/admin/$nome" 2>/dev/null | sha256sum | cut -d' ' -f1)"
+        if [ "$atual" = "$sha" ]; then return 0; fi
+    done < <(git_do_clone "$repo" log --all --format=%H -- "templates/admin/$nome" 2>/dev/null)
+    return 1
 }
 
 # carregar_env_dgclaw: le o /etc/dgclaw/dgclaw.env se existir (dominio, imagem...).

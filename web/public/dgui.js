@@ -322,7 +322,8 @@
         (c.escolher ? `<button type="button" class="dg-car-esc" data-dgui-opcao="${esc(('Escolho: ' + titulo).slice(0, 200))}">Escolher esta</button>` : '') +
         '</div></div>';
     });
-    return (c.titulo ? `<div class="dgui-painel-tit">${txt(c.titulo)}</div>` : '') + htmlCarrossel(slides);
+    const corpo = (c.titulo ? `<div class="dgui-painel-tit">${txt(c.titulo)}</div>` : '') + htmlCarrossel(slides);
+    return c.titulo ? `<div data-dg-pergunta="${esc(String(c.titulo).slice(0, 160))}">${corpo}</div>` : corpo;
   }
   // Pontinhos, contador e setas acompanham a rolagem do trilho (qualquer .dg-car da página)
   function ligaCarrosseis(doc) {
@@ -836,7 +837,11 @@
           caixa.classList.add('respondida'); op.classList.add('escolhida');
           try { raiz.localStorage.setItem('dgui-escolha:' + caixa.dataset.escolha, op.dataset.dguiOpcao); } catch (_) { /* sem storage */ }
         }
-        raiz.document.dispatchEvent(new CustomEvent('dgui-pergunta', { detail: { texto: op.dataset.dguiOpcao } }));
+        // a pergunta do cartão vai junto: a resposta sai citando a que pergunta responde (19/10/2026)
+        const perg = (caixa && caixa.querySelector('.dgui-escolha-perg')) || null;
+        const car = op.closest('[data-dg-pergunta]');
+        const pergunta = perg ? perg.textContent.trim() : car ? car.dataset.dgPergunta : '';
+        raiz.document.dispatchEvent(new CustomEvent('dgui-pergunta', { detail: { texto: op.dataset.dguiOpcao, pergunta } }));
         return;
       }
       if (ev.target.closest('[data-dgui-outra]')) {

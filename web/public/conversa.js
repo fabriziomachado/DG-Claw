@@ -1289,7 +1289,9 @@ function htmlMidia(m) {
            `data-aud="${esc(md.id)}" src="${esc(md.url)}"></audio>${botaoBaixaMidia(md, rot)}</span>`;
   }
   if (md.kind === 'document' && !md.thumb && !/\.pdf$/i.test(md.nome || '')) {
-    return `<span class="midcx cxarq">${cartaoArquivo(md, md.id)}${botaoBaixaMidia(md, rot)}</span>`;
+    // texto, .md e código abrem no leitor: o olho ao lado do baixar deixa isso à vista
+    const ver = ehTextoLegivel(md) ? `<button type="button" class="midver" data-mid="${esc(md.id)}" title="Ver ${esc(md.nome || '')}" aria-label="Ver o arquivo">${ICO_VER}</button>` : '';
+    return `<span class="midcx cxarq${ver ? ' comver' : ''}">${cartaoArquivo(md, md.id)}${ver}${botaoBaixaMidia(md, rot)}</span>`;
   }
   const legenda = esc(md.nome || '') + (md.bytes ? ' (' + tamanhoHumano(md.bytes) + ')' : '');
   if (md.thumb) {
@@ -1334,6 +1336,7 @@ function cartaoArquivo(md, mid) {
 
 /* O ⬇ de todo anexo da thread: um link com `download`, FORA do botão da mídia
    (botão dentro de botão não vale). */
+const ICO_VER = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 function botaoBaixaMidia(md, rot) {
   return `<a class="midbx" href="${esc(md.url)}" download="${esc(md.nome || '')}" ` +
          `title="Baixar ${esc(md.nome || '')}" aria-label="Baixar ${rot.replace(/^\S+\s/, '')}">` +
@@ -2799,18 +2802,41 @@ lbCorpo.addEventListener('click', ev => {
   if (!pre) return;
   copiaTexto(pre.textContent).then(ok => { if (!ok) return; const tx = bt.querySelector('span'); bt.classList.add('ok'); if (tx) tx.textContent = 'Copiado'; setTimeout(() => { bt.classList.remove('ok'); if (tx) tx.textContent = 'Copiar'; }, 1600); });
 });
-/* No visor, o .md ganha títulos (# a ###), que a conversa não usa; fora dos blocos de
-   código o resto segue o mesmo paragrafos() das mensagens. */
+/* No visor, o .md vira documento: títulos (# a ###), listas, citação (>) e linha (---), que a
+   conversa não usa. Parágrafos e tabelas seguem o mesmo paragrafos() das mensagens, e cada
+   linha passa pelo mesmo esc + linkify + formata, então negrito, `código` e link funcionam. */
 function mdComTitulos(t) {
-  const pedacos = String(t).split(/(```[\s\S]*?```)/);
-  return pedacos.map((p, i) => {
-    if (i % 2) return paragrafos(p, 'markdown');
-    return p.split(/^(#{1,6}[ \t]+.*)$/m).map((q, j) => {
-      if (!(j % 2)) return q.trim() ? paragrafos(q, 'markdown') : '';
-      const n = Math.min(/^#+/.exec(q)[0].length, 3) + 1;
-      return `<h${n} class="lb-tit">${esc(q.replace(/^#+[ \t]+/, '').replace(/[ \t]+#*$/, ''))}</h${n}>`;
-    }).join('');
-  }).join('');
+  const linha = x => formata(linkify(esc(x)), 'markdown');
+  const blocoTexto = linhas => {
+    let html = '', resto = [], i = 0;
+    const solta = () => { const r = resto.join('\n'); if (r.trim()) html += paragrafos(r, 'markdown'); resto = []; };
+    while (i < linhas.length) {
+      const l = linhas[i];
+      let m;
+      if ((m = /^(#{1,6})[ \t]+(.*?)[ \t#]*$/.exec(l))) {
+        solta(); const n = Math.min(m[1].length, 3) + 1;
+        html += `<h${n} class="lb-tit">${linha(m[2])}</h${n}>`; i++;
+      } else if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(l)) {
+        solta(); html += '<hr class="lb-hr">'; i++;
+      } else if (/^\s*>/.test(l)) {
+        solta(); const q = [];
+        while (i < linhas.length && /^\s*>/.test(linhas[i])) q.push(linhas[i++].replace(/^\s*>\s?/, ''));
+        html += `<blockquote class="lb-cita">${blocoTexto(q)}</blockquote>`;
+      } else if (/^\s*([-*+]|\d+[.)])\s+/.test(l)) {
+        solta(); const ord = /^\s*\d/.test(l), itens = [];
+        while (i < linhas.length && (/^\s*([-*+]|\d+[.)])\s+/.test(linhas[i]) || (/^\s{2,}\S/.test(linhas[i]) && itens.length))) {
+          const x = linhas[i++];
+          if (/^\s*([-*+]|\d+[.)])\s+/.test(x)) itens.push(x.replace(/^\s*([-*+]|\d+[.)])\s+/, ''));
+          else itens[itens.length - 1] += ' ' + x.trim();
+        }
+        const tag = ord ? 'ol' : 'ul';
+        html += `<${tag} class="lb-lista">${itens.map(x => `<li>${linha(x)}</li>`).join('')}</${tag}>`;
+      } else { resto.push(l); i++; }
+    }
+    solta();
+    return html;
+  };
+  return String(t).split(/(```[\s\S]*?```)/).map((p, i) => i % 2 ? paragrafos(p, 'markdown') : blocoTexto(p.split('\n'))).join('');
 }
 
 async function abreTextoNoVisor(md) {
@@ -3018,7 +3044,7 @@ wrap.addEventListener('click', ev => {
 }, true);
 
 wrap.addEventListener('click', ev => {
-  const alvo = ev.target.closest ? ev.target.closest('.mid[data-mid], .cartaoarq[data-mid]') : null;
+  const alvo = ev.target.closest ? ev.target.closest('.mid[data-mid], .cartaoarq[data-mid], .midver[data-mid]') : null;
   if (alvo) { destravarAudio(); abreLightbox(alvo.getAttribute('data-mid')); }
 });
 

@@ -1060,4 +1060,17 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 .lb-md .lb-tit:first-child{margin-top:0}
 .lb-md h2.lb-tit{font-size:20px}
 .lb-md h3.lb-tit{font-size:16.5px}
-.lb-md h4.lb-tit{font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--dg-texto-2)}
+.lb-md h4.lb-tit{font-size:15px;color:var(--dg-texto)}
+/* olho "ver" ao lado do baixar, nos arquivos de texto que abrem no leitor (19/10/2026) */
+.cxarq{position:relative}
+.cxarq.comver .cartaoarq{padding-right:100px}
+.midver{position:absolute;top:50%;right:54px;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;background:transparent;color:var(--dg-texto-2);border:1px solid var(--dg-borda);cursor:pointer;padding:0}
+.midver:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
+.lb-md .lb-lista{margin:4px 0 12px;padding-left:22px}
+.lb-md .lb-lista li{margin:3px 0}
+.lb-md .lb-lista li::marker{color:var(--dg-texto-3)}
+.lb-md .lb-cita{margin:8px 0 14px;padding:2px 0 2px 14px;border-left:3px solid var(--dg-borda);color:var(--dg-texto-2)}
+.lb-md .lb-cita > :last-child{margin-bottom:0}
+.lb-md .lb-hr{border:0;border-top:1px solid var(--dg-borda);margin:20px 0}
+.lb-md .lb-tit code{font-size:.9em}

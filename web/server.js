@@ -23,6 +23,7 @@ const { criarProxy } = require('./lib/proxy');
 const { criarCofreAgente } = require('./lib/cofre-agente');
 const { criarCofreRotas } = require('./lib/cofre-rotas');
 const { criarPaineisVivos } = require('./lib/paineis-vivos');
+const { criarMencoes } = require('./lib/mencoes');
 const { criarAlertas } = require('./lib/alertas');
 const { criarFoco } = require('./lib/foco');
 const { criarVoz } = require('./lib/voz');
@@ -108,7 +109,9 @@ function criarServidor(opcoes) {
   const integracoes = criarIntegracoes({ registro, log });
   const arquivoConversa = criarArquivoConversa({ dataDir: config.dataDir, log });
   // A conversa como a tela vê: depois do último /clear (o antes fica em Histórico > Arquivadas).
-  const threadTela = async (agente) => arquivoConversa.visivel(agente.slug, await conversa.thread(agente));
+  const mencoes = criarMencoes({ config, registro, conversa, log });
+  mencoes.retoma();
+  const threadTela = async (agente) => mencoes.junta(agente.slug, arquivoConversa.visivel(agente.slug, await conversa.thread(agente)));
   const historico = criarHistorico({ registro, log, conversa, arquivoConversa });
   const paineisVivos = opcoes.paineisVivos || criarPaineisVivos({ registro, log });
   // Foto trocada pelo dono no menu: vale por cima da foto da criação e do avatar do registro.
@@ -487,6 +490,14 @@ function criarServidor(opcoes) {
       if (acao === 'stream' && m === 'GET') return stream(req, res, url, agente);
       if (acao === 'wait' && m === 'GET') return esperar(req, res, url, agente);
       if (acao === 'send' && m === 'POST') return enviar(req, res, agente);
+      // @mencionar outro agente na conversa deste (lib/mencoes.js); só o dono, no navegador
+      if (acao === 'mencao' && m === 'POST') {
+        if (sessao.via === 'caixa') return H.erroJson(res, 403, 'Mencionar outro agente é coisa do dono, no navegador.');
+        const corpo = await lerEnvio(req, res);
+        if (!corpo) return undefined;
+        const r = await mencoes.criar(agente, corpo);
+        return H.enviaJson(res, r.status, r.corpo);
+      }
       if (acao === 'permissao' && m === 'POST') {
         const corpo = await lerEnvio(req, res);
         if (!corpo) return undefined;
@@ -496,7 +507,7 @@ function criarServidor(opcoes) {
       if (acao === 'upload' && m === 'POST') return upload(req, res, agente);
       if (acao === 'comandos' && m === 'GET') return H.enviaJson(res, 200, Object.assign({ ok: true, agente: agente.slug }, await comandos.catalogo(agente)));
       if (acao === 'comando' && m === 'POST') return comandoPost(req, res, agente);
-      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'upload', 'permissao', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
+      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'mencao', 'upload', 'permissao', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
     }
 
     mm = /^\/api\/v1\/media\/([0-9a-f]{16})\/visual$/.exec(p);

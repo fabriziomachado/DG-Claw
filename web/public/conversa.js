@@ -1798,6 +1798,7 @@ function render(opt) {
       continue;
     }
     if (m.origin === 'comando') { itens.push([m.id, htmlResultadoComando(m)]); continue; }
+    if (m.origin === 'mencao' && m.mencao) { itens.push([m.id, htmlMencao(m)]); anterior = 'her'; continue; }
     if (m.cartaoNasc) { itens.push([m.id, window.DGOnboarding.htmlCartao(m.cartaoNasc)]); anterior = null; continue; }
     const lado = ehDono(m) ? 'me' : 'her';
     const troca = (anterior !== null && anterior !== lado ? ' gap' : '') +
@@ -1828,7 +1829,7 @@ function render(opt) {
       }
     }
     itens.push([m.id, `<div class="row ${lado}${ehVisual(m.media) ? ' vis' : ''}${troca}" data-msg="${esc(m.id)}">` +
-                      `<div class="bub">${htmlCorpo(m)}</div>${lado === 'her' ? htmlAcoes(m, htmlHora(m)) : htmlHora(m)}</div>`]);
+                      `<div class="bub">${m.mencaoPergunta ? destacaMencao(htmlCorpo(m), m) : htmlCorpo(m)}</div>${lado === 'her' ? htmlAcoes(m, htmlHora(m)) : htmlHora(m)}</div>`]);
     anterior = lado;
   }
   if (!itens.length && carregouUmaVez) itens.push(['vazio', htmlVazio()]);
@@ -4259,6 +4260,75 @@ wrap.addEventListener('click', ev => {
     }
   });
 })();
+/* @mencionar outro agente (19/10/2026, ideia 1): "@" no campo abre a lista dos outros agentes (o Admin
+   fica de fora); a mensagem que começa com "@Nome" vai ao agente citado por POST /mencao, e a resposta
+   dele volta aqui num cartão (lib/mencoes.js), e este agente recebe a resposta para continuar. */
+const mencionaveis = () => agentesMenu.filter(a => a.tipo !== 'admin' && a.id !== AGENTE.id);
+const fotoAg = a => { const img = a && (a.avatar_img || (/^https:\/\//i.test(a.avatar || '') ? a.avatar : '')); return img ? `<img src="${esc(img)}" alt="">` : esc((a && (a.avatar || a.nome) || '?').slice(0, 1)); };
+function destacaMencao(html, m) {
+  const a = agentesMenu.find(x => x.id === m.mencaoPergunta.para);
+  if (!a) return html;
+  const marca = esc('@' + a.nome);
+  return html.replace(marca, `<span class="mencao-nome">${marca}</span>`);
+}
+function htmlMencao(m) {
+  const me = m.mencao, a = agentesMenu.find(x => x.id === me.para) || { nome: me.paraNome };
+  const cab = me.estado === 'respondida' ? `<b>${esc(a.nome)}</b> respondeu, a pedido ${EH_ADMIN ? 'seu' : 'do ' + esc(AGENTE.nome)}`
+    : me.estado === 'falhou' ? `<b>${esc(a.nome)}</b> não respondeu${me.motivo ? ': ' + esc(me.motivo) : ''}`
+    : `Perguntando ao <b>${esc(a.nome)}</b>…`;
+  const corpo = me.estado === 'respondida' ? `<div class="men-txt">${htmlCorpo(Object.assign({}, m, { origin: 'agente', mencao: null }))}</div>` : '';
+  return `<div class="row her men${me.estado === 'perguntando' ? ' men-esperando' : ''}" data-msg="${esc(m.id)}"><div class="men-cartao">` +
+    `<div class="men-cab"><span class="men-foto" style="background:${esc(a.cor || '#2f9e5e')}">${fotoAg(a)}</span><span>${cab}</span>` +
+    (me.estado === 'perguntando' ? '<i class="men-gira" aria-hidden="true"></i>' : '') +
+    `<a class="men-abrir" href="/a/${encodeURIComponent(me.para)}" title="Abrir a conversa do ${esc(a.nome)}">abrir</a></div>${corpo}</div></div>`;
+}
+const menLista = document.createElement('div');
+menLista.id = 'menLista'; menLista.hidden = true; menLista.setAttribute('role', 'listbox');
+document.querySelector('.barra').insertBefore(menLista, document.querySelector('.barra .linha1'));
+let menSel = 0;
+function menTrecho() {
+  const v = entrada.value.slice(0, entrada.selectionStart || 0);
+  const r = /(^|\s)@([^\s@]*)$/.exec(v);
+  return r ? { de: v.length - r[2].length - 1, q: r[2].toLowerCase() } : null;
+}
+function menPinta() {
+  const t = menTrecho();
+  const lista = t ? mencionaveis().filter(a => a.nome.toLowerCase().startsWith(t.q) || a.id.startsWith(t.q)) : [];
+  if (!lista.length) { menLista.hidden = true; return; }
+  menSel = Math.min(menSel, lista.length - 1);
+  menLista.innerHTML = lista.map((a, i) => `<button type="button" role="option" class="men-op${i === menSel ? ' on' : ''}" data-men="${esc(a.id)}">` +
+    `<span class="men-foto" style="background:${esc(a.cor || '#2f9e5e')}">${fotoAg(a)}</span><span>${esc(a.nome)}</span>` +
+    `<small>${esc(a.subtitulo || a.papel || '')}</small></button>`).join('');
+  menLista.hidden = false;
+}
+function menEscolhe(id) {
+  const a = mencionaveis().find(x => x.id === id), t = menTrecho();
+  if (!a || !t) return;
+  const fim = entrada.selectionStart || 0;
+  entrada.value = entrada.value.slice(0, t.de) + '@' + a.nome + ' ' + entrada.value.slice(fim);
+  const pos = t.de + a.nome.length + 2;
+  entrada.setSelectionRange(pos, pos); entrada.focus(); menLista.hidden = true; ajustaCampo();
+}
+entrada.addEventListener('input', () => { menSel = 0; menPinta(); });
+entrada.addEventListener('keydown', ev => {
+  if (menLista.hidden) return;
+  const ops = menLista.querySelectorAll('.men-op');
+  if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') { ev.preventDefault(); menSel = (menSel + (ev.key === 'ArrowDown' ? 1 : ops.length - 1)) % ops.length; menPinta(); }
+  else if ((ev.key === 'Enter' || ev.key === 'Tab') && ops[menSel]) { ev.preventDefault(); ev.stopImmediatePropagation(); menEscolhe(ops[menSel].dataset.men); }
+  else if (ev.key === 'Escape') { menLista.hidden = true; }
+}, true);
+menLista.addEventListener('mousedown', ev => ev.preventDefault());
+menLista.addEventListener('click', ev => { const b = ev.target.closest('.men-op'); if (b) menEscolhe(b.dataset.men); });
+async function enviaMencao(t) {
+  const r = /^@(\S+)\s+([\s\S]+)$/.exec(t);
+  if (!r) return false;
+  const a = mencionaveis().find(x => x.nome.toLowerCase() === r[1].toLowerCase() || x.id === r[1].toLowerCase());
+  if (!a) return false;
+  try {
+    await api(API + '/mencao', { method: 'POST', body: { para: a.id, pergunta: r[2].trim() } });
+  } catch (e) { mostraErro('Não consegui perguntar ao ' + a.nome + ': ' + e.message); entrada.value = t; ajustaCampo(); }
+  return true;
+}
 function enviarDoCampo() {
   if (anexos.length) {
     // a legenda é o texto do campo: despachaAnexos lê e limpa o campo sozinho
@@ -4271,6 +4341,8 @@ function enviarDoCampo() {
   ajustaCampo();
   vozNoCampo = false;
   if (lcInterceptaLogin(t)) return;   // /login abre o cartão e não vai ao agente
+  menLista.hidden = true;
+  if (!EH_ADMIN && /^@\S+\s/.test(t) && mencionaveis().some(a => t.toLowerCase().startsWith('@' + a.nome.toLowerCase() + ' '))) { fimResposta(); enviaMencao(t); return; }
   enviarTexto(comResposta(t));
 }
 // pergunta sugerida embaixo de um painel (dgui.js): vai ao agente como se a pessoa tivesse digitado

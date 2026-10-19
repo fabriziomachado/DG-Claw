@@ -959,3 +959,22 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 .resp-x:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
 .cita[data-ir-msg]{cursor:pointer}
 .cita{background:color-mix(in srgb,var(--accent) 9%,transparent)}
+
+/* @mencionar outro agente (19/10/2026) */
+#menLista{margin:0 6px 8px;border:1px solid var(--dg-borda);background:var(--dg-superficie);border-radius:14px;padding:4px;box-shadow:0 8px 24px rgba(0,0,0,.18)}
+#menLista[hidden]{display:none}
+.men-op{display:flex;align-items:center;gap:10px;width:100%;padding:7px 8px;border:0;border-radius:9px;background:transparent;color:var(--dg-texto);font:inherit;font-size:14px;cursor:pointer;text-align:left}
+.men-op.on,.men-op:hover{background:var(--dg-superficie-2)}
+.men-op small{margin-left:auto;color:var(--dg-texto-3);font-size:12px;max-width:50%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.men-foto{flex:0 0 24px;width:24px;height:24px;border-radius:50%;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700}
+.men-foto img{width:100%;height:100%;object-fit:cover}
+.mencao-nome{color:var(--dg-azul-forte);font-weight:600}
+.men-cartao{border:1px solid var(--dg-borda);border-radius:14px;background:var(--dg-superficie);padding:10px 12px;max-width:100%}
+.men-cab{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--dg-texto-2)}
+.men-cab b{color:var(--dg-texto);font-weight:600}
+.men-abrir{margin-left:auto;font-size:12px;color:var(--dg-texto-3);text-decoration:none}
+.men-abrir:hover{color:var(--dg-texto);text-decoration:underline}
+.men-txt{margin-top:6px}
+.men-gira{width:12px;height:12px;border-radius:50%;border:2px solid var(--dg-borda);border-top-color:var(--dg-texto-2);animation:men-gira .9s linear infinite}
+@keyframes men-gira{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.men-gira{animation:none}}

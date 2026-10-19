@@ -287,7 +287,7 @@
   #atividade.atv-cinza .atv-txt{color:var(--dg-texto-3)}
   @keyframes atvPulsa{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
   @media (prefers-reduced-motion:reduce){
-    .atv-ponto{animation:none}
+    .atv-pts i{animation-name:atvPtSoOpacidade}
     #atividade .atv-acao{transition:none}
   }
   .erroconfig{max-width:600px;margin:0 auto;padding:28px 18px;
@@ -449,7 +449,7 @@
 #tourCaixa .tour-n{font-size:11.5px;color:var(--muted);margin-bottom:6px}
 #tourCaixa p{margin:0 0 6px}
 #tourCaixa p b{color:#1f7a45}
-#tourCaixa .tour-acoes{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}
+#tourCaixa .tour-acoes{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap;position:sticky;bottom:0;background:#fff;padding:8px 0 0}
 #tourCaixa button{min-height:36px;padding:0 14px;border-radius:18px;border:1px solid var(--line);
   background:var(--dg-superficie);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;color:var(--dg-texto-2)}
 #tourCaixa button.pri{background:var(--accent);border-color:var(--accent);color:#fff}

@@ -44,25 +44,12 @@ Como produzir:
    confirma na barrinha e a frase chega a você como `[do visual <título>] <frase>`.
 6. Se a lousa vier vazia ou com tarja de erro, corrija e mande de novo com outro nome (`vis-assunto-2.html`).
 
-**Texto para copiar vai SEMPRE numa caixinha com botão Copiar, dentro da lousa.** Comando, prompt,
-mensagem pronta, configuração, link com parâmetro: uma caixinha por trecho, nunca texto solto no
-balão (no celular, selecionar com o dedo quase nunca dá certo). A sintaxe exata:
-
-```html
-<title>Comandos pra colar</title>
-<p class="dv-rotulo">1. Cole no terminal</p>
-<textarea class="cx" readonly rows="2">npm run build</textarea>
-<button class="dv-botao" onclick="copiar(this)">Copiar</button>
-<style>.cx{width:100%;box-sizing:border-box;font:14px/1.4 ui-monospace,monospace;padding:8px;border-radius:8px}</style>
-<script>
-function copiar(b){const t=b.previousElementSibling;t.focus();t.select();
-  let ok=false;try{ok=document.execCommand('copy')}catch(e){}
-  if(!ok&&navigator.clipboard){navigator.clipboard.writeText(t.value).then(()=>{b.textContent='Copiado ✓'}).catch(()=>{b.textContent='Toque e segure pra copiar'});return}
-  b.textContent=ok?'Copiado ✓':'Toque e segure pra copiar';}
-</script>
-```
-
-Repita o trio rótulo, `textarea`, botão para cada trecho (a função `copiar` e o `style` entram uma vez).
+**Texto para copiar vai na própria mensagem, num bloco de código, nunca dentro da lousa.** Comando,
+prompt, mensagem pronta, configuração, link com parâmetro: escreva num bloco ``` com a língua
+(```bash, ```sql, ```text). O chat mostra o bloco com a língua no topo e o botão Copiar, que funciona
+no celular. Um trecho por bloco. Passo a passo com comandos: use o componente `passos` do ```dgui
+(cada passo com `titulo`, `texto` e `codigo`). Não monte caixinha de copiar (textarea com botão) na
+lousa: ela foge do design do app (pedido do dono, 19/10/2026).
 
 ### Mini-Bunker: sessões paralelas (cards)
 

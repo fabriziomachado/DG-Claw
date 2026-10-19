@@ -72,6 +72,10 @@ Os do sistema estão em `references/icones.md`: use estes antes de inventar outr
 - **Números, gráficos, tabelas, painéis, filtros, painel vivo, carrossel:** bloco ```dgui (skill
   `ui-generativa`). Já seguem este guia e ganham baixar, copiar, ampliar e tocar no ponto.
 - **Decisão do dono:** cartão de escolha (`{"tipo":"escolha"}`), com a recomendada marcada.
+- **Texto para copiar** (comando, prompt, mensagem pronta, configuração, link): bloco de código na
+  própria mensagem, com a língua (```bash, ```sql, ```text). O chat desenha a barra com a língua e o
+  Copiar. Passo a passo com comandos: componente `passos` do ```dgui. **Nunca** caixinha de copiar
+  (textarea + botão) dentro de um visual: é o estilo antigo e foge do design do app.
 - **Visual livre (animação, layout próprio):** skill `visuais-na-conversa`, seguindo este guia.
 
 ## Checklist antes de mandar

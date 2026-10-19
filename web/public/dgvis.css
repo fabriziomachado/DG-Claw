@@ -5,54 +5,62 @@
    Fase 2: .dv-abas, .dv-passos[data-play], .dv-acordeao, .dv-slider, .dv-opcoes, .dv-botao e o
    estado [data-dv-pergunta] (botões que pedem para a agente; ver docs/api-v1.md). */
 
-/* ---------- tokens ---------- */
+/* ---------- tokens ----------
+   19/10/2026: as cores seguem o design system do app (web/public/tema.css, --dg-*), no lugar da
+   paleta verde antiga. A lousa fica transparente sobre o cartão da conversa nos dois temas. */
 :root,
 html[data-tema="claro"] {
   --dv-fundo: transparent;
-  --dv-superficie: #f5f9f6;
-  --dv-superficie-2: #e8f0ea;
-  --dv-texto: #0f1c14;
-  --dv-suave: #5f7566;
-  --dv-linha: #dce7df;
-  --dv-acento: #2f9e5e;
-  --dv-acento-forte: #23814a;
-  --dv-c1: #2f9e5e;
-  --dv-c2: #3b7dd8;
-  --dv-c3: #e0922f;
-  --dv-c4: #8a5cd0;
-  --dv-c5: #d4567a;
-  --dv-c6: #1f9fb0;
-  --dv-ok: #2e9d5b;
-  --dv-alerta: #c97a10;
-  --dv-perigo: #d64550;
-  --dv-info: #3b7dd8;
-  --dv-tip-fundo: #0f1c14;
+  --dv-superficie: #f7f7f7;
+  --dv-superficie-2: #efefef;
+  --dv-texto: #0d0d0d;
+  --dv-suave: #5d5d5d;
+  --dv-linha: #e5e5e5;
+  --dv-acento: #3b82f6;
+  --dv-acento-forte: #2563eb;
+  --dv-c1: #3b82f6;
+  --dv-c2: #16a34a;
+  --dv-c3: #d97706;
+  --dv-c4: #8b5cf6;
+  --dv-c5: #dc2626;
+  --dv-c6: #0891b2;
+  --dv-ok: #1f7a45;
+  --dv-alerta: #b45309;
+  --dv-perigo: #a01818;
+  --dv-info: #2563eb;
+  --dv-tip-fundo: #0d0d0d;
   --dv-tip-texto: #ffffff;
-  --dv-sombra: 0 1px 2px rgba(15, 28, 20, .05), 0 8px 20px -12px rgba(15, 28, 20, .18);
+  --dv-botao-fundo: #0d0d0d;
+  --dv-botao-texto: #ffffff;
+  --dv-codigo: #f7f7f7;
+  --dv-sombra: 0 2px 10px rgba(0, 0, 0, .06), 0 1px 2px rgba(0, 0, 0, .04);
   color-scheme: light;
 }
 html[data-tema="escuro"] {
-  --dv-fundo: #111a14;
-  --dv-superficie: #1a251e;
-  --dv-superficie-2: #243229;
-  --dv-texto: #e8f1ea;
-  --dv-suave: #93a99a;
-  --dv-linha: #2c3c32;
-  --dv-acento: #4cc383;
-  --dv-acento-forte: #1f7a47;
-  --dv-c1: #4cc383;
-  --dv-c2: #6aa3f0;
-  --dv-c3: #f0ae55;
-  --dv-c4: #aa86e6;
-  --dv-c5: #ee7f9f;
-  --dv-c6: #4cc4d0;
-  --dv-ok: #4cc383;
-  --dv-alerta: #f0ae55;
-  --dv-perigo: #f0707a;
-  --dv-info: #6aa3f0;
-  --dv-tip-fundo: #e8f1ea;
-  --dv-tip-texto: #111a14;
-  --dv-sombra: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 20px -12px rgba(0, 0, 0, .6);
+  --dv-fundo: transparent;
+  --dv-superficie: #2b2b2b;
+  --dv-superficie-2: #353535;
+  --dv-texto: #ececec;
+  --dv-suave: #b4b4b4;
+  --dv-linha: #3d3d3d;
+  --dv-acento: #60a5fa;
+  --dv-acento-forte: #3b82f6;
+  --dv-c1: #60a5fa;
+  --dv-c2: #4ade80;
+  --dv-c3: #fbbf24;
+  --dv-c4: #a78bfa;
+  --dv-c5: #f87171;
+  --dv-c6: #22d3ee;
+  --dv-ok: #86e0a8;
+  --dv-alerta: #f5d76e;
+  --dv-perigo: #ffb3aa;
+  --dv-info: #60a5fa;
+  --dv-tip-fundo: #ececec;
+  --dv-tip-texto: #212121;
+  --dv-botao-fundo: #ececec;
+  --dv-botao-texto: #212121;
+  --dv-codigo: #171717;
+  --dv-sombra: 0 2px 10px rgba(0, 0, 0, .35), 0 1px 2px rgba(0, 0, 0, .3);
   color-scheme: dark;
 }
 :root {
@@ -462,11 +470,11 @@ html[data-tema="escuro"] .dv-pergunta-rot { color: var(--dv-acento); }
 [data-dv-pergunta="erro"] > .dv-pergunta-rot { color: var(--dv-perigo); }
 .dv-botao {
   display: inline-flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
-  min-height: 44px; max-width: 100%; margin: 0 0 var(--dv-s4); padding: 10px 20px; border: 0; border-radius: 99px;
-  font: inherit; font-size: 15px; font-weight: 750; line-height: 1.25; color: #fff; background: var(--dv-acento-forte);
-  box-shadow: 0 8px 18px -10px color-mix(in srgb, var(--dv-acento-forte) 80%, transparent);
-  transition: background .2s, box-shadow .2s;
+  min-height: 40px; max-width: 100%; margin: 0 0 var(--dv-s4); padding: 8px 18px; border: 0; border-radius: 99px;
+  font: inherit; font-size: 14px; font-weight: 600; line-height: 1.25; color: var(--dv-botao-texto); background: var(--dv-botao-fundo);
+  box-shadow: none; transition: opacity .2s;
 }
+.dv-botao:hover { opacity: .88; }
 .dv-botao .dv-pergunta-rot, html[data-tema="escuro"] .dv-botao .dv-pergunta-rot { color: inherit; font-weight: 650; }
 .dv-botao[data-dv-pergunta="confirme"] { box-shadow: 0 0 0 4px color-mix(in srgb, var(--dv-acento) 35%, transparent); }
 .dv-botao[data-dv-pergunta="erro"] { background: var(--dv-perigo); }
@@ -625,3 +633,19 @@ html [data-cor="info"] { --cor: var(--dv-info); }
 
 /* No iPhone, campo com fonte abaixo de 16px dá zoom quando recebe o foco. Regra: nada dá zoom no app instalado. */
 input,textarea,select{font-size:16px!important}
+
+/* ---------- caixinha de copiar (19/10/2026) ----------
+   O jeito antigo de "texto para copiar" (textarea + botão Copiar dentro da lousa). Hoje a regra é
+   bloco de código na mensagem, mas as lousas que já existem ganham a cara do bloco de código do
+   app: fundo de código, borda fina, fonte mono, e o Copiar como pílula discreta com contorno. */
+textarea, textarea.cx {
+  display: block; width: 100%; margin: 0 0 var(--dv-s2); padding: 10px 12px; resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.5;
+  color: var(--dv-texto); background: var(--dv-codigo); border: 1px solid var(--dv-linha); border-radius: var(--dv-r2);
+}
+textarea:focus { outline: none; border-color: var(--dv-acento); }
+.dv-botao[onclick*="copiar"] {
+  flex-direction: row; min-height: 32px; padding: 4px 14px; font-size: 13px; font-weight: 600;
+  color: var(--dv-texto); background: transparent; border: 1px solid var(--dv-linha);
+}
+.dv-botao[onclick*="copiar"]:hover { background: var(--dv-superficie-2); opacity: 1; }

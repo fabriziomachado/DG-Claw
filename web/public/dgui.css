@@ -189,3 +189,34 @@ th[aria-sort="descending"] .dgui-ord::after{content:"▼";color:var(--dg-azul)}
 .dgui-vivo .dgui-painel-tit{padding-right:140px}
 @media (max-width:520px){.dgui-vivo-meta{top:10px;right:8px}.dgui-vivo .dgui-painel-tit{padding-right:118px}}
 @media (prefers-reduced-motion:reduce){.dgui-vivo-atu.girando svg{animation:none}}
+
+/* carrossel (19/10/2026): um cartão por vez, desliza com o dedo; setas discretas onde há mouse */
+.dg-car{position:relative;margin:4px 0}
+.dg-car-trilho{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;outline:none;padding:1px}
+.dg-car-trilho::-webkit-scrollbar{display:none}
+.dg-car-trilho:focus-visible{box-shadow:0 0 0 2px var(--dg-azul);border-radius:16px}
+.dg-car-sl{flex:0 0 min(86%,360px);scroll-snap-align:start;border:1px solid var(--dg-borda);border-radius:16px;background:var(--dg-superficie);overflow:hidden;display:flex;flex-direction:column}
+.dg-car-sl.rec{border-color:color-mix(in srgb,var(--dg-azul) 45%,var(--dg-borda))}
+.dg-car-img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;object-position:top;background:var(--dg-superficie-2)}
+.dg-car-cont-int{padding:10px 12px 0}
+.dg-car-tx{padding:10px 12px 12px;display:flex;flex-direction:column;gap:2px;margin-top:auto}
+.dg-car-k{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dg-texto-3)}
+.dg-car-k span{color:var(--dg-azul-forte)}
+.dg-car-t{font-weight:650;font-size:15px;line-height:1.3}
+.dg-car-d{font-size:13px;color:var(--dg-texto-2);line-height:1.4}
+.dg-car-esc{align-self:flex-start;margin-top:8px;font:inherit;font-size:13px;font-weight:600;color:var(--dg-texto);background:transparent;border:1px solid var(--dg-borda);border-radius:999px;padding:6px 12px;cursor:pointer}
+.dg-car-esc:hover{border-color:var(--dg-texto-3)}
+.dg-car-cont{position:absolute;top:8px;right:10px;font-size:11px;font-variant-numeric:tabular-nums;background:rgba(0,0,0,.5);color:#fff;border-radius:999px;padding:2px 8px;pointer-events:none}
+.dg-car-pts{display:flex;justify-content:center;gap:5px;margin-top:8px}
+.dg-car-pts i{width:6px;height:6px;border-radius:3px;background:var(--dg-borda);transition:width .2s,background .2s}
+.dg-car-pts i.on{width:16px;background:var(--dg-texto-2)}
+.dg-car-seta{position:absolute;top:40%;width:32px;height:32px;border-radius:50%;border:1px solid var(--dg-borda);background:var(--dg-superficie);color:var(--dg-texto-2);display:none;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.dg-car-seta.ant{left:6px}.dg-car-seta.prox{right:6px}
+@media(hover:hover){.dg-car-seta{display:inline-flex}.dg-car-seta[hidden]{display:none}}
+@media (prefers-reduced-motion:reduce){.dg-car-pts i{transition:none}}
+/* fotos do agente em sequência viram carrossel */
+.dg-car-fotos .dg-car-sl{flex-basis:min(86%,380px)}
+.dg-car-fotos .mid{display:block;width:100%;padding:0;border:0;background:none;cursor:zoom-in}
+.dg-car-fotos .mid img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;object-position:top}
+.dg-car-fotos .midcx{display:block}
+.dg-car-fotos .lupa,.dg-car-fotos .midfb{display:none}

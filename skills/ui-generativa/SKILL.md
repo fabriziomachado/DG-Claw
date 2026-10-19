@@ -132,3 +132,25 @@ A tela mostra "atualizado há X min" e um ícone de atualizar; quando passa do i
 está olhando, ela roda o script de novo e redesenha. Escolha o intervalo pelo custo da consulta
 (respeite limites de API, como os 60 por minuto do SoftDesk) e não use isso para dado que muda
 uma vez por mês.
+
+## Carrossel: variantes, propostas e cenários
+
+Quando a resposta é "aqui estão N opções" (layouts, cenários, versões de um painel), mande um
+carrossel em vez de tudo empilhado. Um cartão por opção; no celular desliza com o dedo.
+
+```json
+{"tipo":"carrossel","titulo":"Qual layout do relatório?","escolher":true,
+ "itens":[
+   {"titulo":"Compacto","detalhe":"Só os KPIs e um gráfico","conteudo":[{"tipo":"kpi","titulo":"Evasão","valor":"10,8%"}]},
+   {"titulo":"Completo","detalhe":"KPIs, gráfico e tabela","recomendada":true,"conteudo":{"tipo":"grafico","forma":"colunas","categorias":["2023","2024"],"series":[{"nome":"Evasão","valores":[12,11]}]}},
+   {"titulo":"Só tabela","detalhe":"Para exportar"}
+ ]}
+```
+
+- `conteudo`: um componente (kpi, grafico, tabela) ou uma lista deles. Pode ficar sem: o cartão
+  mostra só título e detalhe.
+- `escolher: true` põe "Escolher esta" em cada cartão; o toque chega a você como
+  "Escolho: <titulo>". Marque a sua sugestão com `"recomendada": true`.
+- Até 12 cartões. `imagem` só aceita endereço do próprio DG Claw (começando com `/`).
+- Imagens (prints, fotos, propostas desenhadas): mande cada uma com `send_file`, uma seguida da
+  outra, cada uma com a sua legenda. A conversa junta imagens seguidas num carrossel sozinha.

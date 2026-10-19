@@ -142,3 +142,16 @@ test('filtros no painel: desenha a variante padrão e avisa quando falta a combi
   const falta = D.blocoParaHtml('dgui\n' + JSON.stringify({ tipo: 'painel', filtros: [{ nome: 'Ano', opcoes: ['2023'] }], variantes: { 2025: kpi('9') } }));
   assert.ok(falta.includes('Sem dados para 2023'));
 });
+
+test('carrossel: um cartão por item, conteúdo dgui dentro, "Escolher esta" e imagem só do próprio DG Claw', () => {
+  const D = require('../public/dgui.js');
+  const h = D.blocoParaHtml('dgui\n' + JSON.stringify({ tipo: 'carrossel', escolher: true, itens: [
+    { titulo: 'A', detalhe: 'a', imagem: '/api/v1/media/x1', conteudo: { tipo: 'kpi', titulo: 'K', valor: '1' } },
+    { titulo: 'B', recomendada: true, imagem: 'https://fora.example/x.png' },
+  ] }));
+  assert.equal((h.match(/class="dg-car-sl/g) || []).length, 2);
+  assert.ok(h.includes('data-dgui-opcao="Escolho: A"') && h.includes('recomendada'));
+  assert.ok(h.includes('src="/api/v1/media/x1"') && !h.includes('fora.example'), 'imagem de fora não entra');
+  assert.ok(/dgui-kpi-valor">1</.test(h) && (h.match(/<i/g) || []).length >= 2);
+  assert.ok(D.blocoParaHtml('dgui\n{"tipo":"carrossel","itens":[]}').includes('Não consegui desenhar'));
+});

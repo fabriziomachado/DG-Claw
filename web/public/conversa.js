@@ -1535,6 +1535,31 @@ function humanizaHoras() {
 }
 setInterval(humanizaHoras, 30000);
 
+const RX_LINHA_TAREFA = /^📋 Tarefa #(\d+) da Mesa:[^\n]*\n?/m;
+const RX_LINK_TAREFA = /(?:https?:\/\/[^\s/]+)?\/mesa(?:\?[^\s#]*)?#t(\d+)\b/g;
+const tarefasCache = new Map();   // n -> tarefa | null (não existe) ; ausente = ainda não buscou
+function htmlTarefaCartao(n) {
+  const t = tarefasCache.get(String(n));
+  if (!t) return `<span class="tf-k">▦ Tarefa da Mesa · #${esc(n)}</span><b>${t === null ? 'Tarefa não encontrada' : 'Carregando…'}</b>`;
+  const est = { fazendo: 'fazendo', esperando_dono: 'esperando você', travada: 'travada', concluida: 'concluída', cancelada: 'cancelada' }[t.estado] || t.estado || '';
+  const ag = (agentesMenu.find(a => a.id === t.agente) || {}).nome || t.agente || '';
+  return `<span class="tf-k">▦ Tarefa da Mesa · #${esc(n)}${est ? ' · ' + esc(est) : ''}</span><b>${esc(t.titulo || '')}</b>` +
+    `<small>${esc([ag, t.progresso != null ? t.progresso + '%' : '', t.nota || ''].filter(Boolean).join(' · '))}</small>`;
+}
+async function preencheTarefas() {
+  const els = wrap.querySelectorAll('.tf-cartao[data-tarefa]');
+  const faltam = new Set();
+  for (const el of els) { const n = el.dataset.tarefa; if (tarefasCache.has(n)) el.innerHTML = htmlTarefaCartao(n); else faltam.add(n); }
+  for (const n of faltam) {
+    tarefasCache.set(n, undefined);
+    try {
+      const r = await fetch('/api/v1/tarefas/' + encodeURIComponent(n), { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+      const d = r.ok ? await r.json() : null;
+      tarefasCache.set(n, d ? (d.tarefa || d) : null);
+    } catch (_) { tarefasCache.delete(n); continue; }
+    wrap.querySelectorAll('.tf-cartao[data-tarefa="' + n + '"]').forEach(el => { el.innerHTML = htmlTarefaCartao(n); });
+  }
+}
 function htmlCorpo(m) {
   let midia = '';
   if (m.local && m.local.anexos) {
@@ -1548,6 +1573,14 @@ function htmlCorpo(m) {
   const cita = m.cita ? `<div class="cita"${m.cita.id ? ` role="button" tabindex="0" data-ir-msg="${esc(m.cita.id)}" title="Ir até a mensagem citada"` : ''}><b>${ehDono({ origin: m.cita.origin }) ? 'Você' :
       esc(AGENTE.nome)}</b>${esc(m.cita.texto)}</div>` : '';
   let leg = legendaUtil(m);
+  // tarefa da Mesa citada (19/10/2026, ideia 4): a linha "📋 Tarefa #N da Mesa: ..." vira cartão, e todo
+  // link /mesa#tN do texto ganha o cartão embaixo
+  const tarefas = [];
+  if (leg) {
+    leg = String(leg).replace(RX_LINHA_TAREFA, (_, n) => { tarefas.push(n); return ''; }).trim();
+    for (const r of String(leg).matchAll(RX_LINK_TAREFA)) if (!tarefas.includes(r[1])) tarefas.push(r[1]);
+  }
+  const cartoesTarefa = tarefas.slice(0, 4).map(n => `<a class="tf-cartao" href="/mesa#t${n}" data-tarefa="${n}">${htmlTarefaCartao(n)}</a>`).join('');
   let doVisual = '';
   const dv = ehDono(m) ? separaDoVisual(leg) : null;
   if (dv) {
@@ -1562,7 +1595,7 @@ function htmlCorpo(m) {
     ? `<span class="reac">${m.reacoes.map(esc).join(' ')}</span>` : '';
   // a hora das mensagens já entregues fica fora do balão (htmlHora); a do pendente segue dentro
   const meta = m.pendente ? metaPendente(m.local) : '';
-  return htmlSelo(m) + cita + midia + corpo + reac + meta;
+  return htmlSelo(m) + cita + midia + cartoesTarefa + corpo + reac + meta;
 }
 
 /* Trilha de comandos: o que a pessoa abriu (resumo ou passo) continua aberto quando a lista cresce
@@ -1892,6 +1925,7 @@ function render(opt) {
   if (filtrosProntos) { aplicaFiltro(); observaVistos(); observaLeitura(); }
   if (window.dgui && window.dgui.restauraEscolhas) window.dgui.restauraEscolhas(wrap);
   visuaisAposRender();
+  preencheTarefas();
   respiroDasFaixas();
   guardaCache();
   atualizaSeta();
@@ -4380,6 +4414,28 @@ async function enviaMencao(t) {
   } catch (e) { mostraErro('Não consegui perguntar ao ' + a.nome + ': ' + e.message); entrada.value = t; ajustaCampo(); }
   return true;
 }
+let tarefaPresa = null;
+(function () {
+  const n = new URLSearchParams(location.search).get('tarefa');
+  if (!n || !/^\d+$/.test(n)) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  tarefaPresa = n;
+  const chip = document.createElement('div');
+  chip.id = 'tarefaChip';
+  chip.innerHTML = `<a class="tf-cartao" data-tarefa="${n}" href="/mesa#t${n}">${htmlTarefaCartao(n)}</a><button type="button" class="resp-x" aria-label="Não citar a tarefa" title="Cancelar">✕</button>`;
+  document.querySelector('.barra').insertBefore(chip, document.querySelector('.barra').firstChild);
+  chip.querySelector('.resp-x').onclick = () => { tarefaPresa = null; chip.remove(); };
+  fetch('/api/v1/tarefas/' + encodeURIComponent(n), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+    .then(r => r.ok ? r.json() : null).then(d => { tarefasCache.set(n, d ? (d.tarefa || d) : null); const a = chip.querySelector('.tf-cartao'); if (a) a.innerHTML = htmlTarefaCartao(n); }).catch(() => {});
+  setTimeout(() => entrada.focus(), 300);
+})();
+function comTarefa(t) {
+  if (!tarefaPresa) return t;
+  const n = tarefaPresa, tt = tarefasCache.get(n);
+  tarefaPresa = null;
+  const chip = document.getElementById('tarefaChip'); if (chip) chip.remove();
+  return '📋 Tarefa #' + n + ' da Mesa: ' + ((tt && tt.titulo) || 'sem título') + ' (/mesa#t' + n + ')\n' + t;
+}
 function enviarDoCampo() {
   if (anexos.length) {
     // a legenda é o texto do campo: despachaAnexos lê e limpa o campo sozinho
@@ -4394,7 +4450,7 @@ function enviarDoCampo() {
   if (lcInterceptaLogin(t)) return;   // /login abre o cartão e não vai ao agente
   menLista.hidden = true;
   if (!EH_ADMIN && /^@\S+\s/.test(t) && mencionaveis().some(a => t.toLowerCase().startsWith('@' + a.nome.toLowerCase() + ' '))) { fimResposta(); enviaMencao(t); return; }
-  enviarTexto(comResposta(t));
+  enviarTexto(comResposta(comTarefa(t)));
 }
 // pergunta sugerida embaixo de um painel (dgui.js): vai ao agente como se a pessoa tivesse digitado
 document.addEventListener('dgui-pergunta', ev => {

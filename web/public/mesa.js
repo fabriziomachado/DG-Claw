@@ -208,7 +208,8 @@
         } else {
           h += `<button type="button" class="mz-btn" ${atrib} data-acao="reabrir">Reabrir</button>`;
         }
-        h += `<button type="button" class="mz-btn" ${atrib} data-acao="editar">Editar</button></div>`;
+        h += `<button type="button" class="mz-btn" ${atrib} data-acao="editar">Editar</button>` +
+          (t.agente ? `<a class="mz-btn" href="/a/${encodeURIComponent(t.agente)}?tarefa=${encodeURIComponent(t.id)}" title="Abre a conversa do agente com esta tarefa citada">Conversar sobre isto</a>` : '') + '</div>';
       }
       h += `<h4 class="mz-h4">Histórico</h4><div class="mz-hist">${htmlHistorico(o.demo ? [] : o.eventos)}</div></div>`;
     }

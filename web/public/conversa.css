@@ -986,3 +986,13 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 /* 👍 👎 (19/10/2026): mesmo peso dos outros ícones; marcado fica no tom do texto */
 .acoes .ac-voto.on{color:var(--dg-texto)}
 .acoes .ac-voto.on svg{fill:currentColor;fill-opacity:.18}
+
+/* tarefa da Mesa citada (19/10/2026) */
+.tf-cartao{display:flex;flex-direction:column;gap:1px;margin:2px 0 8px;padding:9px 12px;border:1px solid var(--dg-borda);border-radius:12px;background:var(--dg-superficie);color:var(--dg-texto);text-decoration:none;max-width:100%}
+.tf-cartao:hover{border-color:var(--dg-texto-3)}
+.tf-k{font-size:11.5px;font-weight:600;color:var(--dg-texto-3)}
+.tf-cartao b{font-size:14.5px;font-weight:600;line-height:1.35}
+.tf-cartao small{font-size:12.5px;color:var(--dg-texto-2)}
+#tarefaChip{display:flex;align-items:flex-start;gap:8px;margin:0 6px 8px}
+#tarefaChip .tf-cartao{flex:1;min-width:0;margin:0}
+.bub a.tf-cartao,.bub a.tf-cartao b{color:var(--dg-texto);text-decoration:none}

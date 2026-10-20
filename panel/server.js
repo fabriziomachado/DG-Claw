@@ -1185,6 +1185,22 @@ router.get('/api/apps', (req, res) => {
   }
 });
 
+// Painéis vivos do agente na aba Apps (19/10/2026): a lista e o "tirar daqui / pôr de volta".
+router.get('/api/apps/paineis', (req, res) => {
+  try {
+    res.json(apps.paineis());
+  } catch (e) {
+    res.status(500).json({ error: `Nao consegui listar os paineis: ${e.message}` });
+  }
+});
+router.post('/api/apps/paineis/:id/ocultar', (req, res) => {
+  try {
+    responderApps(res, apps.ocultarPainel(req.params.id, !(req.body && req.body.oculto === false)));
+  } catch (e) {
+    res.status(500).json({ error: `Nao consegui guardar a escolha: ${e.message}` });
+  }
+});
+
 router.get('/api/apps/:app/conteudos', (req, res) => {
   try {
     responderApps(res, apps.projetos(req.params.app));

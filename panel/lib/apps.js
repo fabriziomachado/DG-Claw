@@ -574,7 +574,52 @@ function buildApps(config) {
     return { caminho: alvo, nome, mime: mimeDaExt(ext), tipo: tipoDaExt(ext), ext, bytes: st.size };
   }
 
-  return { listar, projetos, projeto, arquivo, assets, assetBinario, STATUS, ETAPAS_PADRAO };
+  // ─── Painéis vivos como apps (19/10/2026, pedido do dono) ──────────────
+  // O que o agente monta como painel vivo (`.dgclaw/paineis/<id>.json`, com o script <id>.py ou .sh que
+  // o refaz) aparece sozinho na aba Apps, sem o agente registrar nada. O dono pode tirar um painel da
+  // aba e pôr de volta; a escolha fica em `.dgclaw/apps-ocultos.json`. Mostrar e atualizar o painel é
+  // com o Web (GET/POST /api/v1/paineis/<slug>/<id>), o mesmo da conversa.
+  const PASTA_PAINEIS = path.join(AGENT_DIR, '.dgclaw', 'paineis');
+  const OCULTOS_FILE = path.join(AGENT_DIR, '.dgclaw', 'apps-ocultos.json');
+  const RX_PAINEL = /^[a-z0-9][a-z0-9-]{0,39}$/;
+  function ocultos() {
+    const o = lerJSON(OCULTOS_FILE);
+    return new Set(o && Array.isArray(o.paineis) ? o.paineis.filter((x) => typeof x === 'string') : []);
+  }
+  function paineis() {
+    let nomes = [];
+    try { nomes = fs.readdirSync(PASTA_PAINEIS); } catch { return { paineis: [] }; }
+    const escondidos = ocultos();
+    const lista = [];
+    for (const n of nomes) {
+      const m = /^(.+)\.json$/.exec(n);
+      if (!m || !RX_PAINEL.test(m[1])) continue;
+      const arq = path.join(PASTA_PAINEIS, n);
+      const d = lerJSON(arq);
+      if (!d) continue;
+      lista.push({
+        id: m[1],
+        titulo: typeof d.titulo === 'string' && d.titulo.trim() ? d.titulo.trim().slice(0, 120) : m[1],
+        atualizado: mtime(arq),
+        atualizavel: existe(path.join(PASTA_PAINEIS, m[1] + '.py')) || existe(path.join(PASTA_PAINEIS, m[1] + '.sh')),
+        oculto: escondidos.has(m[1]),
+      });
+    }
+    lista.sort((x, y) => String(y.atualizado).localeCompare(String(x.atualizado)));
+    return { paineis: lista };
+  }
+  function ocultarPainel(id, oculto) {
+    if (typeof id !== 'string' || !RX_PAINEL.test(id)) return { erro: 'Esse painel não existe.', status: 404 };
+    if (!existe(path.join(PASTA_PAINEIS, id + '.json'))) return { erro: `Não achei o painel "${id}".`, status: 404 };
+    const set = ocultos();
+    if (oculto) set.add(id); else set.delete(id);
+    const tmp = OCULTOS_FILE + '.' + process.pid + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify({ paineis: [...set].sort() }, null, 2) + '\n', { mode: 0o644 });
+    fs.renameSync(tmp, OCULTOS_FILE);
+    return { ok: true, id, oculto: !!oculto };
+  }
+
+  return { listar, projetos, projeto, arquivo, assets, assetBinario, paineis, ocultarPainel, STATUS, ETAPAS_PADRAO };
 }
 
 module.exports = { buildApps, STATUS, ETAPAS_PADRAO };

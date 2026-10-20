@@ -92,10 +92,27 @@ function criarIntegracoes({ registro, log }) {
   const ehAdmin = (a) => a.tipo === 'admin';
   const dirClaude = (a) => (ehAdmin(a) ? '/root/.claude' : path.join(casa(a), '.claude'));
 
+  /* As chaves do cofre do agente, para conferir os conectores como o agente de verdade os vê. Conector que
+     usa ${CHAVE} no cabeçalho (ex.: ploi, Authorization: Bearer ${PLOI_API_TOKEN}) falhava aqui com 401 e
+     aparecia como "precisa de login", porque o `podman exec` não carrega o cofre (20/10/2026). Os VALORES
+     vão só no ambiente do processo do podman; na linha de comando entram só os NOMES (`-e NOME`). */
+  function cofreDe(a) {
+    const vals = {};
+    if (!a.cofre_arquivo) return vals;
+    let t = '';
+    try { t = fs.readFileSync(a.cofre_arquivo, 'utf8'); } catch (_) { return vals; }
+    for (const l of t.split('\n')) {
+      const m = /^\s*(?:export\s+)?([A-Z_][A-Z0-9_]*)=(.*)$/.exec(l);
+      if (m) vals[m[1]] = m[2].trim().replace(/^(['"])(.*)\1$/, '$2');
+    }
+    return vals;
+  }
   async function conectores(a) {
+    const cofre = ehAdmin(a) ? {} : cofreDe(a);
     const r = ehAdmin(a)
       ? await roda('claude', ['mcp', 'list'], { cwd: casa(a) || '/opt/dgclaw/admin', env: { ...process.env, HOME: '/root', ENABLE_CLAUDEAI_MCP_SERVERS: 'false' } })
-      : await roda('podman', ['exec', '-u', 'agente', '-w', a.home_container || '/home/agente', a.container || `dgclaw-${a.slug}`, 'claude', 'mcp', 'list']);
+      : await roda('podman', ['exec', '-u', 'agente', '-w', a.home_container || '/home/agente', ...Object.keys(cofre).flatMap((n) => ['-e', n]),
+          a.container || `dgclaw-${a.slug}`, 'claude', 'mcp', 'list'], { env: { ...process.env, ...cofre } });
     if (!r.ok && !r.saida) return { erro: `não consegui listar os conectores de ${a.nome} (${(r.erro || 'sem resposta').replace(/\s+/g, ' ').slice(0, 160)})`, itens: [] };
     return { itens: r.saida.split('\n').map(linhaMcp).filter(Boolean) };
   }

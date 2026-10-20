@@ -1103,3 +1103,15 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 .resp-info .ri-t{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dg-texto-3);margin-bottom:2px}
 .resp-info div{display:flex;justify-content:space-between;gap:16px;color:var(--dg-texto-2)}
 .resp-info b{color:var(--dg-texto);font-weight:600;font-variant-numeric:tabular-nums}
+/* opção A (20/10/2026): chip de memória abaixo da resposta e tokens sempre à vista */
+.resp-memchip{margin:6px 0 2px;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.rmc-bt{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:0 10px;border:1px solid var(--dg-borda);border-radius:999px;background:transparent;
+  color:var(--dg-texto-2);font:inherit;font-size:12.5px;cursor:pointer}
+.rmc-bt b{font-weight:600;color:var(--dg-texto)}
+.rmc-bt:hover,.rmc-bt.on{background:var(--dg-superficie-2)}
+.rmc-seta{transition:transform .15s}
+.rmc-bt.on .rmc-seta{transform:rotate(180deg)}
+.resp-memchip .resp-mem{margin:0;width:100%}
+.acoes .ac-tok{width:auto;margin-left:auto;padding:0 6px;gap:4px;display:inline-flex;align-items:center;font-size:12px;color:var(--dg-texto-3);font-variant-numeric:tabular-nums;white-space:nowrap}
+.acoes .ac-tok:hover{color:var(--dg-texto-2)}
+@media(prefers-reduced-motion:reduce){.rmc-seta{transition:none}}

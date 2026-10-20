@@ -1712,7 +1712,7 @@ async function vota(m, tipo) {
 function htmlAcoes(m, hora) {
   hora = hora || '';
   if (!m || m.pendente || !legendaUtil(m) || ehVisual(m.media)) return hora ? `<div class="acoes so-hora">${hora}</div>` : '';
-  return `<div class="acoes" data-acoes="${esc(m.id)}">` +
+  return chipMemoria(m) + `<div class="acoes" data-acoes="${esc(m.id)}">` +
          `<button type="button" class="ac" data-ac="copiar" title="Copiar" aria-label="Copiar a resposta">${ICONE_ACAO.copiar}</button>` +
          `<button type="button" class="ac ac-ouvir" data-ac="ouvir" title="Ouvir em voz alta" aria-label="Ouvir a resposta em voz alta">${ICONE_ACAO.ouvir}</button>` +
          `<button type="button" class="ac${respondendo && respondendo.id === m.id ? ' acao-resp-on' : ''}" data-ac="responder" title="Responder citando" aria-label="Responder citando esta mensagem">${ICONE_ACAO.responder}</button>` +
@@ -1738,18 +1738,28 @@ function duracao(ms) {
   const s = Math.round(ms / 1000);
   return s < 60 ? s + ' s' : Math.floor(s / 60) + ' min' + (s % 60 ? ' ' + (s % 60) + ' s' : '');
 }
-function extrasDaResposta(m) {
+/* Opção A (o dono trocou de B para A em 20/10/2026): "2 memórias" é um chip numa linha logo abaixo da
+   resposta (o toque abre o que foi guardado), e os tokens ficam sempre à vista à direita da linha das ações
+   ("↓ 853 mil · ↑ 7,8 mil"); o toque neles abre o detalhe (cache e tempo). */
+function chipMemoria(m) {
   if (!m || m.origin !== 'agente') return '';
   const n = Array.isArray(m.memorias) ? m.memorias.length : 0;
-  return (n ? `<button type="button" class="ac ac-mem${memAbertas.has(m.id) ? ' on' : ''}" data-ac="mem" title="O que ${esc(AGENTE.nome)} guardou na memória" aria-label="${n} ${n === 1 ? 'memória guardada' : 'memórias guardadas'}" aria-expanded="${memAbertas.has(m.id)}">${ICO_MEMORIA}<span>${n}</span></button>` : '') +
-    (m.uso ? `<button type="button" class="ac ac-info${infoAbertas.has(m.id) ? ' on' : ''}" data-ac="info" title="Tokens e tempo desta resposta" aria-label="Tokens e tempo desta resposta" aria-expanded="${infoAbertas.has(m.id)}">${ICO_INFO}</button>` : '');
+  if (!n) return '';
+  const aberto = memAbertas.has(m.id);
+  return `<div class="resp-memchip" data-memchip="${esc(m.id)}"><button type="button" class="rmc-bt${aberto ? ' on' : ''}" data-memchip-bt aria-expanded="${aberto}">${ICO_MEMORIA}` +
+    `<b>${n} ${n === 1 ? 'memória' : 'memórias'}</b><svg class="rmc-seta" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>` +
+    (aberto ? `<div class="resp-mem">${m.memorias.map(x => `<div><span class="rm-tag">${esc(x.tipo || 'Fato')}</span><span>${esc(x.texto)}</span></div>`).join('')}</div>` : '') + '</div>';
+}
+function extrasDaResposta(m) {
+  if (!m || m.origin !== 'agente' || !m.uso) return '';
+  const aberto = infoAbertas.has(m.id);
+  return `<button type="button" class="ac ac-tok${aberto ? ' on' : ''}" data-ac="info" title="Tokens desta resposta: entrada e saída" aria-expanded="${aberto}">` +
+    `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3 5 13h6l-1 8 8-10h-6z"/></svg>` +
+    `<span>↓ ${numCurto(m.uso.entrada)} · ↑ ${numCurto(m.uso.saida)}</span></button>`;
 }
 function detalhesDaResposta(m) {
   if (!m || m.origin !== 'agente') return '';
   let html = '';
-  if (memAbertas.has(m.id) && Array.isArray(m.memorias) && m.memorias.length) {
-    html += `<div class="resp-mem" data-det="mem">${m.memorias.map(x => `<div><span class="rm-tag">${esc(x.tipo || 'Fato')}</span><span>${esc(x.texto)}</span></div>`).join('')}</div>`;
-  }
   if (infoAbertas.has(m.id) && m.uso) {
     const u = m.uso;
     html += `<div class="resp-info" data-det="info"><span class="ri-t">Esta resposta</span>` +
@@ -1760,6 +1770,15 @@ function detalhesDaResposta(m) {
   }
   return html;
 }
+wrap.addEventListener('click', ev => {
+  const bt = ev.target.closest ? ev.target.closest('[data-memchip-bt]') : null;
+  if (!bt) return;
+  const caixa = bt.closest('[data-memchip]'), id = caixa.dataset.memchip;
+  const m = msgs.find(x => x.id === id);
+  if (!m) return;
+  if (memAbertas.has(id)) memAbertas.delete(id); else memAbertas.add(id);
+  caixa.outerHTML = chipMemoria(m);
+});
 wrap.addEventListener('click', async ev => {
   const b = ev.target.closest ? ev.target.closest('.acoes .ac') : null;
   if (!b) return;

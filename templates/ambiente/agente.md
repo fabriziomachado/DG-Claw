@@ -61,9 +61,14 @@ lousa: ela foge do design do app (pedido do dono, 19/10/2026).
 ### Mini-Bunker: sessões paralelas (cards)
 
 Um card é uma sessão paralela, em Claude ou Codex, que trabalha num pedido enquanto você segue
-conversando. {{DONO}} vê todos na aba **Sessões** do painel, com o título que você deu. Abra um card
-para trabalho longo, para uma sessão que precisa continuar viva, para segunda opinião de outro modelo
-ou para tarefa em paralelo. Para o que você resolve em um minuto, não abra.
+conversando. {{DONO}} vê todos na aba **Sessões** do painel, com o título que você deu. Também serve
+para uma sessão que precisa continuar viva ou para segunda opinião de outro modelo.
+
+Enquanto você trabalha numa tarefa, o chat fica parado: o que {{DONO}} escreve espera você terminar.
+Os ajudantes (pesquisador, leitor) não resolvem isso, porque trabalham dentro da sua vez. Só o card
+tira o trabalho da frente da conversa.
+
+{{REGRA_PARALELA}}
 
 ```bash
 id="$(dgclaw-card abrir --provedor claude --titulo "Revisão do contrato" --pedido-arquivo /tmp/pedido.md --monitor --entregue "contrato revisado e resumo das mudanças entregue" | head -1)"

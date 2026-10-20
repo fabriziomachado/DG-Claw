@@ -28,9 +28,12 @@ const INTERVALO_MS = 3 * 60 * 1000;
 const AVISO_SESSAO = 80;
 const AVISO_SEMANA = 70;
 const NIVEIS = [60, 70, 85];
+const MINUTOS_PARALELA = [3, 5, 10, 15];
 const PESO = { entrada: 1, cache_lido: 0.1, cache_criado: 1.25, saida: 5 };
 
-const CONFIG_PADRAO = { avisar: true, economia: { ligado: true, nivel: 70 } };
+// paralela: trabalho que passa de N minutos vai para uma sessão paralela (card) e o chat fica livre.
+// Vira texto nas instruções de cada agente (bin/dgclaw, regra_paralela) quando muda.
+const CONFIG_PADRAO = { avisar: true, economia: { ligado: true, nivel: 70 }, paralela: { ligado: true, minutos: 5 } };
 
 /** Os números da Anthropic no formato da tela. */
 function normaliza(d) {
@@ -95,7 +98,16 @@ async function usoPeloLogin(arquivo) {
   return { dados: await r.json(), plano: tok.subscriptionType || null };
 }
 
-function criarLimites({ registro, conversa, push, log = () => {}, dataDir, tz = 'America/Sao_Paulo', agora = () => Date.now(), buscarUso, homeAdmin = os.homedir() }) {
+/** Regrava as instruções de cada agente (a regra da sessão paralela mudou). Um por vez; não reinicia nada. */
+function regravaIdentidades(agentes, log) {
+  const { execFile } = require('node:child_process');
+  return agentes.reduce((p, a) => p.then(() => new Promise((ok) => execFile('/usr/local/bin/dgclaw', ['agente', 'identidade', a.slug], { timeout: 60000 }, (err, _o, e) => {
+    if (err) log('aviso', `Sessão paralela: não consegui regravar as instruções de ${a.slug}: ${String(e || err.message).trim().slice(0, 200)}`);
+    ok();
+  }))), Promise.resolve());
+}
+
+function criarLimites({ registro, conversa, push, log = () => {}, dataDir, tz = 'America/Sao_Paulo', agora = () => Date.now(), buscarUso, homeAdmin = os.homedir(), regravar = regravaIdentidades }) {
   const arquivo = path.join(dataDir, 'limites.json');
   const cache = { uso: null, quem: null };
   let timer = null, rodando = false;
@@ -106,7 +118,9 @@ function criarLimites({ registro, conversa, push, log = () => {}, dataDir, tz = 
       return {
         config: { avisar: d.config && typeof d.config.avisar === 'boolean' ? d.config.avisar : CONFIG_PADRAO.avisar,
           economia: { ligado: d.config && d.config.economia && typeof d.config.economia.ligado === 'boolean' ? d.config.economia.ligado : CONFIG_PADRAO.economia.ligado,
-            nivel: d.config && d.config.economia && NIVEIS.includes(d.config.economia.nivel) ? d.config.economia.nivel : CONFIG_PADRAO.economia.nivel } },
+            nivel: d.config && d.config.economia && NIVEIS.includes(d.config.economia.nivel) ? d.config.economia.nivel : CONFIG_PADRAO.economia.nivel },
+          paralela: { ligado: !(d.config && d.config.paralela && d.config.paralela.ligado === false),
+            minutos: d.config && d.config.paralela && MINUTOS_PARALELA.includes(d.config.paralela.minutos) ? d.config.paralela.minutos : CONFIG_PADRAO.paralela.minutos } },
         estado: Object.assign({ avisados: {}, economia: { ativa: false, desde: null, ate: null, aplicado: {} } }, d.estado || {}),
       };
     } catch (_) {
@@ -252,7 +266,18 @@ function criarLimites({ registro, conversa, push, log = () => {}, dataDir, tz = 
         if (!NIVEIS.includes(b.economia.nivel)) { H.erroJson(res, 400, `O nível do modo economia precisa ser ${NIVEIS.join(', ')}.`); return true; }
         d.config.economia.nivel = b.economia.nivel;
       }
+      let mudouParalela = false;
+      if (b.paralela && typeof b.paralela.ligado === 'boolean' && b.paralela.ligado !== d.config.paralela.ligado) { d.config.paralela.ligado = b.paralela.ligado; mudouParalela = true; }
+      if (b.paralela && b.paralela.minutos != null) {
+        if (!MINUTOS_PARALELA.includes(b.paralela.minutos)) { H.erroJson(res, 400, `O tempo da sessão paralela precisa ser ${MINUTOS_PARALELA.join(', ')} minutos.`); return true; }
+        if (b.paralela.minutos !== d.config.paralela.minutos || !d.config.paralela.ligado) { d.config.paralela.minutos = b.paralela.minutos; d.config.paralela.ligado = true; mudouParalela = true; }
+      }
       grava(d);
+      if (mudouParalela) {
+        const p = d.config.paralela;
+        log('info', `Sessão paralela: ${p.ligado ? `trabalho de mais de ${p.minutos} min vai para card` : 'só quando o dono pedir'}; regravando as instruções dos agentes.`);
+        regravar(trabalho(), log);
+      }
       tick();   // aplica já (liga ou desliga o modo economia), sem esperar a próxima volta
       H.enviaJson(res, 200, { ok: true, config: d.config });
       return true;
@@ -262,7 +287,7 @@ function criarLimites({ registro, conversa, push, log = () => {}, dataDir, tz = 
     const u = await uso(forca);
     const d = lerArquivo();
     H.enviaJson(res, 200, { ok: !u.erro || !!u.semana, erro: u.erro, plano: u.plano || null, sessao: u.sessao || null, semana: u.semana || null, extras: u.extras || null,
-      quem: u.semana ? quemUsou(u, forca) : { sessao: [], semana: [] }, config: d.config, economia: economia(), niveis: NIVEIS,
+      quem: u.semana ? quemUsou(u, forca) : { sessao: [], semana: [] }, config: d.config, economia: economia(), niveis: NIVEIS, minutos_paralela: MINUTOS_PARALELA,
       avisos: { sessao: AVISO_SESSAO, semana: AVISO_SEMANA }, conferido_em: u.em ? new Date(u.em).toISOString() : null });
     return true;
   }
@@ -274,4 +299,4 @@ function criarLimites({ registro, conversa, push, log = () => {}, dataDir, tz = 
   };
 }
 
-module.exports = { criarLimites, normaliza, pesoDe, divide, NIVEIS };
+module.exports = { criarLimites, normaliza, pesoDe, divide, NIVEIS, MINUTOS_PARALELA };

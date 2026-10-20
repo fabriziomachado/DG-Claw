@@ -62,3 +62,24 @@ test('modo economia desligado na configuração não troca nada', async () => {
   assert.deepEqual(comandos, []);
   assert.equal(l.economia().ativa, false);
 });
+
+test('sessão paralela: mudar o tempo grava e regrava as instruções dos agentes de trabalho', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'lim-'));
+  const regravados = [];
+  const l = criarLimites({
+    registro: { estado: () => ({ ok: true, agentes: [{ slug: 'data', nome: 'Data', tipo: 'agente' }, { slug: 'admin', nome: 'Admin', tipo: 'admin' }] }) },
+    conversa: { atividade: async () => ({ estado: 'ocioso' }), comando: async () => ({ status: 202 }) }, push: null,
+    dataDir: dir, buscarUso: async () => USO(1, 1), homeAdmin: dir, regravar: async (ags) => { regravados.push(...ags.map(a => a.slug)); },
+  });
+  const corpo = JSON.stringify({ paralela: { minutos: 10 } });
+  const req = require('node:stream').Readable.from([Buffer.from(corpo)]);
+  req.method = 'POST'; req.headers = { 'content-type': 'application/json', 'content-length': String(corpo.length) };
+  let codigo = 0, saida = '';
+  const res = { writeHead(c) { codigo = c; return this; }, setHeader() {}, end(b) { saida = String(b || ''); } };
+  await l.rotas(req, res, new URL('http://x/api/v1/limites/config'), { via: 'login' });
+  assert.equal(codigo, 200, saida);
+  assert.deepEqual(JSON.parse(saida).config.paralela, { ligado: true, minutos: 10 });
+  assert.deepEqual(regravados, ['data']);
+  const salvo = JSON.parse(fs.readFileSync(path.join(dir, 'limites.json'), 'utf8'));
+  assert.equal(salvo.config.paralela.minutos, 10);
+});

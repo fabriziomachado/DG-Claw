@@ -17,6 +17,7 @@
     relogio: ico('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
     sino: ico('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>'),
     folha: ico('<path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14z"/><path d="M5 19l7-7"/>'),
+    paralela: ico('<rect x="3.5" y="5" width="7" height="14" rx="2"/><rect x="13.5" y="5" width="7" height="14" rx="2"/>'),
   };
   let dados = null, periodo = 'dia', agentesInfo = {}, carregando = false, verTudo = false, lim = null, janela = 'semana';
   const CORES = ['var(--dg-serie-0)', 'var(--dg-serie-1)', 'var(--dg-serie-2)', 'var(--dg-serie-3)', 'var(--dg-serie-4)', 'var(--dg-serie-5)'];
@@ -62,7 +63,12 @@
       `<div class="ss-op"><span class="ss-ic">${I.folha}</span><span class="ss-optx"><b>Modo economia automático</b><small>os agentes passam para o Sonnet e o Admin pergunta antes de trabalho grande, até a semana renovar</small>` +
       `<span class="ss-niveis">${(lim.niveis || []).map((n, i) => `<button type="button" class="ss-chip${c.economia.nivel === n ? ' on' : ''}" data-nivel="${n}">${i === 0 ? 'liga em ' : ''}${n}%</button>`).join('')}</span>` +
       (e.ativa ? `<span class="ss-eco on">ligado desde ${hm(e.desde)} · semana em ${lim.semana ? lim.semana.pct : '?'}%</span>` : c.economia.ligado && lim.semana ? `<span class="ss-eco">desligado · semana em ${lim.semana.pct}%</span>` : '') +
-      `</span>${sw('economia', c.economia.ligado, 'Modo economia automático')}</div></div>`;
+      `</span>${sw('economia', c.economia.ligado, 'Modo economia automático')}</div>` +
+      (c.paralela ? '<div class="ss-div"></div>' +
+        `<div class="ss-op"><span class="ss-ic">${I.paralela}</span><span class="ss-optx"><b>Sessão paralela automática</b><small>trabalho que passar deste tempo vai para uma sessão paralela, e o chat com o agente fica livre</small>` +
+        `<span class="ss-niveis">${(lim.minutos_paralela || []).map((n, i) => `<button type="button" class="ss-chip${c.paralela.ligado && c.paralela.minutos === n ? ' on' : ''}" data-minutos="${n}">${i === 0 ? 'depois de ' : ''}${n} min</button>`).join('')}</span>` +
+        `${c.paralela.ligado ? '' : '<span class="ss-eco">desligada · só quando você pedir</span>'}</span>${sw('paralela', c.paralela.ligado, 'Sessão paralela automática')}</div>` : '') +
+      '</div>';
   }
   async function salva(corpo) {
     try {
@@ -175,7 +181,9 @@
     const j = ev.target.closest('[data-janela]');
     if (j && lim) { janela = j.dataset.janela; pinta(); return; }
     const w = ev.target.closest('[data-sw]');
-    if (w && lim) { const on = !w.classList.contains('on'); salva(w.dataset.sw === 'avisar' ? { avisar: on } : { economia: { ligado: on } }); return; }
+    if (w && lim) { const on = !w.classList.contains('on'); salva(w.dataset.sw === 'avisar' ? { avisar: on } : w.dataset.sw === 'paralela' ? { paralela: { ligado: on } } : { economia: { ligado: on } }); return; }
+    const mn = ev.target.closest('[data-minutos]');
+    if (mn && lim) { salva({ paralela: { minutos: +mn.dataset.minutos } }); return; }
     const nv = ev.target.closest('[data-nivel]');
     if (nv && lim) { salva({ economia: { nivel: +nv.dataset.nivel, ligado: true } }); return; }
     const p = ev.target.closest('[data-periodo]');

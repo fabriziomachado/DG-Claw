@@ -92,6 +92,17 @@
   /* ───────────── tela ───────────── */
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   let el = null, agentes = [], timer = null;
+  const ico = (d, t) => `<svg viewBox="0 0 24 24" width="${t || 16}" height="${t || 16}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const ICO = {
+    sino: ico('<path d="M18 16v-5a6 6 0 0 0-12 0v5l-1.5 2h15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>'),
+    tarefa: ico('<rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8.5 12 2.5 2.5 4.5-5"/>'),
+    caixa: ico('<path d="M4 13h4l1.5 2.5h5L16 13h4"/><path d="M5.5 5h13L20 13v5.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5V13z"/>'),
+    espera: ico('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+    fazendo: ico('<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>'),
+    pronto: ico('<circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/>'),
+    relogio: ico('<circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 1.5"/>', 14),
+    seta: ico('<path d="m9 6 6 6-6 6"/>', 14),
+  };
 
   async function api(url, op) {
     const r = await fetch(url, Object.assign({ credentials: 'same-origin', cache: 'no-store' }, op || {}));
@@ -120,8 +131,8 @@
       <section class="bh-novo" data-tour="bh-novo">
         <textarea id="bhFrase" rows="2" maxlength="500" placeholder="Escreva: me lembra amanhã às 9h de ligar pro contador"></textarea>
         <p class="bh-entendi" id="bhEntendi" aria-live="polite"></p>
-        <div class="bh-acoes"><button type="button" class="bh-bt pri" data-novo="lembrete">Lembrete</button>
-          <button type="button" class="bh-bt" data-novo="tarefa">Tarefa para</button>
+        <div class="bh-acoes"><button type="button" class="bh-bt pri" data-novo="lembrete">${ICO.sino}Lembrete</button>
+          <button type="button" class="bh-bt" data-novo="tarefa">${ICO.tarefa}Tarefa para</button>
           <select id="bhAgente" aria-label="De qual agente"></select></div>
         <p class="bh-msg" id="bhMsg" role="status" hidden></p>
       </section>
@@ -204,22 +215,23 @@
     const tocando = (lb.insistindo || []);
     const doDia = (lb.lembretes || []).filter(l => l.estado === 'ativo' && l.proxima && (t => t >= h0 && t < h1)(new Date(l.proxima).getTime()))
       .sort((a, b) => new Date(a.proxima) - new Date(b.proxima));
-    const chipsL = tocando.map(o => `<div class="bh-lb tocando"><span>agora</span><b>${esc(o.texto)}</b><button type="button" class="bh-mini" data-feito="${esc(o.id)}">Feito</button></div>`)
-      .concat(doDia.map(l => { const d = new Date(l.proxima); return `<div class="bh-lb"><span>${pad2(d.getHours())}:${pad2(d.getMinutes())}</span><b>${esc(l.texto)}</b></div>`; }));
+    const chipsL = tocando.map(o => `<div class="bh-lb tocando"><span>${ICO.relogio}agora</span><b>${esc(o.texto)}</b><button type="button" class="bh-mini" data-feito="${esc(o.id)}">Feito</button></div>`)
+      .concat(doDia.map(l => { const d = new Date(l.proxima); return `<div class="bh-lb"><span>${ICO.relogio}${pad2(d.getHours())}:${pad2(d.getMinutes())}</span><b>${esc(l.texto)}</b></div>`; }));
     const esperando = tarefas.filter(t => t.estado === 'esperando_dono' || t.estado === 'esperando_danilo');
     const fazendo = tarefas.filter(t => t.estado === 'fazendo' || t.estado === 'travada');
     const pronto = tarefas.filter(t => t.estado === 'concluida');
     const linha = (t, extra) => `<a class="bh-t${t.estado === 'travada' ? ' travada' : ''}" href="#t${esc(t.id)}">${foto(t.agente)}<span class="bh-tt"><b>${esc(t.titulo)}</b>` +
-      (extra || '') + '</span></a>';
-    const sec = (titulo, n, corpo) => `<div class="bh-sec">${titulo}${n != null ? `<span class="q">${n}</span>` : ''}</div>${corpo}`;
-    let html = sec('Seus lembretes de hoje', chipsL.length || null, chipsL.length ? `<div class="bh-lbs">${chipsL.join('')}</div>` : '<p class="bh-fraco">Nenhum lembrete para hoje.</p>');
-    const caixa = pedidosCaixa ? `<a class="bh-t bh-caixa" href="/caixa">${'<span class="bh-av ico"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 13h4l1.5 2.5h5L16 13h4"/><path d="M5.5 5h13L20 13v5.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5V13z"/></svg></span>'}<span class="bh-tt"><b>${pedidosCaixa} ${pedidosCaixa === 1 ? 'item' : 'itens'} na Caixa de entrada</b><small>pedidos e entregas dos agentes</small></span></a>` : '';
-    html += sec('Esperando você', (esperando.length + (pedidosCaixa ? 1 : 0)) || null,
-      (esperando.length || caixa) ? caixa + esperando.map(t => linha(t, t.motivo ? `<small>${esc(t.motivo)}</small>` : '')).join('') : '<p class="bh-fraco">Nada esperando você.</p>');
-    html += sec('Agentes fazendo', fazendo.length || null, fazendo.length ? fazendo.map(t => linha(t,
+      (extra || '') + `</span><span class="bh-ir">${ICO.seta}</span></a>`;
+    const sec = (icone, titulo, n, corpo) => `<div class="bh-sec">${icone}${titulo}${n != null ? `<span class="q">${n}</span>` : ''}</div>${corpo}`;
+    const grupo = (itens) => `<div class="bh-grupo">${itens}</div>`;
+    let html = sec(ICO.sino, 'Seus lembretes de hoje', chipsL.length || null, chipsL.length ? `<div class="bh-lbs">${chipsL.join('')}</div>` : '<p class="bh-fraco">Nenhum lembrete para hoje.</p>');
+    const caixa = pedidosCaixa ? `<a class="bh-t bh-caixa" href="/caixa"><span class="bh-av ico">${ICO.caixa}</span><span class="bh-tt"><b>${pedidosCaixa} ${pedidosCaixa === 1 ? 'item' : 'itens'} na Caixa de entrada</b><small>pedidos e entregas dos agentes</small></span><span class="bh-ir">${ICO.seta}</span></a>` : '';
+    html += sec(ICO.espera, 'Esperando você', (esperando.length + (pedidosCaixa ? 1 : 0)) || null,
+      (esperando.length || caixa) ? grupo(caixa + esperando.map(t => linha(t, t.motivo ? `<small>${esc(t.motivo)}</small>` : '')).join('')) : '<p class="bh-fraco">Nada esperando você.</p>');
+    html += sec(ICO.fazendo, 'Agentes fazendo', fazendo.length || null, fazendo.length ? grupo(fazendo.map(t => linha(t,
       (t.nota ? `<small>${esc(t.nota)}</small>` : t.estado === 'travada' && t.motivo ? `<small>travada: ${esc(t.motivo)}</small>` : '') +
-      (typeof t.progresso === 'number' ? `<span class="bh-prog"><i style="width:${Math.max(2, Math.min(100, t.progresso))}%"></i></span>` : ''))).join('') : '<p class="bh-fraco">Nenhum agente com tarefa aberta agora.</p>');
-    if (pronto.length) html += sec('Pronto hoje', pronto.length, pronto.map(t => linha(t)).join(''));
+      (typeof t.progresso === 'number' ? `<span class="bh-prog"><i style="width:${Math.max(2, Math.min(100, t.progresso))}%"></i></span>` : ''))).join('')) : '<p class="bh-fraco">Nenhum agente com tarefa aberta agora.</p>');
+    if (pronto.length) html += sec(ICO.pronto, 'Pronto hoje', pronto.length, grupo(pronto.map(t => linha(t)).join('')));
     el.querySelector('#bhDia').innerHTML = html;
   }
 

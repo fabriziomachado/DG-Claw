@@ -194,3 +194,37 @@ a{color:#1f7ac2}
 .bh-tt small{font-size:12.5px;color:var(--dg-texto-3);overflow-wrap:anywhere}
 .bh-prog{display:block;height:4px;border-radius:2px;background:var(--dg-superficie-2);overflow:hidden;margin-top:4px}
 .bh-prog i{display:block;height:100%;background:var(--dg-azul)}
+
+/* ── Board no design system (20/10/2026, pedido do dono: mais clean, ícones de traço) ── */
+.mz-abas{background:var(--dg-fundo);border-bottom:1px solid var(--dg-borda);gap:4px;padding:0 12px}
+.mz-aba{color:var(--dg-texto-2);font-weight:500;font-size:14.5px;border-bottom:2px solid transparent;margin-bottom:-1px}
+.mz-aba:hover{color:var(--dg-texto)}
+.mz-aba.ativa{color:var(--dg-texto);font-weight:600;border-bottom-color:var(--dg-texto)}
+/* compositor: um campo só, botões com ícone */
+.bh-novo{background:var(--dg-superficie);border:1px solid var(--dg-borda);border-radius:20px;padding:6px 6px 8px;gap:6px;box-shadow:var(--dg-sombra)}
+.bh-novo textarea{border:0;background:transparent;padding:8px 10px;min-height:40px;font-size:15.5px}
+.bh-novo textarea:focus{border:0}
+.bh-entendi{padding:0 10px;font-size:12.5px;color:var(--dg-texto-3)}
+.bh-acoes{padding:0 4px;gap:6px}
+.bh-bt{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:0 12px;font-size:13px}
+.bh-bt svg{flex:0 0 16px}
+.bh-acoes select{min-height:32px;font-size:13px;border-radius:999px;background:transparent;color:var(--dg-texto-2)}
+/* seções: título com ícone, itens agrupados num cartão só com divisórias finas */
+.bh-sec{gap:6px;margin:18px 4px 6px}
+.bh-sec svg{color:var(--dg-texto-3)}
+.bh-grupo{background:var(--dg-superficie);border:1px solid var(--dg-borda);border-radius:14px;overflow:hidden}
+.bh-grupo .bh-t{border:0;border-radius:0;margin:0;background:transparent;border-bottom:1px solid var(--dg-borda)}
+.bh-grupo .bh-t:last-child{border-bottom:0}
+.bh-grupo .bh-t:hover{background:var(--dg-superficie-2)}
+.bh-t.travada .bh-tt small{color:var(--dg-erro-texto)}
+.bh-caixa{border-color:var(--dg-borda)}
+.bh-ir{flex:0 0 auto;color:var(--dg-texto-3);display:grid;place-items:center}
+.bh-av{width:24px;height:24px;flex-basis:24px}
+.bh-av.ico{background:transparent;color:var(--dg-texto-2)}
+/* lembretes de hoje: pílulas discretas com relógio */
+.bh-lb{border-radius:14px;padding:8px 12px;min-width:120px}
+.bh-lb span{display:inline-flex;align-items:center;gap:4px}
+.bh-lb.tocando{border-color:var(--dg-azul);background:color-mix(in srgb,var(--dg-azul) 8%,var(--dg-superficie))}
+.bh-mini{min-height:26px}
+.bh-prog{height:3px;margin-top:6px}
+.bh-novo textarea{overflow:hidden;min-height:56px}

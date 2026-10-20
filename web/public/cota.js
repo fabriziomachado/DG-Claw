@@ -106,6 +106,7 @@
     try {
       const r = await fetch('/api/v1/agents/' + encodeURIComponent(ag.id) + '/cota?desde=' + encodeURIComponent(desde), { credentials: 'same-origin', cache: 'no-store' });
       const d = r.ok ? await r.json() : null;
+      if (d && d.conferindo) setTimeout(confere, 8000);   // o teste leva uns segundos: pergunta de novo logo, sem esperar o minuto
       return !!(d && d.liberada);
     } catch (_) { return false; }
   }

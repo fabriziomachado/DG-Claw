@@ -154,3 +154,43 @@ a{color:#1f7ac2}
   .mz-topo{padding-left:24px;padding-right:24px}
 }
 
+
+/* ── aba Hoje do Board (board-hoje.js, 19/10/2026): a central do dia, na paleta do tema.css ── */
+.bh{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:6px;color:var(--dg-texto)}
+.bh-novo{background:var(--dg-superficie);border:1px solid var(--dg-borda);border-radius:16px;padding:12px;display:flex;flex-direction:column;gap:8px;margin-bottom:6px}
+.bh-novo textarea{width:100%;box-sizing:border-box;resize:none;border:1px solid var(--dg-borda);border-radius:12px;background:var(--dg-fundo);color:var(--dg-texto);
+  font:inherit;font-size:16px;line-height:1.4;padding:10px 12px}
+.bh-novo textarea:focus{outline:none;border-color:var(--dg-azul)}
+.bh-entendi{margin:0;font-size:13px;color:var(--dg-texto-2);min-height:0}
+.bh-entendi:empty{display:none}
+.bh-acoes{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.bh-bt{min-height:34px;padding:0 14px;border-radius:999px;border:1px solid var(--dg-borda);background:transparent;color:var(--dg-texto);font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+.bh-bt:hover{background:var(--dg-superficie-2)}
+.bh-bt.pri{background:var(--dg-texto);border-color:var(--dg-texto);color:var(--dg-fundo)}
+.bh-bt:disabled{opacity:.5;cursor:wait}
+.bh-acoes select{min-height:34px;border:1px solid var(--dg-borda);border-radius:999px;background:var(--dg-superficie);color:var(--dg-texto);font:inherit;font-size:13.5px;padding:0 10px}
+.bh-msg{margin:0;padding:8px 10px;border-radius:10px;font-size:13px;background:var(--dg-superficie-2);color:var(--dg-texto-2)}
+.bh-msg.erro{background:var(--dg-erro-fundo);color:var(--dg-erro-texto)}
+.bh-sec{display:flex;align-items:center;gap:6px;margin:14px 2px 4px;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dg-texto-3)}
+.bh-sec .q{margin-left:auto;letter-spacing:0}
+.bh-fraco{margin:2px 2px 6px;font-size:13.5px;color:var(--dg-texto-3)}
+.bh-lbs{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.bh-lbs::-webkit-scrollbar{display:none}
+.bh-lb{flex:0 0 auto;min-width:130px;max-width:220px;background:var(--dg-superficie);border:1px solid var(--dg-borda);border-radius:12px;padding:8px 12px;display:flex;flex-direction:column;gap:2px}
+.bh-lb span{font-size:12px;color:var(--dg-texto-3);font-variant-numeric:tabular-nums}
+.bh-lb b{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bh-lb.tocando{border-color:var(--dg-azul)}
+.bh-lb.tocando span{color:var(--dg-azul-forte);font-weight:600}
+.bh-mini{align-self:flex-start;margin-top:4px;min-height:28px;padding:0 12px;border-radius:999px;border:0;background:var(--dg-texto);color:var(--dg-fundo);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+.bh-t{display:flex;align-items:center;gap:10px;background:var(--dg-superficie);border:1px solid var(--dg-borda);border-radius:12px;padding:9px 12px;color:var(--dg-texto);text-decoration:none;margin-bottom:6px}
+.bh-t:hover{background:var(--dg-superficie-2)}
+.bh-t.travada{border-color:var(--dg-erro-borda)}
+.bh-caixa{border-color:var(--dg-pedido-borda)}
+.bh-av{flex:0 0 26px;width:26px;height:26px;border-radius:50%;overflow:hidden;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:600}
+.bh-av img{width:100%;height:100%;object-fit:cover;display:block}
+.bh-av.ico{background:var(--dg-superficie-2);color:var(--dg-texto-2)}
+.bh-tt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.bh-tt b{font-size:14px;font-weight:600;overflow-wrap:anywhere}
+.bh-tt small{font-size:12.5px;color:var(--dg-texto-3);overflow-wrap:anywhere}
+.bh-prog{display:block;height:4px;border-radius:2px;background:var(--dg-superficie-2);overflow:hidden;margin-top:4px}
+.bh-prog i{display:block;height:100%;background:var(--dg-azul)}

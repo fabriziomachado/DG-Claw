@@ -69,7 +69,7 @@
     '<div class="ml-lista" id="mlLista" role="menu"></div></div></div>' +
     '<nav class="ml-tabs" id="mlTabs" aria-label="Páginas do agente">' +
     '<div data-tour="gm-conversa"><button type="button" class="ml-tab ativo" id="gmIrConversa" aria-current="page"><span class="ml-ico" aria-hidden="true">◔</span>Conversa</button></div>' +
-    '<div data-tour="gm-mesa"><a class="ml-tab" href="/mesa"><span class="ml-ico" aria-hidden="true">▦</span>Mesa de tarefas</a></div>' +
+    '<div data-tour="gm-mesa"><a class="ml-tab" href="/mesa"><span class="ml-ico" aria-hidden="true">▦</span>Board</a></div>' +
     '<div id="mlPainel" data-tour="gm-painel" hidden></div></nav>' +
     '<section class="ml-config" id="mlConfig" data-tour="gm-config" aria-label="Configurações"><h3>Configurações</h3>' +
     '<button type="button" class="ml-tab" id="mlInstalar"><span class="ml-ico" aria-hidden="true">⤓</span><span class="ml-tx">Instalar o app<small id="mlInstalarSub"></small></span></button>' +
@@ -227,7 +227,7 @@
     return [
       { alvo: '#cabecalho', antes: () => abreMenu(false), titulo: 'O cabeçalho',
         oque: 'A foto e o nome do agente, e embaixo o nome da página em que você está. O botão Tutorial, aqui no cabeçalho, explica a página.',
-        como: 'O cabeçalho é o mesmo em todas as telas: Conversa, Mesa, Lembretes e as páginas do painel. A cor e a foto são as de ' + nome + '.',
+        como: 'O cabeçalho é o mesmo em todas as telas: Conversa, Board, Lembretes e as páginas do painel. A cor e a foto são as de ' + nome + '.',
         porque: 'Assim você sabe de quem é a tela e nunca fica sem saber onde está.' },
       ...($('btnSessoes') && !$('btnSessoes').hidden ? [{ alvo: '#btnSessoes', antes: () => abreMenu(false), titulo: 'O botão Sessões',
         oque: 'Um atalho para as sessões de trabalho de ' + nome + ': os cards que andam em paralelo com a conversa principal. Uma bolinha vermelha avisa quando alguma espera uma decisão sua.',

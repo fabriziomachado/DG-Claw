@@ -112,13 +112,14 @@ test('mesa.html: ordem dos scripts, casca no lugar do cabeçalho antigo e o Quad
   assert.ok(h.indexOf('<script src="/menu-lado.js">') < h.indexOf('<script src="/casca.js">'));
   assert.ok(h.indexOf('<script src="/casca.js">') < h.indexOf('<script src="/mesa.js">'));
   assert.ok(h.indexOf('href="/casca.css"') < h.indexOf('href="/menu-lado.css"'), 'casca.css vem antes do menu-lado.css');
-  assert.match(h, /DGCasca\.monta\(\{ pagina: 'mesa', titulo: 'Mesa de tarefas'/);
+  assert.match(h, /DGCasca\.monta\(\{ pagina: 'mesa', titulo: 'Board'/);
+  assert.ok(h.indexOf('<script src="/board-hoje.js">') < h.indexOf('<script src="/mesa.js">'), 'a aba Hoje carrega antes da mesa.js');
   assert.doesNotMatch(h, /mz-volta|mz-topo/);
   assert.match(h, /^<link rel="stylesheet" href="\/avisos\.css">$/m);
   assert.match(h, /^<script src="\/avisos\.js"><\/script>$/m);
 });
 
-test('o menu da conversa tem o item Mesa de tarefas', () => {
+test('o menu da conversa tem o item Board (a antiga Mesa de tarefas)', () => {
   // o menu é o da casca (uma fonte só); a conversa.html monta ele pelo ponto de montagem
-  assert.match(require('../public/casca').MARCACAO_MENU, /<a class="ml-tab" href="\/mesa"><span class="ml-ico" aria-hidden="true">▦<\/span>Mesa de tarefas<\/a>/);
+  assert.match(require('../public/casca').MARCACAO_MENU, /<a class="ml-tab" href="\/mesa"><span class="ml-ico" aria-hidden="true">▦<\/span>Board<\/a>/);
 });

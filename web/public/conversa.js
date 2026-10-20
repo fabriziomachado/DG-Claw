@@ -1546,10 +1546,10 @@ const RX_LINK_TAREFA = /(?:https?:\/\/[^\s/]+)?\/mesa(?:\?[^\s#]*)?#t(\d+)\b/g;
 const tarefasCache = new Map();   // n -> tarefa | null (não existe) ; ausente = ainda não buscou
 function htmlTarefaCartao(n) {
   const t = tarefasCache.get(String(n));
-  if (!t) return `<span class="tf-k">▦ Tarefa da Mesa · #${esc(n)}</span><b>${t === null ? 'Tarefa não encontrada' : 'Carregando…'}</b>`;
+  if (!t) return `<span class="tf-k">▦ Tarefa do Board · #${esc(n)}</span><b>${t === null ? 'Tarefa não encontrada' : 'Carregando…'}</b>`;
   const est = { fazendo: 'fazendo', esperando_dono: 'esperando você', travada: 'travada', concluida: 'concluída', cancelada: 'cancelada' }[t.estado] || t.estado || '';
   const ag = (agentesMenu.find(a => a.id === t.agente) || {}).nome || t.agente || '';
-  return `<span class="tf-k">▦ Tarefa da Mesa · #${esc(n)}${est ? ' · ' + esc(est) : ''}</span><b>${esc(t.titulo || '')}</b>` +
+  return `<span class="tf-k">▦ Tarefa do Board · #${esc(n)}${est ? ' · ' + esc(est) : ''}</span><b>${esc(t.titulo || '')}</b>` +
     `<small>${esc([ag, t.progresso != null ? t.progresso + '%' : '', t.nota || ''].filter(Boolean).join(' · '))}</small>`;
 }
 async function preencheTarefas() {
@@ -4813,9 +4813,9 @@ function passosTutorial() {
       como: 'Toque nele e o painel abre na mesma janela. Para voltar, use o item Conversa do menu do painel ou o voltar do navegador.',
       porque: 'Fica no topo para você passar da conversa ao painel com um toque, sem abrir o menu.' });
   }
-  passos.push({ alvo: '#btnMesa', titulo: 'O botão Mesa',
-    oque: 'Um atalho para a Mesa de tarefas, onde ficam as tarefas de todos os agentes.',
-    como: 'Toque nele e a Mesa abre na mesma janela. Lá você acompanha o que está pendente e o que já foi feito.',
+  passos.push({ alvo: '#btnMesa', titulo: 'O botão Board',
+    oque: 'Um atalho para o Board, onde ficam o seu dia e as tarefas de todos os agentes.',
+    como: 'Toque nele e o Board abre na mesma janela. Lá você acompanha o que está pendente e o que já foi feito.',
     porque: 'Você confere o andamento do trabalho sem sair procurando no menu.' });
   passos.push({ alvo: '#btnLembretes', titulo: 'O botão Lembretes',
     oque: 'Um atalho para a tela de lembretes.',

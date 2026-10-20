@@ -17,6 +17,6 @@ test('GET /api/v1/atividade: o estado de todos os agentes, só para quem entrou'
     assert.equal(r.status, 200, r.texto);
     assert.deepEqual(Object.keys(r.json.agentes).sort(), ['admin', 'ana']);
     assert.equal(r.json.agentes.ana.estado, 'sem_sinal');
-    assert.deepEqual(Object.keys(r.json.agentes.ana), ['estado'], 'só o estado, sem passo nem detalhe');
+    assert.deepEqual(Object.keys(r.json.agentes.ana), ['estado', 'parado_desde'], 'só o estado e desde quando está parado (avatar dormindo), sem passo nem detalhe');
   } finally { await t.fechar(); }
 });

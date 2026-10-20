@@ -325,6 +325,7 @@ function criarConversa({ config, runner, leitor, leitorRollout, midia, log, agor
     const desde = ant && ant.chave === chave ? ant.desde : iso(agoraMs);
     atividadeAnterior.set(agente.slug, { chave, desde });
     est.desde = est.estado === 'ocioso' ? null : desde;
+    est.parado_desde = est.estado === 'ocioso' ? desde : null;
     return est;
   }
 

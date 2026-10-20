@@ -304,6 +304,7 @@ function criarServidor(opcoes) {
       provedor: a.provedor, modelo: a.modelo, rotulo_provedor: rotulo,
       tem_painel: !!a.porta_painel, painel_url: a.porta_painel ? `/p/${a.slug}/` : null,
       voz: voz.vozDoAgente(a), tem_voz: voz.vozDoAgente(a), microfone: voz.microfone,
+      avatar_sono: avatares.sono(a.slug),
     }, avatarDe(a));
   }
 
@@ -375,7 +376,8 @@ function criarServidor(opcoes) {
       if (falhaDoRegistro(req, res, true)) return undefined;
       const agentes = {};
       await Promise.all(registro.estado().agentes.map(async (a) => {
-        try { const e = await conversa.atividade(a); agentes[a.slug] = { estado: e.estado }; }
+        // parado_desde: desde quando está sem trabalhar (o avatar dorme depois de uns minutos, sono.js)
+        try { const e = await conversa.atividade(a); agentes[a.slug] = { estado: e.estado, parado_desde: e.parado_desde || null }; }
         catch (_) { agentes[a.slug] = { estado: 'sem_sinal' }; }
       }));
       return H.enviaJson(res, 200, { ok: true, agentes });
@@ -494,7 +496,7 @@ function criarServidor(opcoes) {
       return res.end(fs.readFileSync(path.join(__dirname, 'docs', 'TRILHA-E-PERMISSAO.md'), 'utf8'));
     }
 
-    if (/^\/api\/v1\/agents\/[^/]+\/avatar$/.test(p)) {
+    if (/^\/api\/v1\/agents\/[^/]+\/avatar(\/(adormecendo|dormindo|parado))?$/.test(p)) {
       if (falhaDoRegistro(req, res, true)) return undefined;
       if (await avatares.tratar(req, res, url, sessao, { enviaJson: H.enviaJson, erroJson: H.erroJson, lerCorpo: H.lerCorpo, agentePublico })) return undefined;
     }

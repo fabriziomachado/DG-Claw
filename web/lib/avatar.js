@@ -19,6 +19,10 @@ const LIMITE_BYTES = 5 * 1024 * 1024;   // o mesmo da foto da criação (onboard
 const LADO = 512;
 const RX_SLUG = /^[a-z0-9][a-z0-9-]{0,40}$/;
 const RX_ROTA = /^\/api\/v1\/agents\/([^/]+)\/avatar$/;
+// Avatar dormindo (20/10/2026, pedido do dono): <slug>-adormecendo.webp (toca uma vez), <slug>-dormindo.webp
+// (repete) e <slug>-dormindo.png (parado, para quem pede menos movimento), na mesma pasta das fotos.
+const RX_ROTA_SONO = /^\/api\/v1\/agents\/([^/]+)\/avatar\/(adormecendo|dormindo|parado)$/;
+const ARQ_SONO = { adormecendo: '-adormecendo.webp', dormindo: '-dormindo.webp', parado: '-dormindo.png' };
 const ERRO_TIPO = 'Escolha uma foto PNG, JPEG ou WebP.';
 
 /** Tipo pela assinatura dos primeiros bytes. Devolve o demuxer do ffmpeg ou null. */
@@ -46,6 +50,33 @@ function criarAvatares({ dataDir, registro, log, ffmpeg = 'ffmpeg', timeoutMs = 
     } catch (e) { if (e.code !== 'ENOENT') log('aviso', `Foto de ${slug}: não li ${arqFoto(slug)} (${e.code || e.message}). Fica a foto anterior.`); }
     try { if (fs.statSync(arqSem(slug)).isFile()) return { removida: true }; } catch (_) { /* sem marca */ }
     return null;
+  }
+
+  /** { adormecendo, dormindo, parado } com as URLs que existem, ou null se o agente não tem a animação. */
+  function sono(slug) {
+    if (!RX_SLUG.test(slug || '')) return null;
+    const out = {};
+    for (const [tipo, suf] of Object.entries(ARQ_SONO)) {
+      try {
+        const st = fs.statSync(path.join(pasta, slug + suf));
+        if (st.isFile() && st.size > 0) out[tipo] = '/api/v1/agents/' + slug + '/avatar/' + tipo + '?v=' + Math.round(st.mtimeMs).toString(36);
+      } catch (_) { /* esse pedaço não existe */ }
+    }
+    return out.dormindo ? out : null;
+  }
+
+  function servirSono(req, res, slug, tipo) {
+    const arq = path.join(pasta, slug + ARQ_SONO[tipo]);
+    let st;
+    try { st = fs.lstatSync(arq); } catch (_) { st = null; }
+    if (!st || !st.isFile()) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }); return res.end('Sem animação.'); }
+    res.writeHead(200, {
+      'Content-Type': tipo === 'parado' ? 'image/png' : 'image/webp', 'Content-Length': st.size, 'X-Content-Type-Options': 'nosniff',
+      'Content-Security-Policy': "default-src 'none'; sandbox", 'Content-Disposition': 'inline',
+      'Cache-Control': 'private, max-age=31536000, immutable',
+    });
+    if (req.method === 'HEAD') return res.end();
+    fs.createReadStream(arq).on('error', () => res.destroy()).pipe(res);
   }
 
   function preparaPasta() {
@@ -124,6 +155,15 @@ function criarAvatares({ dataDir, registro, log, ffmpeg = 'ffmpeg', timeoutMs = 
 
   /** Rota /api/v1/agents/<slug>/avatar. Os ajudantes de HTTP e `agentePublico(a)` vêm do server.js. */
   async function tratar(req, res, url, sessao, { enviaJson, erroJson, lerCorpo, agentePublico }) {
+    const ms = RX_ROTA_SONO.exec(url.pathname);
+    if (ms) {
+      if (req.method !== 'GET' && req.method !== 'HEAD') { erroJson(res, 405, 'Use GET.'); return true; }
+      if (!sessao || sessao.via === 'caixa') { erroJson(res, 403, 'Só o dono vê as fotos pelo navegador.'); return true; }
+      let sl; try { sl = decodeURIComponent(ms[1]); } catch (_) { sl = ''; }
+      if (!RX_SLUG.test(sl) || !registro.obter(sl)) { erroJson(res, 404, 'Não achei esse agente.'); return true; }
+      servirSono(req, res, sl, ms[2]);
+      return true;
+    }
     const mm = RX_ROTA.exec(url.pathname);
     if (!mm) return false;
     const m = req.method;
@@ -148,7 +188,7 @@ function criarAvatares({ dataDir, registro, log, ffmpeg = 'ffmpeg', timeoutMs = 
     return true;
   }
 
-  return { estado, trocar, remover, tratar };
+  return { estado, sono, trocar, remover, tratar };
 }
 
 module.exports = { criarAvatares, tipoPelosBytes, LIMITE_BYTES };

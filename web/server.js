@@ -512,7 +512,7 @@ function criarServidor(opcoes) {
       return res.end(fs.readFileSync(path.join(__dirname, 'docs', 'TRILHA-E-PERMISSAO.md'), 'utf8'));
     }
 
-    if (/^\/api\/v1\/agents\/[^/]+\/avatar(\/(adormecendo|dormindo|parado))?$/.test(p)) {
+    if (/^\/api\/v1\/agents\/[^/]+\/avatar(\/(adormecendo|dormindo|parado|trabalhando|trabalhando-parado))?$/.test(p)) {
       if (falhaDoRegistro(req, res, true)) return undefined;
       if (await avatares.tratar(req, res, url, sessao, { enviaJson: H.enviaJson, erroJson: H.erroJson, lerCorpo: H.lerCorpo, agentePublico })) return undefined;
     }

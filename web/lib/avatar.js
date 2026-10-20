@@ -21,8 +21,10 @@ const RX_SLUG = /^[a-z0-9][a-z0-9-]{0,40}$/;
 const RX_ROTA = /^\/api\/v1\/agents\/([^/]+)\/avatar$/;
 // Avatar dormindo (20/10/2026, pedido do dono): <slug>-adormecendo.webp (toca uma vez), <slug>-dormindo.webp
 // (repete) e <slug>-dormindo.png (parado, para quem pede menos movimento), na mesma pasta das fotos.
-const RX_ROTA_SONO = /^\/api\/v1\/agents\/([^/]+)\/avatar\/(adormecendo|dormindo|parado)$/;
-const ARQ_SONO = { adormecendo: '-adormecendo.webp', dormindo: '-dormindo.webp', parado: '-dormindo.png' };
+// Trabalhando (20/10/2026): <slug>-trabalhando.webp (repete enquanto trabalha) e <slug>-trabalhando.png (parado).
+const RX_ROTA_SONO = /^\/api\/v1\/agents\/([^/]+)\/avatar\/(adormecendo|dormindo|parado|trabalhando|trabalhando-parado)$/;
+const ARQ_SONO = { adormecendo: '-adormecendo.webp', dormindo: '-dormindo.webp', parado: '-dormindo.png',
+  trabalhando: '-trabalhando.webp', 'trabalhando-parado': '-trabalhando.png' };
 const ERRO_TIPO = 'Escolha uma foto PNG, JPEG ou WebP.';
 
 /** Tipo pela assinatura dos primeiros bytes. Devolve o demuxer do ffmpeg ou null. */
@@ -52,7 +54,7 @@ function criarAvatares({ dataDir, registro, log, ffmpeg = 'ffmpeg', timeoutMs = 
     return null;
   }
 
-  /** { adormecendo, dormindo, parado } com as URLs que existem, ou null se o agente não tem a animação. */
+  /** { adormecendo, dormindo, parado, trabalhando, trabalhando-parado } com as URLs que existem, ou null se não há nenhuma. */
   function sono(slug) {
     if (!RX_SLUG.test(slug || '')) return null;
     const out = {};
@@ -62,7 +64,7 @@ function criarAvatares({ dataDir, registro, log, ffmpeg = 'ffmpeg', timeoutMs = 
         if (st.isFile() && st.size > 0) out[tipo] = '/api/v1/agents/' + slug + '/avatar/' + tipo + '?v=' + Math.round(st.mtimeMs).toString(36);
       } catch (_) { /* esse pedaço não existe */ }
     }
-    return out.dormindo ? out : null;
+    return out.dormindo || out.trabalhando ? out : null;
   }
 
   function servirSono(req, res, slug, tipo) {
@@ -71,7 +73,7 @@ function criarAvatares({ dataDir, registro, log, ffmpeg = 'ffmpeg', timeoutMs = 
     try { st = fs.lstatSync(arq); } catch (_) { st = null; }
     if (!st || !st.isFile()) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' }); return res.end('Sem animação.'); }
     res.writeHead(200, {
-      'Content-Type': tipo === 'parado' ? 'image/png' : 'image/webp', 'Content-Length': st.size, 'X-Content-Type-Options': 'nosniff',
+      'Content-Type': /parado$/.test(tipo) ? 'image/png' : 'image/webp', 'Content-Length': st.size, 'X-Content-Type-Options': 'nosniff',
       'Content-Security-Policy': "default-src 'none'; sandbox", 'Content-Disposition': 'inline',
       'Cache-Control': 'private, max-age=31536000, immutable',
     });

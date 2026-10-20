@@ -3,6 +3,7 @@
    O painel do agente já sabe (GET <painel>/api/saude, diagnostico.tipo === "limite", com a frase da
    Anthropic "resets 9:30pm (America/Sao_Paulo)"). Aqui isso vira, na conversa:
    - um cartão "A cota acabou · volta às 21:30 · faltam 38 min", com contador regressivo;
+   - a cada conferência pergunta ao servidor se a conta já liberou antes da hora (crédito novo, 20/10/2026);
    - mensagens escritas enquanto isso ficam guardadas (neste aparelho) e vão sozinhas quando a cota
      voltar, com o chip "N guardadas para a volta" (o x tira da fila).
    A conversa chama DGCota.inicia({ agente, enviar }) e, ao enviar, DGCota.guarda(texto) (true = guardou).
@@ -92,12 +93,21 @@
     const desde = (dg && dg.desde) || '';
     const volta = dg && dg.tipo === 'limite' ? horaDaVolta((dg.trecho || '') + ' ' + (dg.frase || ''), new Date()) : null;
     // o aviso do painel vem da última fala do registro: depois da hora da volta, ou com o "mandar agora", ele não segura mais nada
-    const limite = !!(dg && dg.tipo === 'limite') && !(volta && volta < Date.now() - 60000) && !(desde && (desde === ignorada() || desde === ignoradaMem));
+    let limite = !!(dg && dg.tipo === 'limite') && !(volta && volta < Date.now() - 60000) && !(desde && (desde === ignorada() || desde === ignoradaMem));
     const antes = estado.limite;
+    if (limite && await liberou(desde)) { ignoradaMem = desde; if (desde) ignora(desde); limite = false; }
     estado = { limite, volta: limite ? volta : null, desde };
     pinta();
     if (antes && !limite) despacha();
     else if (!limite && le().length) despacha();   // abriu a página depois da volta: manda o que ficou
+  }
+  /* O servidor testa a conta de tempos em tempos (lib/cota-vigia.js): crédito novo ou limite que voltou antes. */
+  async function liberou(desde) {
+    try {
+      const r = await fetch('/api/v1/agents/' + encodeURIComponent(ag.id) + '/cota?desde=' + encodeURIComponent(desde), { credentials: 'same-origin', cache: 'no-store' });
+      const d = r.ok ? await r.json() : null;
+      return !!(d && d.liberada);
+    } catch (_) { return false; }
   }
   async function despacha() {
     const fila = le();

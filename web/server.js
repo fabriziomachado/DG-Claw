@@ -21,6 +21,7 @@ const { lerMultipart, nomeSeguro, gravaSemSobrescrever } = require('./lib/upload
 const { abrirStream } = require('./lib/sse');
 const { criarProxy } = require('./lib/proxy');
 const { criarCofreAgente } = require('./lib/cofre-agente');
+const { criarCotaVigia } = require('./lib/cota-vigia');
 const { criarCofreRotas } = require('./lib/cofre-rotas');
 const { criarPaineisVivos } = require('./lib/paineis-vivos');
 const { criarMencoes } = require('./lib/mencoes');
@@ -118,6 +119,7 @@ function criarServidor(opcoes) {
   const arquivoConversa = criarArquivoConversa({ dataDir: config.dataDir, log });
   const caixaEntrada = criarCaixaEntrada({ registro, alertas, corteDe: (slug) => arquivoConversa.ultimoCorte(slug), log });
   const saudeServidor = criarSaudeServidor({ registro, conversa, log });
+  const cotaVigia = opcoes.cotaVigia || criarCotaVigia({ log });
   // A conversa como a tela vê: depois do último /clear (o antes fica em Histórico > Arquivadas).
   const mencoes = criarMencoes({ config, registro, conversa, log });
   mencoes.retoma();
@@ -524,6 +526,11 @@ function criarServidor(opcoes) {
         log('info', `${agente.slug}: o dono interrompeu o trabalho em andamento (Esc).`);
         return H.enviaJson(res, 200, { ok: true });
       }
+      // A conta liberou antes da hora do aviso de limite? (lib/cota-vigia.js; a tarja da cota pergunta)
+      if (acao === 'cota' && m === 'GET') {
+        if (sessao && sessao.via === 'caixa') return H.erroJson(res, 403, 'Só o dono confere a cota, pelo painel.');
+        return H.enviaJson(res, 200, cotaVigia.consulta(agente, String(url.searchParams.get('desde') || '')));
+      }
       // 👍 / 👎 numa resposta (lib/feedback.js); GET devolve os votos desta conversa
       if (acao === 'feedback') {
         if (sessao.via === 'caixa') return H.erroJson(res, 403, 'O 👍 👎 é do dono, no navegador.');
@@ -560,7 +567,7 @@ function criarServidor(opcoes) {
       if (acao === 'upload' && m === 'POST') return upload(req, res, agente);
       if (acao === 'comandos' && m === 'GET') return H.enviaJson(res, 200, Object.assign({ ok: true, agente: agente.slug }, await comandos.catalogo(agente)));
       if (acao === 'comando' && m === 'POST') return comandoPost(req, res, agente);
-      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'interromper', 'mencao', 'aviso', 'pedido', 'upload', 'permissao', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
+      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'interromper', 'cota', 'mencao', 'aviso', 'pedido', 'upload', 'permissao', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
     }
 
     mm = /^\/api\/v1\/media\/([0-9a-f]{16})\/visual$/.exec(p);

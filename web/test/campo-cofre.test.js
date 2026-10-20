@@ -36,3 +36,18 @@ test('conversa.js liga o gancho e o html carrega os arquivos novos', () => {
   const html = fs.readFileSync(path.join(pub, 'conversa.html'), 'utf8');
   assert.ok(html.includes('/campo-cofre.js') && html.includes('/campo-cofre.css'));
 });
+
+test('alvo: `slug:NOME` só vira campo na conversa do Admin e grava no cofre do outro agente', () => {
+  assert.deepStrictEqual(cc.analisa('dgcofre\nhelp:SOFTDESK_HASH_API\nChave do SoftDesk'),
+    { envName: 'SOFTDESK_HASH_API', rotulo: 'Chave do SoftDesk', alvo: 'help' });
+  for (const b of ['dgcofre\nHelp:X_KEY', 'dgcofre\n../x:X_KEY', 'dgcofre\nhelp:minuscula', 'dgcofre\n:X_KEY']) {
+    assert.strictEqual(cc.analisa(b), null, b);
+  }
+  cc.configurar({ agente: 'smartsau', outrosAgentes: false });
+  assert.strictEqual(cc.blocoParaHtml('dgcofre\nhelp:SOFTDESK_HASH_API', 'm'), null);
+  cc.configurar({ agente: 'admin', outrosAgentes: true });
+  const h = cc.blocoParaHtml('dgcofre\nhelp:SOFTDESK_HASH_API', 'm');
+  assert.ok(h.includes('data-alvo="help"') && h.includes('cofre de help') && h.includes('SOFTDESK_HASH_API'));
+  assert.ok(!cc.blocoParaHtml('dgcofre\nGROQ_API_KEY', 'm').includes('data-alvo'));
+  cc.configurar({ agente: '', outrosAgentes: false });
+});

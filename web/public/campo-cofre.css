@@ -6,7 +6,7 @@
   overflow-wrap:anywhere;padding:2px 6px;border-radius:6px;background:rgba(0,0,0,.075)}
 .dgc-linha{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}
 .dgc-valor{flex:1 1 160px;min-width:0;min-height:36px;box-sizing:border-box;padding:0 10px;font-size:16px;
-  border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--txt);font-family:inherit}
+  border:1px solid var(--line);border-radius:8px;background:var(--dg-superficie);color:var(--txt);font-family:inherit}
 .dgc-valor:focus{outline:none;border-color:var(--accent)}
 .dgc-salvar{flex:0 0 auto;min-height:36px;min-width:32px;padding:0 14px;border:0;border-radius:8px;
   background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
@@ -15,3 +15,10 @@
 .dgc-ok{font-size:14px;font-weight:600;color:var(--accent);overflow-wrap:anywhere}
 .dgc-ok code{font-family:ui-monospace,Menlo,monospace}
 .dgc-aviso{margin-top:6px;font-size:13px;overflow-wrap:anywhere}
+.dgc-outros{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;font-size:13px}
+.dgc-outros[hidden]{display:none}
+.dgc-ou{color:var(--dg-texto-2);margin-right:2px}
+.dgc-usar{min-height:32px;padding:0 12px;border:1px solid var(--line);border-radius:999px;background:var(--dg-superficie);
+  color:var(--txt);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.dgc-usar:hover{border-color:var(--accent)}
+.dgc-usar:disabled{opacity:.6;cursor:default}

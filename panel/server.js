@@ -390,6 +390,8 @@ const VOLTAR_HTML =
 // por isso os caminhos são absolutos e não levam o prefixo. Painel solto não tem esses arquivos:
 // vira vazio e a tela fica exatamente como era. O casca.css vem ANTES do menu-lado.css (a ordem importa).
 const CASCA_HTML = [
+  '<link rel="stylesheet" href="/tema.css">',
+  '<script src="/tema.js"></script>',
   '<link rel="stylesheet" href="/casca.css">',
   '<link rel="stylesheet" href="/menu-lado.css">',
   '<script src="/tour.js"></script>',
@@ -1180,6 +1182,22 @@ router.get('/api/apps', (req, res) => {
     res.json(apps.listar());
   } catch (e) {
     res.status(500).json({ error: `Nao consegui ler a lista de apps: ${e.message}` });
+  }
+});
+
+// Painéis vivos do agente na aba Apps (19/10/2026): a lista e o "tirar daqui / pôr de volta".
+router.get('/api/apps/paineis', (req, res) => {
+  try {
+    res.json(apps.paineis());
+  } catch (e) {
+    res.status(500).json({ error: `Nao consegui listar os paineis: ${e.message}` });
+  }
+});
+router.post('/api/apps/paineis/:id/ocultar', (req, res) => {
+  try {
+    responderApps(res, apps.ocultarPainel(req.params.id, !(req.body && req.body.oculto === false)));
+  } catch (e) {
+    res.status(500).json({ error: `Nao consegui guardar a escolha: ${e.message}` });
   }
 });
 

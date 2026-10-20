@@ -6,6 +6,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 const { criarServidor } = require('../server');
 const { loja, registrarPedido, RX_ID } = require('../lib/onboarding');
+const chavesComp = require('../lib/chaves-compartilhadas');
 
 async function executar(acao, id, op = {}) {
   const uso = 'Uso: node web/bin/onboarding.js criar|testar|ver <id do pedido|atual>, ou pedir com o JSON {nome, papel, jeito, dono} no STDIN';
@@ -46,13 +47,41 @@ async function executar(acao, id, op = {}) {
         if (codigo !== 0) throw new Error('A criação parou. O Admin vai conferir o registro e retomar.');
       }
       if (!web.registro.obter(p.slug)) throw new Error('A criação não terminou direito. O Admin vai conferir o registro e retomar.');
+      // "Usar as mesmas chaves dos outros agentes" do formulário: copia Groq e Gemini de quem já tem.
+      if (p.usarChaves && !p.chavesCopiadas) {
+        const novo = web.registro.obter(p.slug);
+        let copiadas = [];
+        try { copiadas = chavesComp.copiarPara(web.registro, web.cofreAgente, novo, (p.dono || 'Dono') + ' (formulário)'); }
+        catch (e) { console.error('Não consegui copiar as chaves dos outros agentes: ' + e.message); }
+        if (copiadas.length) {
+          const a = await web.cofreAgente.aplicar(novo);
+          if (a && a.erro) console.error('As chaves foram copiadas, mas o reinício falhou: ' + a.erro);
+        }
+        p = db.gravar({ ...p, chavesCopiadas: copiadas });
+      }
       mudar('login', 'Seu agente foi criado. Entre com sua assinatura no painel dele para ligar a conversa. Depois volte aqui e avise o Admin.');
       return p;
     }
     const agente = web.registro.obter(p.slug);
     if (!agente || agente.tipo === 'admin') throw new Error('Seu agente ainda não foi criado. O Admin precisa criar ele primeiro.');
     mudar('testando', 'Conferindo se o seu agente consegue responder.');
-    const TEXTO_OI = 'Oi! Sou ' + p.dono + '. Acabei de te criar. Me cumprimente pelo nome, se apresente brevemente e me ofereça estas opções, numeradas e nesta ordem: 1. Conectar a Groq, para conversarmos por áudio. 2. Conectar o Gmail. 3. Mão na massa: começar logo uma tarefa. 4. Conectar a API do Gemini no modo gratuito, para você me ajudar com análise de vídeo. Canais e conexões que ainda não configuramos não são falha: não fale de erro deles.';
+    // As opções da boas-vindas: só oferece conectar a chave que o agente ainda não tem (18/10/2026).
+    let faltam = ['GROQ_API_KEY', 'GEMINI_API_KEY'];
+    try { faltam = chavesComp.faltam(web.cofreAgente, agente); } catch (_) { /* sem cofre legível: oferece tudo */ }
+    // As opções vão num cartão de escolha (```dgui tipo escolha, 18/10/2026): o dono toca em vez de digitar o número.
+    const opcoes = [
+      faltam.includes('GROQ_API_KEY') && { texto: 'Conectar a Groq', detalhe: 'para conversarmos por áudio' },
+      { texto: 'Conectar o Gmail', detalhe: 'para eu ler e organizar seus e-mails' },
+      { texto: 'Mão na massa', detalhe: 'começar logo uma tarefa' },
+      faltam.includes('GEMINI_API_KEY') && { texto: 'Conectar o Gemini', detalhe: 'no modo gratuito, para análise de vídeo' },
+    ].filter(Boolean);
+    // Em prosa, não em JSON: esta mensagem aparece no balão do dono na conversa do agente.
+    const lista = opcoes.map(o => o.texto + ' (' + o.detalhe + ')').join('; ');
+    const jaTem = ['GROQ_API_KEY', 'GEMINI_API_KEY'].filter(k => !faltam.includes(k)).map(k => k === 'GROQ_API_KEY' ? 'Groq (áudio)' : 'Gemini (vídeo)');
+    const TEXTO_OI = 'Oi! Sou ' + p.dono + '. Acabei de te criar. Me cumprimente pelo nome e se apresente brevemente.' +
+      (jaTem.length ? ' Conte que as chaves de ' + jaTem.join(' e ') + ' já estão no seu cofre, prontas, sem pedir de novo.' : '') +
+      ' Termine com um cartão de escolha (bloco dgui do tipo escolha, pergunta "Por onde quer começar?", cada opção com texto e detalhe, sem lista numerada no texto) com estas opções, nesta ordem: ' + lista + '.' +
+      ' Canais e conexões que ainda não configuramos não são falha: não fale de erro deles.';
     // Envia o oi e espera a resposta. A resposta só conta se for nova em relação ao que existia antes deste envio.
     const tentar = async () => {
       const antes = new Set((await web.conversa.thread(agente)).msgs.map(m => m.id));

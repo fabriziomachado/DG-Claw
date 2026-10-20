@@ -208,7 +208,8 @@
         } else {
           h += `<button type="button" class="mz-btn" ${atrib} data-acao="reabrir">Reabrir</button>`;
         }
-        h += `<button type="button" class="mz-btn" ${atrib} data-acao="editar">Editar</button></div>`;
+        h += `<button type="button" class="mz-btn" ${atrib} data-acao="editar">Editar</button>` +
+          (t.agente ? `<a class="mz-btn" href="/a/${encodeURIComponent(t.agente)}?tarefa=${encodeURIComponent(t.id)}" title="Abre a conversa do agente com esta tarefa citada">Conversar sobre isto</a>` : '') + '</div>';
       }
       h += `<h4 class="mz-h4">Histórico</h4><div class="mz-hist">${htmlHistorico(o.demo ? [] : o.eventos)}</div></div>`;
     }
@@ -221,7 +222,7 @@
   /* ───────────── navegador ───────────── */
   const $ = id => document.getElementById(id);
   const INTERVALO_MS = 15000;
-  const CHAVE_ABA = 'dgclaw:mesa:aba';
+  const CHAVE_ABA = 'dgclaw:board:aba';   // chave nova com o Board: quem guardava "tarefas" passa a abrir em Hoje
 
   function guardado(chave, valor) {
     try {
@@ -279,7 +280,7 @@
     if (h && abas.some(a => a.id === h)) return h;
     const g = guardado(CHAVE_ABA);
     if (g && abas.some(a => a.id === g)) return g;
-    return 'tarefas';
+    return abas.some(a => a.id === 'hoje') ? 'hoje' : 'tarefas';
   }
 
   function escolheAba(id, deUsuario) {
@@ -295,7 +296,7 @@
     bolinha(aba.id, false);
     if (deUsuario) {
       guardado(CHAVE_ABA, aba.id);
-      history.replaceState(null, '', aba.id === 'tarefas' ? location.pathname : '#' + aba.id);
+      history.replaceState(null, '', aba.id === (abas[0] && abas[0].id) ? location.pathname + location.search : location.pathname + location.search + '#' + aba.id);
     }
     if (!aba.montada) {
       aba.montada = true;
@@ -721,10 +722,15 @@
 
   /* ── Boot ── */
   function boot() {
+    // Board (19/10/2026): a aba Hoje, a central do dia (board-hoje.js), vem primeiro e abre por padrão
+    if (raiz.DGBoardHoje && typeof raiz.DGBoardHoje.montar === 'function') registrar({ id: 'hoje', titulo: 'Hoje', montar: raiz.DGBoardHoje.montar });
     registrar({ id: 'tarefas', titulo: 'Tarefas', montar: montaTarefas });
     if (raiz.DGAvisos && typeof raiz.DGAvisos.montar === 'function' && !abas.some(a => a.id === 'avisos')) {
       registrar({ id: 'avisos', titulo: raiz.DGAvisos.titulo || 'Quadro de avisos', montar: raiz.DGAvisos.montar, bolinha: raiz.DGAvisos.bolinha });
     }
+    // ordem fixa das abas, venha quem vier primeiro: Hoje, Tarefas, Avisos (as outras depois)
+    const ORDEM = ['hoje', 'tarefas', 'avisos'];
+    abas.sort((x, y) => (ORDEM.indexOf(x.id) + 1 || 99) - (ORDEM.indexOf(y.id) + 1 || 99));
     abasIniciadas = true;
     for (const a of abas) criaAba(a);
     escolheAba(abaDesejada());

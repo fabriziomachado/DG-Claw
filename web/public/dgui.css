@@ -1,0 +1,258 @@
+/* dgui.css: componentes de UI generativa na conversa (KPI, tabela, gráfico), dgui.js.
+   Só cores da paleta (tema.css), então valem nos dois temas. */
+.dgui{margin:8px 0 12px;max-width:100%;color:var(--dg-texto)}
+.dgui-tit{font-size:14px;font-weight:600;color:var(--dg-texto);margin:0 0 8px}
+.dgui-painel{border:1px solid var(--dg-borda);border-radius:16px;padding:14px;background:var(--dg-superficie);display:flex;flex-direction:column;gap:14px}
+.dgui-painel-tit{font-size:15.5px;font-weight:700}
+.dgui > .dgui-tabela,.dgui > .dgui-grafico{border:1px solid var(--dg-borda);border-radius:14px;padding:12px;background:var(--dg-superficie)}
+.dgui-aviso{font-size:13px;color:var(--dg-erro-texto);background:var(--dg-erro-fundo);border-radius:10px;padding:8px 10px}
+.dgui-cru{font-size:12px;white-space:pre-wrap;overflow-x:auto;max-height:200px;color:var(--dg-texto-2)}
+
+/* KPI */
+.dgui-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.dgui-kpi{border:1px solid var(--dg-borda);border-radius:14px;padding:12px 14px;background:var(--dg-superficie);min-width:0}
+.dgui-painel .dgui-kpi{background:var(--dg-fundo)}
+.dgui-kpi-tit{font-size:12.5px;color:var(--dg-texto-2);margin-bottom:4px;overflow-wrap:anywhere}
+.dgui-kpi-valor{font-size:26px;font-weight:700;line-height:1.15;letter-spacing:-.01em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.dgui-kpi-var{font-size:13px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
+.dgui-kpi-var.bom{color:var(--dg-entrega-texto)}
+.dgui-kpi-var.ruim{color:var(--dg-erro-texto)}
+.dgui-kpi-var.neutro{color:var(--dg-texto-2)}
+.dgui-kpi-leg{font-size:12px;color:var(--dg-texto-3);margin-top:4px}
+
+/* Tabela */
+.dgui-tabela-rola{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--dg-borda);border-radius:10px}
+.dgui-tabela table{border-collapse:collapse;width:100%;font-size:14px;line-height:1.4;font-variant-numeric:tabular-nums}
+.dgui-tabela th,.dgui-tabela td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--dg-borda);white-space:nowrap}
+.dgui-tabela td:first-child,.dgui-tabela th:first-child{white-space:normal;min-width:8em}
+.dgui-tabela th{font-weight:600;background:var(--dg-superficie-2);position:relative;user-select:none}
+.dgui-tabela tbody tr:last-child td{border-bottom:0}
+.dgui-tabela tbody tr:hover td{background:color-mix(in srgb,var(--dg-superficie-2) 60%,transparent)}
+table[data-dgui-ordena] th{cursor:pointer}
+table[data-dgui-ordena] th:focus-visible{outline:2px solid var(--dg-azul);outline-offset:-2px}
+.dgui-ord{display:inline-block;width:1em;margin-left:4px;color:var(--dg-texto-3);font-size:11px}
+th[aria-sort="none"] .dgui-ord::after{content:"↕"}
+th[aria-sort="ascending"] .dgui-ord::after{content:"▲";color:var(--dg-azul)}
+th[aria-sort="descending"] .dgui-ord::after{content:"▼";color:var(--dg-azul)}
+
+/* cores das séries */
+.dgui-c0{--c:var(--dg-serie-0)}.dgui-c1{--c:var(--dg-serie-1)}.dgui-c2{--c:var(--dg-serie-2)}
+.dgui-c3{--c:var(--dg-serie-3)}.dgui-c4{--c:var(--dg-serie-4)}.dgui-c5{--c:var(--dg-serie-5)}
+
+/* Barras deitadas */
+.dgui-barras{display:flex;flex-direction:column;gap:8px}
+.dgui-barra-lin{display:grid;grid-template-columns:minmax(90px,34%) 1fr;gap:10px;align-items:center}
+.dgui-barra-cat{font-size:13.5px;color:var(--dg-texto);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dgui-barra-vals{display:flex;flex-direction:column;gap:3px;min-width:0}
+.dgui-barra-par{display:flex;align-items:center;gap:8px;min-width:0}
+.dgui-barra{display:block;height:14px;border-radius:4px;background:var(--c);min-width:2px;
+            animation:dguiCresce .5s ease-out both;transform-origin:left}
+.dgui-barra-par b{font-size:12.5px;font-weight:600;color:var(--dg-texto-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+@keyframes dguiCresce{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+
+/* Colunas, linhas, pizza (SVG) */
+.dgui-svg{display:block;width:100%;height:auto;overflow:visible}
+.dgui-svg rect,.dgui-svg path{fill:var(--c)}
+.dgui-svg rect:hover,.dgui-svg path:hover{opacity:.82}
+.dgui-grade{stroke:var(--dg-borda);stroke-width:1}
+.dgui-eixo{fill:var(--dg-texto-3);font-size:11px;font-family:inherit}
+.dgui-linha{fill:none;stroke:var(--c);stroke-width:2.5;stroke-linejoin:round;stroke-linecap:round}
+.dgui-ponto{fill:var(--dg-superficie);stroke:var(--c);stroke-width:2}
+.dgui-pizza-caixa{display:flex;flex-wrap:wrap;align-items:center;gap:16px}
+.dgui-pizza{width:min(200px,60%);flex:0 0 auto}
+.dgui-legenda{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:10px;font-size:12.5px;color:var(--dg-texto-2)}
+.dgui-legenda-col{flex-direction:column;flex:1;min-width:140px;margin-top:0}
+.dgui-legenda i{display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--c);margin-right:6px;vertical-align:-1px}
+.dgui-legenda b{color:var(--dg-texto);font-weight:600;margin-left:4px}
+@media (prefers-reduced-motion:reduce){.dgui-barra{animation:none}}
+@media (max-width:520px){.dgui-kpi-valor{font-size:22px}.dgui-barra-lin{grid-template-columns:minmax(80px,38%) 1fr}}
+/* o balão que traz componentes usa a largura toda da coluna */
+.bub:has(.dgui){width:100%}
+
+/* ferramentas discretas no canto de cada gráfico e tabela (18/10/2026) */
+.dgui-comp{position:relative}
+.dgui-ferr{position:absolute;top:6px;right:6px;display:flex;gap:2px;opacity:0;transition:opacity .15s;z-index:2}
+.dgui-comp:hover .dgui-ferr,.dgui-comp:focus-within .dgui-ferr,.dgui-cheio .dgui-ferr{opacity:1}
+@media (hover:none){.dgui-ferr{opacity:.85}}
+.dgui-acao{width:30px;height:30px;border:0;border-radius:8px;background:transparent;color:var(--dg-texto-2);
+           display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.dgui-acao:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
+.dgui-acao:focus-visible{outline:2px solid var(--dg-azul);outline-offset:1px}
+.dgui-acao.feito{color:var(--dg-entrega-texto)}
+.dgui-acao.erro{color:var(--dg-erro-texto)}
+.dgui-comp > .dgui-tit{padding-right:110px}
+
+/* fonte e data embaixo */
+.dgui-fonte{font-size:12px;color:var(--dg-texto-3);margin-top:8px}
+
+/* perguntas sugeridas: botões contornados, um por linha no celular (18/10/2026) */
+.dgui-sugestoes{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.dgui-sug-tit{flex:0 0 100%;display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--dg-texto-2);margin-bottom:2px}
+.dgui-sug-tit svg{color:var(--dg-azul)}
+.dgui-sugestao{font:inherit;font-size:13.5px;line-height:1.3;text-align:left;display:inline-flex;align-items:center;gap:8px;
+               padding:8px 12px 8px 14px;border-radius:12px;border:1px solid var(--dg-borda);background:transparent;
+               color:var(--dg-texto);cursor:pointer;max-width:100%;transition:border-color .15s,background .15s}
+@media (hover:hover){.dgui-sugestao:hover{border-color:var(--dg-texto-3)}.dgui-sugestao:hover .dgui-sug-seta{color:var(--dg-texto);transform:translate(1px,-1px)}}
+.dgui-sugestao:active{border-color:var(--dg-texto-3)}
+.dgui-sugestao:focus-visible{outline:2px solid var(--dg-azul);outline-offset:1px}
+.dgui-sug-seta{flex:0 0 auto;color:var(--dg-texto-3);transition:color .15s,transform .15s}
+@media (max-width:520px){.dgui-sugestao{flex:1 1 100%;justify-content:space-between}}
+
+/* ampliar: o componente ocupa a tela */
+.dgui-cheio{position:fixed!important;inset:max(16px,calc(env(safe-area-inset-top) + 8px)) 12px max(16px,calc(env(safe-area-inset-bottom) + 8px));margin:0!important;max-width:none!important;z-index:95;overflow:auto;background:var(--dg-superficie);
+            border:1px solid var(--dg-borda);border-radius:16px;padding:20px!important;box-shadow:0 0 0 100vmax var(--dg-sobreposicao)}
+.dgui-cheio .dgui-svg{max-height:calc(100vh - 160px)}
+.dgui-cheio .dgui-barra{height:20px}
+.dgui-tabela th,.dgui-tabela td,.tabela-md th,.tabela-md td{overflow-wrap:normal;word-break:normal}
+
+/* leitura do especialista: destaques à vista, análise completa recolhida (18/10/2026) */
+.dgui-leitura{border:1px solid var(--dg-borda);border-radius:14px;padding:12px 14px;background:var(--dg-superficie)}
+.dgui-painel + .dgui-leitura{margin-top:12px}
+.dgui-leitura-tit{font-size:13px;font-weight:700;color:var(--dg-texto-2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:8px}
+.dgui-destaques{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.dgui-destaques li{display:flex;gap:10px;align-items:baseline;font-size:14.5px;line-height:1.45}
+.dgui-destaques li{align-items:flex-start}
+.dgui-destaques li > svg{flex:0 0 18px;margin-top:2px;color:var(--dg-texto-2)}
+.dgui-leitura-det{margin-top:10px;border-top:1px solid var(--dg-borda);padding-top:8px}
+.dgui-leitura-det summary{cursor:pointer;font-size:13.5px;font-weight:600;color:var(--dg-azul-forte);list-style:none;display:inline-flex;align-items:center;gap:6px}
+.dgui-leitura-det summary::-webkit-details-marker{display:none}
+.dgui-leitura-det summary::after{content:"▾";transition:transform .15s}
+.dgui-leitura-det[open] summary::after{transform:rotate(180deg)}
+.dgui-leitura-det[open] summary{margin-bottom:6px}
+.dgui-leitura-txt{font-size:14px;line-height:1.55;color:var(--dg-texto)}
+.dgui-leitura-txt p{margin:0 0 8px}
+.dgui-leitura-txt ul{margin:0 0 8px;padding-left:20px}
+
+/* escolha: pedido com opções em lista, como o Claude faz (18/10/2026) */
+.dgui-escolha{border:1px solid var(--dg-borda);border-radius:14px;padding:12px;background:var(--dg-superficie);max-width:560px}
+.dgui-escolha-perg{font-size:14.5px;font-weight:600;margin:2px 4px 10px}
+.dgui-escolha-ops{display:flex;flex-direction:column;gap:6px}
+.dgui-op{font:inherit;text-align:left;display:flex;align-items:center;gap:12px;width:100%;padding:9px 12px;border-radius:10px;
+  border:1px solid var(--dg-borda);background:transparent;color:var(--dg-texto);cursor:pointer}
+@media (hover:hover){.dgui-escolha:not(.respondida) .dgui-op:hover{border-color:var(--dg-texto-3);background:var(--dg-superficie-2)}}
+.dgui-op:focus-visible{outline:2px solid var(--dg-azul);outline-offset:1px}
+.dgui-op-letra{flex:0 0 26px;height:26px;border-radius:7px;border:1px solid var(--dg-borda);display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;color:var(--dg-texto-2)}
+.dgui-op-txt{display:flex;flex-direction:column;min-width:0}
+.dgui-op-txt b{font-weight:500;font-size:14px}
+.dgui-op-txt small{font-size:12.5px;color:var(--dg-texto-3)}
+.dgui-op-outra{border-style:dashed}
+.dgui-escolha.respondida .dgui-op{cursor:default;opacity:.5}
+.dgui-escolha.respondida .dgui-op.escolhida{opacity:1;border-color:var(--dg-azul)}
+.dgui-escolha.respondida .dgui-op.escolhida .dgui-op-letra{background:var(--dg-azul);border-color:var(--dg-azul);color:#fff}
+.dgui-escolha.respondida .dgui-op-outra{display:none}
+.dgui-op-rec{display:inline-block;margin-left:6px;padding:0 7px;border-radius:8px;font-size:11px;font-weight:600;vertical-align:1px;
+  color:var(--dg-azul-forte);border:1px solid var(--dg-azul-suave)}
+
+/* legenda clicável e balão do ponto (18/10/2026) */
+.dgui-leg-item{display:inline-flex;align-items:center;gap:6px;font:inherit;font-size:inherit;color:inherit;background:none;border:0;padding:2px 4px;border-radius:6px;cursor:pointer}
+.dgui-leg-item:hover{background:var(--dg-superficie-2)}
+.dgui-leg-item[aria-pressed="false"]{opacity:.45;text-decoration:line-through}
+[data-dgui-ponto]{cursor:pointer}
+[data-dgui-ponto]:focus-visible{outline:2px solid var(--dg-azul);outline-offset:1px}
+.dgui-comp{position:relative}
+.dgui-balao{position:absolute;z-index:5;display:flex;flex-direction:column;gap:2px;min-width:140px;max-width:240px;padding:8px 10px;border-radius:10px;
+  background:var(--dg-texto);color:var(--dg-fundo);font-size:12.5px;line-height:1.35;box-shadow:0 8px 24px rgba(0,0,0,.22);animation:dgui-balao .12s ease-out}
+.dgui-balao b{font-size:13.5px;font-weight:650}
+.dgui-balao-perg{display:inline-flex;align-items:center;gap:4px;margin-top:4px;padding:0;border:0;background:none;color:inherit;font:inherit;font-size:12px;opacity:.85;cursor:pointer}
+.dgui-balao-perg:hover{opacity:1;text-decoration:underline}
+.dgui-balao-perg svg{width:13px;height:13px}
+@keyframes dgui-balao{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.dgui-balao{animation:none}}
+.dgui-sem-0 svg .dgui-c0,.dgui-sem-0 .dgui-barra-par.dgui-p0{display:none}
+.dgui-sem-1 svg .dgui-c1,.dgui-sem-1 .dgui-barra-par.dgui-p1{display:none}
+.dgui-sem-2 svg .dgui-c2,.dgui-sem-2 .dgui-barra-par.dgui-p2{display:none}
+.dgui-sem-3 svg .dgui-c3,.dgui-sem-3 .dgui-barra-par.dgui-p3{display:none}
+.dgui-sem-4 svg .dgui-c4,.dgui-sem-4 .dgui-barra-par.dgui-p4{display:none}
+.dgui-sem-5 svg .dgui-c5,.dgui-sem-5 .dgui-barra-par.dgui-p5{display:none}
+
+/* filtros no painel (18/10/2026): chips discretos, ou uma lista quando há muitas opções */
+.dgui-filtros{display:flex;flex-wrap:wrap;gap:6px 12px;margin:2px 0 10px}
+.dgui-filtro{display:inline-flex;flex-wrap:wrap;gap:4px}
+.dgui-fchip{font:inherit;font-size:12.5px;line-height:1;padding:6px 11px;border-radius:999px;border:1px solid var(--dg-borda);background:transparent;color:var(--dg-texto-2);cursor:pointer}
+.dgui-fchip:hover{border-color:var(--dg-texto-3)}
+.dgui-fchip[aria-pressed="true"]{background:var(--dg-texto);border-color:var(--dg-texto);color:var(--dg-fundo);font-weight:600}
+.dgui-fsel{align-items:center;gap:6px;font-size:12.5px;color:var(--dg-texto-3)}
+.dgui-fsel select{font:inherit;font-size:12.5px;padding:5px 26px 5px 10px;border-radius:999px;border:1px solid var(--dg-borda);background:transparent;color:var(--dg-texto);-webkit-appearance:none;appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%);background-position:calc(100% - 13px) 50%,calc(100% - 9px) 50%;background-size:4px 4px;background-repeat:no-repeat}
+.dgui-sem-dados{margin:8px 0}
+
+/* painel que se atualiza (18/10/2026): uma linha discreta com a hora e o ícone de atualizar */
+.dgui-vivo{position:relative}
+.dgui-vivo-meta{position:absolute;top:12px;right:14px;z-index:3;display:flex;align-items:center;gap:4px;font-size:11.5px;color:var(--dg-texto-3)}
+.dgui-vivo-meta::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--dg-entrega-texto);opacity:.8}
+.dgui-vivo-atu{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--dg-texto-3);cursor:pointer}
+.dgui-vivo-atu:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
+.dgui-vivo-atu svg{width:14px;height:14px}
+.dgui-vivo-atu.girando svg{animation:dgui-gira .9s linear infinite}
+@keyframes dgui-gira{to{transform:rotate(360deg)}}
+.dgui-vivo .dgui-painel-tit{padding-right:140px}
+@media (max-width:520px){.dgui-vivo-meta{top:10px;right:8px}.dgui-vivo .dgui-painel-tit{padding-right:118px}}
+@media (prefers-reduced-motion:reduce){.dgui-vivo-atu.girando svg{animation:none}}
+
+/* carrossel (19/10/2026): um cartão por vez, desliza com o dedo; setas discretas onde há mouse */
+.dg-car{position:relative;margin:4px 0}
+.dg-car-trilho{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;outline:none;padding:1px}
+.dg-car-trilho::-webkit-scrollbar{display:none}
+.dg-car-trilho:focus-visible{box-shadow:0 0 0 2px var(--dg-azul);border-radius:16px}
+.dg-car-sl{flex:0 0 min(86%,360px);scroll-snap-align:start;border:1px solid var(--dg-borda);border-radius:16px;background:var(--dg-superficie);overflow:hidden;display:flex;flex-direction:column}
+.dg-car-sl.rec{border-color:color-mix(in srgb,var(--dg-azul) 45%,var(--dg-borda))}
+.dg-car-img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;object-position:top;background:var(--dg-superficie-2)}
+.dg-car-cont-int{padding:10px 12px 0}
+.dg-car-tx{padding:10px 12px 12px;display:flex;flex-direction:column;gap:2px;margin-top:auto}
+.dg-car-k{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dg-texto-3)}
+.dg-car-k span{color:var(--dg-azul-forte)}
+.dg-car-t{font-weight:650;font-size:15px;line-height:1.3}
+.dg-car-d{font-size:13px;color:var(--dg-texto-2);line-height:1.4}
+.dg-car-esc{align-self:flex-start;margin-top:8px;font:inherit;font-size:13px;font-weight:600;color:var(--dg-texto);background:transparent;border:1px solid var(--dg-borda);border-radius:999px;padding:6px 12px;cursor:pointer}
+.dg-car-esc:hover{border-color:var(--dg-texto-3)}
+.dg-car-cont{position:absolute;top:8px;right:10px;font-size:11px;font-variant-numeric:tabular-nums;background:rgba(0,0,0,.5);color:#fff;border-radius:999px;padding:2px 8px;pointer-events:none}
+.dg-car-pts{display:flex;justify-content:center;gap:5px;margin-top:8px}
+.dg-car-pts i{width:6px;height:6px;border-radius:3px;background:var(--dg-borda);transition:width .2s,background .2s}
+.dg-car-pts i.on{width:16px;background:var(--dg-texto-2)}
+.dg-car-seta{position:absolute;top:40%;width:32px;height:32px;border-radius:50%;border:1px solid var(--dg-borda);background:var(--dg-superficie);color:var(--dg-texto-2);display:none;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.dg-car-seta.ant{left:6px}.dg-car-seta.prox{right:6px}
+@media(hover:hover){.dg-car-seta{display:inline-flex}.dg-car-seta[hidden]{display:none}}
+@media (prefers-reduced-motion:reduce){.dg-car-pts i{transition:none}}
+/* fotos do agente em sequência viram carrossel */
+.dg-car-fotos .dg-car-sl{flex-basis:min(86%,380px)}
+.dg-car-fotos .mid{display:block;width:100%;padding:0;border:0;background:none;cursor:zoom-in}
+.dg-car-fotos .mid img{display:block;width:100%;aspect-ratio:4/3;object-fit:cover;object-position:top}
+.dg-car-fotos .midcx{display:block}
+.dg-car-fotos .lupa,.dg-car-fotos .midfb{display:none}
+
+/* passos (19/10/2026): numerados, ligados por uma linha fina */
+.dg-passos{list-style:none;margin:4px 0;padding:0;counter-reset:dgp}
+.dg-passos>li{position:relative;padding:0 0 16px 34px;counter-increment:dgp}
+.dg-passos>li::before{content:counter(dgp);position:absolute;left:0;top:1px;width:22px;height:22px;border-radius:50%;border:1px solid var(--dg-borda);background:var(--dg-superficie);
+  font-size:12px;font-weight:650;display:flex;align-items:center;justify-content:center;color:var(--dg-texto-2)}
+.dg-passos>li::after{content:"";position:absolute;left:11px;top:27px;bottom:4px;width:1px;background:var(--dg-borda)}
+.dg-passos>li:last-child{padding-bottom:4px}
+.dg-passos>li:last-child::after{display:none}
+.dg-passos b{display:block;font-size:15px;font-weight:600;line-height:1.4;margin-bottom:1px}
+.dg-passos small{display:block;font-size:13px;color:var(--dg-texto-2);line-height:1.45;margin-bottom:6px}
+.dg-passos .cod{margin:6px 0 0}
+
+/* Dados do gráfico no pé do cartão (19/10/2026, proposta B): a tabela chega fechada numa faixa fina,
+   "Dados · título", com copiar e baixar à mão; tocar abre ali mesmo, colada nas bordas do cartão. */
+.dgui-painel .dgui-dados{margin:0 -14px -14px;border-top:1px solid var(--dg-borda)}
+.dgui-dados .dgui-recolhida + .dgui-recolhida{border-top:1px solid var(--dg-borda)}
+.dgui-faixa-corpo{padding:2px 14px 14px 14px}
+.dgui-faixa-corpo .dgui-destaques li{font-size:14px}
+.dgui-dados-cab{display:flex;align-items:center;gap:2px;padding:6px 8px 6px 6px}
+.dgui-dados-abre{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:6px 8px;border:0;border-radius:8px;background:transparent;
+  font:inherit;font-size:13px;color:var(--dg-texto-3);text-align:left;cursor:pointer}
+.dgui-dados-abre:hover{color:var(--dg-texto-2)}
+.dgui-dados-abre svg{flex:0 0 16px;width:16px;height:16px;color:var(--dg-texto-3)}
+.dgui-dados-rot{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dgui-dados-rot b{font-weight:600;color:var(--dg-texto-2)}
+.dgui-dados-seta svg{transition:transform .15s}
+.dgui-aberta .dgui-dados-seta svg{transform:rotate(90deg)}
+.dgui-recolhida .dgui-tabela-rola{border:0;border-top:1px solid var(--dg-borda);border-radius:0}
+.dgui-recolhida .dgui-tabela-rola th:first-child,.dgui-recolhida .dgui-tabela-rola td:first-child{padding-left:14px}
+.dgui-painel .dgui-dados:last-child .dgui-recolhida:last-child .dgui-tabela-rola{border-radius:0 0 15px 15px}
+@media (prefers-reduced-motion:reduce){.dgui-dados-seta svg{transition:none}}
+/* tabela do pé do painel em tela cheia: a seta de abrir/fechar não faz sentido ali */
+.dgui-cheio.dgui-recolhida .dgui-dados-seta{display:none}
+.dgui-cheio.dgui-recolhida .dgui-dados-cab{padding:0 0 10px}
+.dgui-cheio.dgui-recolhida .dgui-tabela-rola{border:1px solid var(--dg-borda);border-radius:10px}

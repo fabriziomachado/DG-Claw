@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Integrações - S2 Bot</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#2f9e5e">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/tema.css">
+<script src="/tema.js"></script>
+<link rel="stylesheet" href="/integracoes.css">
+<link rel="stylesheet" href="/casca.css">
+<link rel="stylesheet" href="/menu-lado.css">
+</head>
+<body class="ig">
+<main class="ig-main">
+  <div class="ig-cab">
+    <div>
+      <h1>Integrações</h1>
+      <p class="ig-sub">Tudo o que liga cada agente ao mundo: conectores, plugins, skills, chaves e canais.</p>
+    </div>
+    <button type="button" class="ig-btn" id="igRecarregar" title="Conferir tudo de novo agora">↻ Conferir de novo</button>
+  </div>
+
+  <div class="ig-resumo" id="igResumo" aria-live="polite"></div>
+
+  <div class="ig-barra">
+    <div class="ig-abas" id="igAbas" role="tablist" aria-label="Agentes"></div>
+    <input type="search" class="ig-busca" id="igBusca" placeholder="Buscar integração…" aria-label="Buscar integração">
+  </div>
+
+  <p class="ig-msg" id="igMsg" role="status" hidden></p>
+  <div id="igConteudo"><p class="ig-carregando">Conferindo as integrações de cada agente…</p></div>
+</main>
+
+<div class="ig-modal" id="igModal" hidden>
+  <div class="ig-caixa" role="dialog" aria-modal="true" aria-labelledby="igModalTit">
+    <button type="button" class="ig-x" data-fecha aria-label="Fechar" title="Fechar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
+    <h2 id="igModalTit"></h2>
+    <div id="igModalCorpo"></div>
+  </div>
+</div>
+
+<script src="/tour.js"></script>
+<script src="/menu-lado.js"></script>
+<script src="/casca.js"></script>
+<script src="/integracoes.js"></script>
+<script>
+DGCasca.monta({ pagina: 'integracoes', titulo: 'Integrações' });
+</script>
+</body>
+</html>

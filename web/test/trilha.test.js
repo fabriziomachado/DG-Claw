@@ -36,12 +36,14 @@ test('mascara: chaves conhecidas, Bearer e atribuições com cara de segredo', (
   assert.equal(mascarar(null), '');
 });
 
-test('descreveUso: Bash usa a description; Write/Edit resumem; leitura e dgchat ficam de fora; segredo é mascarado', () => {
+test('descreveUso: Bash usa a description; Write/Edit resumem; leitura entra marcada; dgchat fica de fora; segredo é mascarado', () => {
   assert.equal(descreveUso('Bash', { command: 'npm test', description: 'Roda os testes' }).titulo, 'Roda os testes');
   assert.equal(descreveUso('Bash', { command: 'ls   -la\n/tmp' }).titulo, 'ls -la /tmp');
   assert.equal(descreveUso('Write', { file_path: '/a/b.json', content: 'xx' }).titulo, 'gravou /a/b.json');
   assert.match(descreveUso('Edit', { file_path: '/a/b', old_string: 'a', new_string: 'bcd' }).comando, /troca de 1 por 3/);
-  assert.equal(descreveUso('Read', { file_path: '/a' }), null);
+  assert.deepEqual(descreveUso('Read', { file_path: '/a' }), { ferramenta: 'Read', titulo: '/a', comando: '/a', leitura: true });
+  assert.equal(descreveUso('Grep', { pattern: 'evasao', path: 'dados' }).titulo, '"evasao" em dados');
+  assert.equal(descreveUso('Read', {}), null);
   assert.equal(descreveUso('mcp__dgchat__reply', { text: 'oi' }), null);
   assert.equal(descreveUso('Bash', { command: '   ' }), null);
   assert.ok(!descreveUso('Bash', { command: 'echo TOKEN=reservado-12345678' }).comando.includes('reservado-12345678'));

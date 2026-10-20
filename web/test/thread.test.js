@@ -239,3 +239,28 @@ test('fila real: enqueue chega antes da reply, attachment e blobs não duplicam 
   assert.equal(r.eventos.filter(e => e.origin === 'agente').length, 6);
   assert.equal(r.eventos.filter(e => e.origin === 'rotina').length, 0);
 });
+
+test('thread: resposta a um cartão de escolha ("↩ pergunta" na primeira linha) vira citação no balão', () => {
+  const { agente, leitor } = preparar();
+  const tmp = path.join(pastaTemp('jsonl'), 's.jsonl');
+  const linha = (txt, n) => JSON.stringify({ type: 'user', timestamp: `2026-10-12T15:00:0${n}.000Z`, message: { content: `<dgchat from="pessoa" chat="c_ana" msg="m${n}" ts="x">${txt}</dgchat>` } }) + '\n';
+  fs.writeFileSync(tmp, linha('↩ Como seguimos?\nAplica no servidor', 1) + linha('↩ só a seta', 2));
+  const ev = leitor.ler(tmp, agente).eventos;
+  assert.equal(ev[0].text, 'Aplica no servidor');
+  assert.deepEqual(ev[0].cita, { origin: 'agente', texto: 'Como seguimos?' });
+  assert.equal(ev[1].text, '↩ só a seta', 'sem quebra de linha não é citação');
+  assert.equal(ev[1].cita, null);
+});
+
+test('thread: responder citando uma mensagem ("↩ [id] trecho") guarda de quem é a original e o id para pular até ela', () => {
+  const { agente, leitor } = preparar();
+  const tmp = path.join(pastaTemp('jsonl'), 's.jsonl');
+  const linha = (txt, n) => JSON.stringify({ type: 'user', timestamp: `2026-10-12T15:00:0${n}.000Z`, message: { content: `<dgchat from="pessoa" chat="c_ana" msg="m${n}" ts="x">${txt}</dgchat>` } }) + '\n';
+  fs.writeFileSync(tmp, linha('primeira', 1));
+  const id = leitor.ler(tmp, agente).eventos[0].id;
+  fs.appendFileSync(tmp, linha(`↩ [${id}] primeira\nconcordo`, 2));
+  const ev = leitor.ler(tmp, agente).eventos;
+  assert.equal(ev[1].text, 'concordo');
+  assert.equal(ev[1].cita.id, id); assert.equal(ev[1].cita.origin, 'dono'); assert.equal(ev[1].cita.texto, 'primeira');
+  assert.equal(typeof ev[1].cita.ep, 'number');
+});

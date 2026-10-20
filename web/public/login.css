@@ -15,6 +15,7 @@ body{margin:0;color:var(--txt);display:flex;align-items:center;justify-content:c
   box-shadow:0 4px 22px rgba(0,0,0,.16)}
 .marca{display:flex;align-items:center;gap:10px}
 .marca .emoji{font-size:34px;line-height:1}
+.marca .marca-ico{width:40px;height:40px;border-radius:10px;display:block}
 .marca h1{margin:0;font-size:24px;font-weight:700}
 .sub{margin:6px 0 16px;color:var(--muted);font-size:14.5px}
 .erro{margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#fbe0e0;color:#8f2f2f;
@@ -27,3 +28,6 @@ input:focus{border-color:var(--accent);background:#fff}
 button{width:100%;margin-top:20px;min-height:48px;border:0;border-radius:24px;background:var(--accent);
   color:#fff;font:inherit;font-size:16px;font-weight:700;cursor:pointer}
 button:active{opacity:.85}
+
+/* No iPhone, campo com fonte abaixo de 16px dá zoom quando recebe o foco. Regra: nada dá zoom no app instalado. */
+@media (pointer:coarse){input,textarea,select{font-size:16px!important}}

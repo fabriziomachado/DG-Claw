@@ -193,6 +193,27 @@ test('send: "/compact" vai cru para o Admin e para o agente comum; texto comum v
   } finally { await s.fechar(); }
 });
 
+test('send: "/clear" arquiva a conversa da tela e ela vai para o Histórico', async () => {
+  const s = await cenario();
+  try {
+    const antes = (await s.t.c.get('/api/v1/agents/ana/messages')).json;
+    assert.ok(antes.msgs.length > 0);
+    assert.equal(antes.arquivadas, false);
+    const r = (await s.t.c.post('/api/v1/agents/ana/send', { json: { text: '/clear' } })).json;
+    assert.equal(r.arquivou, true);
+    assert.equal(s.rAna.rec.inputs[0].text, '/clear');
+    const depois = (await s.t.c.get('/api/v1/agents/ana/messages')).json;
+    assert.deepEqual(depois.msgs, []);
+    assert.equal(depois.arquivadas, true);
+    const arq = (await s.t.c.get('/api/v1/historico/ana/arquivadas')).json;
+    assert.equal(arq.arquivadas.length, 1);
+    assert.equal(arq.arquivadas[0].total, antes.msgs.length);
+    // texto comum não arquiva
+    const r2 = (await s.t.c.post('/api/v1/agents/ana/send', { json: { text: 'oi' } })).json;
+    assert.equal(r2.arquivou, undefined);
+  } finally { await s.fechar(); }
+});
+
 test('send: vazio, grande demais, agente inexistente e JSON quebrado', async () => {
   const s = await cenario({}, { env: { DGCLAW_WEB_MAX_TEXTO: '50' } });
   try {
@@ -508,7 +529,12 @@ test('registro: relido quando o mtime muda; sinônimo tokenArquivo; arquivo ause
 test('páginas: / vai para o Admin, /a/<slug> serve a conversa e slug inexistente leva 404 com motivo', async () => {
   const s = await cenario();
   try {
-    assert.equal((await s.t.c.get('/')).headers.location, '/a/admin');
+    // sem cookie, "/" abre o primeiro agente que não é o Admin; com o cookie do último usado, abre esse; cookie de agente que sumiu não quebra
+    assert.equal((await s.t.c.get('/')).headers.location, '/a/ana');
+    assert.equal((await s.t.c.get('/', { headers: { Cookie: 'dgclaw_agente=admin' } })).headers.location, '/a/admin');
+    assert.equal((await s.t.c.get('/', { headers: { Cookie: 'dgclaw_agente=ana' } })).headers.location, '/a/ana');
+    assert.equal((await s.t.c.get('/', { headers: { Cookie: 'dgclaw_agente=fantasma' } })).headers.location, '/a/ana');
+    assert.equal((await s.t.c.get('/', { headers: { Cookie: 'dgclaw_agente=%E0%A4%A' } })).headers.location, '/a/ana');
     const ok = await s.t.c.get('/a/ana');
     assert.equal(ok.status, 200); assert.match(ok.texto, /conversa de teste/);
     const nao = await s.t.c.get('/a/fantasma');

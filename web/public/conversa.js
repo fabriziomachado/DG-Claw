@@ -46,6 +46,65 @@ function mostraErroTela(titulo, texto, agentes) {
   if (barra) barra.hidden = true;
 }
 
+/* ── Fileira de agentes do cabeçalho ──────────────────────────────────────
+   Montada aqui fora para aparecer JÁ na partida: a lista da última visita fica guardada no
+   aparelho (só nome, cor e foto) e desenha a fileira antes de a API responder. Sem isso, trocar
+   de agente mostrava por um instante o cabeçalho padrão (bolinha e "DG Claw"). iniciaTela troca
+   a provisória pela de verdade, com estado e avisos. */
+const CHAVE_FILEIRA = 'dgclaw-fileira';
+const escF = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function fotoFileira(a) {
+  const img = a.avatar_img || (/^https:\/\//i.test(a.avatar || '') ? a.avatar : '');
+  return img ? `<img src="${escF(img)}" alt="">` : escF(a.avatar || (a.nome || '?').slice(0, 1));
+}
+function ordemFileira(lista) {
+  return lista.filter(a => a.tipo === 'admin').concat(lista.filter(a => a.tipo !== 'admin'));
+}
+function montaFileira(lista, atualId) {
+  const nav = document.createElement('nav');
+  nav.id = 'fileira';
+  nav.setAttribute('aria-label', 'Trocar de agente');
+  const admin = lista.find(a => a.tipo === 'admin');
+  // "Novo" fica no fim da fileira, depois dos agentes (19/10/2026, pedido do dono)
+  nav.innerHTML =
+    lista.map(a => {
+      const atual = a.id === atualId;
+      return `<a class="fil${atual ? ' atual' : ''}" href="/a/${encodeURIComponent(a.id)}" data-avt="${escF(a.id)}" style="--arco:${escF(a.cor || '#2f9e5e')}"` +
+        `${atual ? ' aria-current="page"' : ''} aria-label="${escF((atual ? 'Conversa aberta: ' : 'Conversar com ') + a.nome)}">` +
+        `<span class="fil-foto" style="background:${escF(a.cor || '#2f9e5e')}">${fotoFileira(a)}</span>` +
+        `<span class="fil-nome">${escF(a.nome)}</span></a>`;
+    }).join('') +
+    (admin ? `<a class="fil novo" href="/a/${encodeURIComponent(admin.id)}#criar" aria-label="Criar um agente novo">` +
+      `<span class="fil-foto"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>` +
+      `<span class="fil-nome">Novo</span></a>` : '');
+  return nav;
+}
+/** Põe a fileira no cabeçalho, no lugar do avatar e do nome soltos (troca a que já estiver lá). */
+function pregaFileira(nav) {
+  const cab = $('cabecalho'), btnMenu = $('btnMenu');
+  if (!cab || !btnMenu) return false;
+  const velha = $('fileira');
+  if (velha) velha.remove();
+  cab.insertBefore(nav, btnMenu.nextSibling);
+  cab.classList.add('com-fileira');
+  const at = nav.querySelector('.atual');
+  if (at && at.scrollIntoView) at.scrollIntoView({ block: 'nearest', inline: 'center' });
+  return true;
+}
+function guardaFileira(lista) {
+  try {
+    localStorage.setItem(CHAVE_FILEIRA, JSON.stringify(lista.map(a => ({ id: a.id, nome: a.nome, tipo: a.tipo, cor: a.cor, avatar: a.avatar, avatar_img: a.avatar_img }))));
+  } catch (_) { /* sem armazenamento: a fileira só aparece quando a API responder */ }
+}
+(function fileiraProvisoria() {
+  const slug = slugDaUrl();
+  if (!slug) return;
+  let lista = null;
+  try { lista = JSON.parse(localStorage.getItem(CHAVE_FILEIRA) || 'null'); } catch (_) { lista = null; }
+  if (!Array.isArray(lista) || lista.length < 2 || !lista.some(a => a && a.id === slug)) return;
+  pregaFileira(montaFileira(ordemFileira(lista.filter(a => a && a.id)), slug));
+})();
+
 async function boot() {
   let d = null;
   try {
@@ -64,6 +123,7 @@ async function boot() {
     return;
   }
   const lista = Array.isArray(d.agentes) ? d.agentes : [];
+  guardaFileira(lista);
   if (!lista.length) {
     mostraErroTela('Nenhum agente por aqui ainda',
                    'O servidor não devolveu nenhum agente. Peça para cadastrarem um e recarregue.');
@@ -104,7 +164,7 @@ const chat = $('chat'), wrap = $('wrap'), estadoEl = $('estado'), entrada = $('e
    ResizeObserver roda depois do layout e antes de pintar: nenhum quadro sai fora do lugar. */
 const rolagem = (() => {
   const R = window.DGRolagem;
-  const est = { noFim: true, ancora: null };
+  const est = { noFim: true, ancora: null, top: 0 };
   const nosVistos = new WeakSet();
   const itens = () => {
     const l = Array.from(wrap.children);
@@ -112,6 +172,7 @@ const rolagem = (() => {
     return l.filter(e => !e.hidden && e.offsetHeight > 0);
   };
   function captura() {
+    est.top = chat.scrollTop;
     est.noFim = R.estaNoFim(chat.scrollTop, chat.scrollHeight, chat.clientHeight);
     est.ancora = null;
     if (est.noFim) return;
@@ -151,8 +212,11 @@ const rolagem = (() => {
     new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) observa(n); })
       .observe(chat, { childList: true });
   }
-  // passivo: só mede. A posição de quem está rolando nunca é tocada aqui.
-  chat.addEventListener('scroll', captura, { passive: true });
+  // passivo: só mede. A posição de quem está rolando nunca é tocada aqui. O evento de scroll chega
+  // um quadro DEPOIS do scrollTop que nós mesmos pusemos (aoFim, aplica); se o conteúdo cresceu nesse
+  // meio tempo (visual, imagem), medir de novo daria "não estou no fim" e a conversa ficaria para trás.
+  // Por isso só mede quando o scrollTop mudou de verdade desde a última captura.
+  chat.addEventListener('scroll', () => { if (R.moveuDeVerdade(est.top, chat.scrollTop)) captura(); }, { passive: true });
   captura();
   return {
     captura,
@@ -179,7 +243,8 @@ const AQUI = location.pathname + location.search;
 const EH_ADMIN = AGENTE.tipo === 'admin';
 /* A Mesa e os Lembretes levam o agente junto (?a=), para o menu deles ser o deste agente. */
 (function () {
-  try { localStorage.setItem('dgclaw:agente', AGENTE.id); } catch (_) { /* sem armazenamento: a casca usa o primeiro agente */ }
+  // localStorage para a casca das outras telas; o cookie é o que o servidor lê na rota "/" (abre o último agente usado)
+  window.DGCasca.guardaAgente(AGENTE.id);
   [['btnMesa', '/mesa'], ['btnLembretes', '/lembretes']].forEach(([id, href]) => {
     const el = $(id);
     if (el) el.href = window.DGMenuLado.comAgente(href, AGENTE.id);
@@ -191,7 +256,7 @@ const EH_ADMIN = AGENTE.tipo === 'admin';
   b.href = AGENTE.painel_url || ('/p/' + encodeURIComponent(AGENTE.id) + '/');
   b.hidden = false;
 })();
-if (window.campoCofre) window.campoCofre.configurar({ agente: AGENTE.id, enviar: texto => new Promise((resolve, reject) => { enviarTexto(texto, null, { aoEntregar: (ok, motivo) => ok ? resolve() : reject(new Error(motivo || 'O agente não recebeu a mensagem.')) }); }) });
+if (window.campoCofre) window.campoCofre.configurar({ agente: AGENTE.id, outrosAgentes: AGENTE.tipo === 'admin', enviar: texto => new Promise((resolve, reject) => { enviarTexto(texto, null, { aoEntregar: (ok, motivo) => ok ? resolve() : reject(new Error(motivo || 'O agente não recebeu a mensagem.')) }); }) });
 if (window.DGOnboarding) window.DGOnboarding.iniciar({ agente: AGENTE, enviar: texto => new Promise((resolve, reject) => { enviarTexto(texto, null, { aoEntregar: (ok, motivo) => ok ? resolve() : reject(new Error(motivo || 'O Admin não recebeu a mensagem.')) }); }), refazer: () => render({ semRolar: true }) });
 if (window.DGBarra) window.DGBarra.liga(entrada, { url: API + '/comandos' });   // lista de comandos ao digitar /
 let novasAbaixo = 0, setaVisivel = false;   // a seta pro fim e o contador dela
@@ -217,6 +282,7 @@ let religaTimer = null, religaEspera = 3000;
 let avisoThread = null;             // último aviso da THREAD posto na faixa amarela
 const ouvintesChegada = [];         // chamados no fim de cada integra()
 let anexos = [];                    // arquivos colados/arrastados/escolhidos esperando o Enter
+let filtrosProntos = false;         // os filtros do topo (mais abaixo) já existem?
 let carregouUmaVez = false;         // a primeira página já chegou (ou falhou)
 let demoAtividade = false;         // o tutorial mostra um exemplo da faixa de atividade
 
@@ -228,9 +294,115 @@ function pintaAvatar(el, a) {
   el.style.background = a.cor || '#2f9e5e';
 }
 document.documentElement.style.setProperty('--accent', AGENTE.cor || '#2f9e5e');
-document.title = AGENTE.nome + ' - DG Claw';
+document.title = AGENTE.nome + ' - S2 Bot';
 $('nomeAgente').textContent = AGENTE.nome;
 pintaAvatar(avEl, AGENTE);
+/* Foto trocada no menu (menu-lado.js): o cabeçalho e a conversa vazia mudam sem recarregar. */
+document.addEventListener('dgavatar', ev => {
+  const d = ev.detail || {};
+  if (d.id !== AGENTE.id) return;
+  AGENTE.avatar = d.avatar; AGENTE.avatar_img = d.avatar_img;
+  const noMenu = agentesMenu.find(a => a.id === d.id);
+  if (noMenu) Object.assign(noMenu, { avatar: d.avatar, avatar_img: d.avatar_img });
+  pintaAvatar(avEl, AGENTE);
+  const vz = document.querySelector('.vazio .vz-av');
+  if (vz) {
+    const img = d.avatar_img || '';
+    vz.innerHTML = img ? `<img src="${esc(img)}" alt="">` : esc(d.avatar || (AGENTE.nome || '?').slice(0, 1));
+  }
+});
+
+/* Fileira de agentes no cabeçalho (18/10/2026, pedido do dono, no lugar do grupo sobreposto e do
+   nome do agente): todos lado a lado, com o nome embaixo, o aberto sublinhado e com o estado
+   ("pronto", "trabalhando") embaixo do nome, um anel e um número quando há aviso não visto, e um "+"
+   que leva ao Admin para criar outro. Um toque troca de conversa; no aberto, abre as mídias. */
+(function () {
+  $('cabecalho').classList.add('pronto');
+  if (agentesMenu.length < 2) { const v = $('fileira'); if (v) v.remove(); $('cabecalho').classList.remove('com-fileira'); return; }
+  const nav = montaFileira(agentesMenu, AGENTE.id);
+  if (!pregaFileira(nav)) return;
+  const at = nav.querySelector('.atual');
+  if (at) {
+    estadoEl.classList.add('fil-estado');
+    at.appendChild(estadoEl);
+    at.title = 'Mídias, links e arquivos desta conversa';
+    at.addEventListener('click', ev => { ev.preventDefault(); $('who').click(); });
+  }
+  document.addEventListener('dgavatar', ev => {
+    const d = ev.detail || {};
+    const el = nav.querySelector('[data-avt="' + CSS.escape(d.id || '') + '"] .fil-foto');
+    if (el) el.innerHTML = fotoFileira(Object.assign({}, agentesMenu.find(a => a.id === d.id) || {}, d));
+  });
+  // número discreto e anel em cada outro agente: avisos não vistos (amarelo se algum pede decisão)
+  const outros = agentesMenu.filter(a => a.id !== AGENTE.id);
+  async function badges() {
+    if (document.hidden) return;
+    let total = 0;
+    for (const a of outros) {
+      let lista = [];
+      try {
+        const r = await fetch('/api/v1/agents/' + encodeURIComponent(a.id) + '/alertas', { credentials: 'same-origin', cache: 'no-store' });
+        if (!r.ok) continue;
+        lista = ((await r.json()) || {}).alertas || [];
+      } catch (_) { continue; }
+      total += lista.length;
+      const el = nav.querySelector('[data-avt="' + CSS.escape(a.id) + '"]');
+      if (!el) continue;
+      let b = el.querySelector('.fil-badge');
+      el.classList.toggle('aviso', lista.length > 0);
+      el.classList.toggle('pede', lista.some(x => x.tipo === 'pedido'));
+      if (!lista.length) { if (b) b.remove(); el.setAttribute('aria-label', 'Conversar com ' + a.nome); continue; }
+      if (!b) { b = document.createElement('span'); b.className = 'fil-badge'; el.appendChild(b); }
+      b.textContent = lista.length > 9 ? '9+' : String(lista.length);
+      el.setAttribute('aria-label', 'Conversar com ' + a.nome + ' (' + lista.length + ' aviso' + (lista.length > 1 ? 's' : '') + ' não visto' + (lista.length > 1 ? 's' : '') + ')');
+    }
+    avisosOutros = total;
+    pintaBadgeApp();
+  }
+  badges(); setInterval(badges, 30000);
+  document.addEventListener('visibilitychange', badges);
+  // borda girando em quem está trabalhando: o aberto vem do stream (integraAtividade), os outros daqui
+  async function quemTrabalha() {
+    if (document.hidden) return;
+    let d = null;
+    try {
+      const r = await fetch('/api/v1/atividade', { credentials: 'same-origin', cache: 'no-store' });
+      if (r.ok) d = await r.json();
+    } catch (_) { return; }
+    if (!d || !d.agentes) return;
+    for (const a of outros) marcaTrabalhando(a.id, (d.agentes[a.id] || {}).estado === 'trabalhando');
+  }
+  quemTrabalha(); setInterval(quemTrabalha, 6000);
+  document.addEventListener('visibilitychange', quemTrabalha);
+})();
+function marcaTrabalhando(id, sim) {
+  const el = document.querySelector('#fileira [data-avt="' + CSS.escape(id) + '"]');
+  if (!el || el.classList.contains('trab') === sim) return;
+  el.classList.toggle('trab', sim);
+  const nome = (agentesMenu.find(a => a.id === id) || {}).nome || id;
+  if (id === AGENTE.id) return;   // o aberto já tem o estado dele embaixo do nome (#estado)
+  el.title = sim ? nome + ' está trabalhando' : '';
+  // os outros também mostram "trabalhando" embaixo do nome, enquanto trabalham (18/10/2026)
+  let e = el.querySelector('.fil-estado');
+  if (sim && !e) { e = document.createElement('span'); e.className = 'fil-estado'; e.textContent = 'trabalhando'; el.appendChild(e); }
+  else if (!sim && e) e.remove();
+}
+/* O "+" da fileira abre o cartão "criar um agente novo" do Admin (onboarding.js). Já na conversa do
+   Admin o toque abre direto; de outro agente, o link leva ao Admin com #criar e ele abre ao carregar. */
+function abreCriacao() {
+  if (window.DGOnboarding && typeof window.DGOnboarding.novo === 'function') { window.DGOnboarding.novo(); return true; }
+  return false;
+}
+if (EH_ADMIN) {
+  document.addEventListener('click', ev => {
+    const n = ev.target.closest && ev.target.closest('#fileira .fil.novo');
+    if (n && abreCriacao()) ev.preventDefault();
+  });
+  if (location.hash === '#criar') {
+    history.replaceState(null, '', location.pathname + location.search);
+    setTimeout(abreCriacao, 400);
+  }
+}
 entrada.placeholder = 'Pergunte ao ' + AGENTE.nome;
 if (EH_ADMIN) $('avisoAdmin').hidden = false;
 if (!caps.microfone) document.documentElement.classList.add('sem-mic');
@@ -250,6 +422,11 @@ function setEstado(txt, ehErro) {
    cabeçalho segue contando o que o app faz (gravando, enviando, erro). A foto
    fica em window.atividadeFoto. */
 const atividadeEl = $('atividade');
+new MutationObserver(() => { if (typeof pintaParar === 'function') pintaParar(); }).observe(atividadeEl, { attributes: true, attributeFilter: ['hidden', 'class'] });
+// dica e folha de "sessão em paralelo" enquanto o agente trabalha (sessao-paralela.js)
+if (window.DGSessaoParalela) window.DGSessaoParalela.inicia({ agente: AGENTE, atividade: atividadeEl, entrada });
+// aviso de cota acabada, com a hora da volta, e a fila das mensagens para a volta (cota.js)
+if (window.DGCota) window.DGCota.inicia({ agente: AGENTE, enviar: t => enviarTexto(t) });
 const atvNomeEl = atividadeEl && atividadeEl.querySelector('.atv-nome');
 const atvSepEl = atividadeEl && atividadeEl.querySelector('.atv-sep');
 const atvAcaoEl = atividadeEl && atividadeEl.querySelector('.atv-acao');
@@ -291,7 +468,7 @@ function atvFrase(est) {
              classe: 'atv-alerta', titulo: est.detalhe || '' };
   }
   if (est.alerta === 'ferramenta_longa') {
-    return { nome: nome, acao: (est.detalhe || est.acao) + ' rodando' + (d ? ' há ' + d : ''), classe: 'atv-alerta',
+    return { nome: nome, acao: acaoAmigavel(est.detalhe || est.acao) + ' rodando' + (d ? ' há ' + d : ''), classe: 'atv-alerta',
              titulo: est.detalhe || '' };
   }
   if (est.alerta === 'sem_escrita') {
@@ -301,11 +478,30 @@ function atvFrase(est) {
   }
   const longa = est.acao !== 'pensando' && est.desde &&
     atvAgoraMs() - Date.parse(est.desde) >= 60000;
-  const oQue = est.detalhe || est.acao;
+  const oQue = acaoAmigavel(est.detalhe || est.acao);
   return { nome: nome + ' está trabalhando',
            acao: oQue + (longa && d ? ', há ' + d : ''),
            base: oQue, classe: longa ? 'atv-longa' : '', titulo: est.detalhe || '' };
 }
+/* Nome técnico da ferramenta vira frase de gente na faixa "está trabalhando" (18/10/2026):
+   "mcp__dgchat__reply" virava texto cru para o dono. O que não está na lista passa como veio. */
+const ACOES_AMIGAVEIS = {
+  mcp__dgchat__reply: 'escrevendo a resposta', mcp__dgchat__send_file: 'enviando um arquivo',
+  mcp__dgchat__whatsapp_reply: 'respondendo no WhatsApp', mcp__dgchat__whatsapp_send_file: 'enviando um arquivo no WhatsApp',
+  Bash: 'rodando um comando', Read: 'lendo um arquivo', Edit: 'editando um arquivo', Write: 'escrevendo um arquivo',
+  MultiEdit: 'editando um arquivo', NotebookEdit: 'editando um caderno', Grep: 'procurando nos arquivos', Glob: 'procurando arquivos',
+  WebFetch: 'lendo uma página da internet', WebSearch: 'pesquisando na internet', Skill: 'seguindo uma skill',
+  Task: 'pedindo ajuda a um subagente', Agent: 'pedindo ajuda a um subagente', TodoWrite: 'organizando as tarefas',
+  ToolSearch: 'procurando uma ferramenta',
+};
+function acaoAmigavel(t) {
+  const s = String(t || '');
+  if (ACOES_AMIGAVEIS[s]) return ACOES_AMIGAVEIS[s];
+  const m = /^mcp__(?:claude_ai_)?([^_]+(?:_[^_]+)*?)__(.+)$/.exec(s);
+  if (m) return 'usando ' + m[1].replace(/_/g, ' ');
+  return s;
+}
+
 function pintaAtividade() {
   if (!atividadeEl || demoAtividade) return;
   const foto = window.atividadeFoto;
@@ -317,10 +513,14 @@ function pintaAtividade() {
     // observador de rolagem (acima) mantém quem estava no fim no fim e quem lia lá em cima parado
     atividadeEl.hidden = !mostra;
   }
-  if (!mostra) { atvBase = null; return; }
+  if (!mostra) { atvBase = null; pgFecha(); return; }
   const f = atvFrase(est);
-  atividadeEl.className = f.classe;
+  // trabalhando sem alerta: a linha de passos (spinner, o comando de agora, quantos passos e o tempo)
+  const trab = est.estado === 'trabalhando' && !est.alerta;
+  atividadeEl.className = (f.classe || '') + (trab ? ' trab' : '') + (trab && pgAberto ? ' aberto' : '');
   atividadeEl.title = f.titulo;
+  if (trab) { pintaPassos(est); return; }
+  pgFecha();
   if (Date.now() < atvDetalheAte) {
     // toque: o detalhe (ex.: "Bash: npm test, há 40 s") no lugar da linha
     const d = Date.parse(est.desde || '');
@@ -344,10 +544,98 @@ function pintaAtividade() {
   atvBase = base;
   atvAcaoEl.textContent = f.acao;
 }
+/* ── Passos do pedido (18/10/2026, proposta aprovada pelo dono) ─────────────────
+   Trabalhando, a linha colada no campo mostra o spinner, o comando (ou arquivo, busca, página) de
+   agora, quantos passos já foram e o tempo desde o pedido. Um toque abre a lista para cima: os passos
+   feitos (✓, com o tempo de cada um) e o de agora. Os feitos vêm da trilha da conversa (itens
+   "trilha" depois da última fala do dono); o de agora vem da foto de atividade (est.passo). */
+let pgAberto = false;
+let pgTimer = null;
+const pgListaEl = $('pgLista'), pgMetaEl = $('pgMeta');
+const ICONE_PASSO = {
+  terminal: '<path d="m4 17 6-6-6-6M12 19h8"/>',
+  ler: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/>',
+  editar: '<path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/>',
+  buscar: '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+  web: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+  skill: '<path d="m12 3 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z"/>',
+  ajuda: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18.5 20a6.5 6.5 0 0 0-2.5-5.1"/>',
+  outro: '<circle cx="12" cy="12" r="3"/>',
+};
+const icPasso = tipo => `<svg class="pg-tipo" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONE_PASSO[tipo] || ICONE_PASSO.outro}</svg>`;
+const IC_FEITO = '<svg class="pg-ok" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>';
+const IC_FALHOU = '<svg class="pg-erro" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+const SETA_BAIXO = '<svg class="pg-seta" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+/* Uma linha de passo: ✓ (ou ✕), ícone do tipo, o comando/alvo e o tempo. Com detalhe, um toque mostra o
+   comando inteiro e a saída (o que a trilha antiga mostrava). */
+function htmlPasso(i, seg) {
+  const t = i.trilha;
+  const rot = TR.rotuloPasso(t);
+  const tipo = TR.tipoPasso(t.ferramenta);
+  const cab = `${t.erro ? IC_FALHOU : IC_FEITO}${icPasso(tipo)}<span class="pg-rot">${esc(rot)}</span>` +
+    (seg != null ? `<span class="pg-q">${esc(TR.duracao(seg))}</span>` : '');
+  const temDetalhe = !t.leitura || t.erro;
+  if (!temDetalhe) return `<li class="pg-passo" title="${esc(t.comando || t.titulo)}">${cab}</li>`;
+  const saida = t.saida ? `<pre class="tl-saida${t.erro ? ' erro' : ''}">${esc(t.saida)}${t.cortado ? '\n…' : ''}</pre>`
+    : `<div class="tl-vazio">${t.erro ? 'falhou, sem texto de saída' : 'sem saída'}</div>`;
+  return `<li class="pg-passo"><details data-tl="${esc(i.id)}"${trilhaAbertas.has(i.id) ? ' open' : ''}><summary title="${esc(t.comando || t.titulo)}">${cab}</summary>` +
+    `<pre class="tl-cmdtxt">${esc(t.comando)}</pre>${saida}</details></li>`;
+}
+/* Os passos feitos, cada um com o tempo até o próximo (o último, até `fimEp`). */
+function htmlPassos(itens, fimEp) {
+  return itens.map((i, k) => htmlPasso(i, (k + 1 < itens.length ? itens[k + 1].ep : fimEp) - i.ep)).join('');
+}
+const ultimaFalaDono = () => msgs.reduce((a, m) => (ehDono(m) && typeof m.ep === 'number' && m.ep > a ? m.ep : a), 0);
+const mmss = seg => { const s = Math.max(0, Math.round(seg)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+function pintaPassos(est) {
+  const desde = ultimaFalaDono();
+  const feitos = msgs.filter(m => TR.ehTrilha(m) && m.ep > desde);
+  const agoraSeg = atvAgoraMs() / 1000;
+  const p = est.passo;
+  const rot = p ? TR.rotuloPasso(p) : (est.acao === 'pensando' ? 'pensando…' : acaoAmigavel(est.acao));
+  atvNomeEl.textContent = '';
+  atvSepEl.hidden = true;
+  atvAcaoEl.className = 'atv-acao';
+  atvAcaoEl.textContent = rot;
+  atvAcaoEl.title = p ? (p.comando || p.titulo || '') : '';
+  const n = feitos.length + (p ? 1 : 0);
+  const ini = desde || (Date.parse(est.desde || '') / 1000) || agoraSeg;
+  pgMetaEl.textContent = (n ? (n === 1 ? '1 passo · ' : n + ' passos · ') : '') + mmss(agoraSeg - ini);
+  pgListaEl.hidden = !pgAberto;
+  if (pgAberto) {
+    const inicioAgora = p ? (Date.parse(est.desde || '') / 1000 || agoraSeg) : agoraSeg;
+    const agoraLi = p ? `<li class="pg-passo agora"><i class="pg-gira" aria-hidden="true"></i>${icPasso(TR.tipoPasso(p.ferramenta))}` +
+      `<span class="pg-rot">${esc(rot)}</span><span class="pg-q">${esc(TR.duracao(agoraSeg - inicioAgora))}</span></li>` : '';
+    const html = '<ul class="pg-passos">' + (feitos.length || agoraLi ? htmlPassos(feitos, inicioAgora) + agoraLi
+      : `<li class="pg-passo vazio">${esc(AGENTE.nome)} ainda não rodou nenhum passo neste pedido.</li>`) + '</ul>';
+    if (pgListaEl.innerHTML !== html) pgListaEl.innerHTML = html;
+  }
+  if (!pgTimer) pgTimer = setInterval(() => {
+    if (document.visibilityState === 'visible' && atividadeEl.classList.contains('trab')) pintaAtividade();
+  }, 1000);
+}
+if (pgListaEl) pgListaEl.addEventListener('toggle', ev => {
+  const d = ev.target;
+  if (!d || !d.dataset || !d.dataset.tl) return;
+  if (d.open) trilhaAbertas.add(d.dataset.tl); else trilhaAbertas.delete(d.dataset.tl);
+}, true);
+function pgFecha() {
+  if (pgTimer) { clearInterval(pgTimer); pgTimer = null; }
+  if (pgListaEl) pgListaEl.hidden = true;
+  if (pgMetaEl) pgMetaEl.textContent = '';
+  if (atvAcaoEl) { atvAcaoEl.className = 'atv-acao'; atvAcaoEl.title = ''; }
+}
+
+let trabalhavaAntes = false;
 function integraAtividade(d) {
   if (!d || !d.agentes) return;
   if (typeof d.agora === 'number') atvDeslocaMs = d.agora * 1000 - Date.now();
   window.atividadeFoto = d;
+  if (d.agentes[AGENTE.id]) marcaTrabalhando(AGENTE.id, d.agentes[AGENTE.id].estado === 'trabalhando');
+  // começou ou terminou de trabalhar: o resumo "Fez N passos" do último pedido some ou aparece
+  const est = d.agentes[AGENTE.id];
+  const trabalha = !!(est && est.estado === 'trabalhando');
+  if (trabalha !== trabalhavaAntes) { trabalhavaAntes = trabalha; if (carregouUmaVez) render({ semRolar: true }); }
   if (telaOciosa()) estadoOcioso();
   else pintaAtividade();
   lcSincroniza();
@@ -357,6 +645,12 @@ function integraAtividade(d) {
 if (atividadeEl) {
   atividadeEl.addEventListener('click', ev => {
     ev.stopPropagation();           // o #who em volta abre as mídias
+    if (atividadeEl.classList.contains('trab')) {
+      if (ev.target.closest('.pg-lista')) return;   // dentro da lista vale o toque de cada passo
+      pgAberto = !pgAberto;
+      pintaAtividade();
+      return;
+    }
     atvDetalheAte = Date.now() + 4000;
     pintaAtividade();
     setTimeout(pintaAtividade, 4100);
@@ -737,6 +1031,7 @@ function estadoOcioso() {
   const est = window.atividadeFoto?.agentes?.[AGENTE.id];
   if (!est) return setEstado('conferindo agente…');
   if (est.alerta === 'permissao') return setEstado('esperando a sua permissão');
+  if (est.estado === 'trabalhando') return setEstado('trabalhando');
   setEstado(est.estado === 'sem_sinal' ? 'agente sem sinal' : 'pronto', est.estado === 'sem_sinal');
 }
 
@@ -745,7 +1040,7 @@ function estadoOcioso() {
    porcentagem ("enviando 40%"); os de conexão também têm reticências, por isso
    entram como exceção. Assim o "reconectando…" nunca pisa num estado de trabalho. */
 function telaOciosa() {
-  if (gravando || esperando || falando) return false;
+  if (gravando || falando) return false;   // esperar a resposta não prende o estado (18/10/2026)
   const t = estadoEl.textContent;
   return ESTADOS_CONEXAO.includes(t) || !/(…|%)$/.test(t);
 }
@@ -842,6 +1137,44 @@ function formata(htmlSeguro, fmt) {
   return s;
 }
 
+/* ```diff (18/10/2026, pedido do dono): o que mudou num código, linha a linha, como no GitHub.
+   Vale para ```diff e ```patch, e para bloco sem língua que tem cara de diff (@@ ou ---/+++).
+   Cada linha vira um <span> com o \n dentro: o copiar (pre.textContent) devolve o texto igual. */
+function ehDiff(lingua, cod) {
+  if (lingua === 'diff' || lingua === 'patch') return true;
+  if (lingua) return false;
+  const l = cod.split('\n');
+  return l.some(x => /^@@ .* @@/.test(x)) || (l.some(x => x.startsWith('--- ')) && l.some(x => x.startsWith('+++ ')));
+}
+/* Cores de sintaxe (18/10/2026, pedido do dono): bloco com a língua no cabeçalho (```php, ```bash...)
+   passa pelo highlight.js (vendor/, sem rede), que já devolve o texto escapado. Sem língua ou com
+   língua que ele não conhece, fica o texto puro. O render redesenha a conversa toda hora: guarda. */
+const SINTAXE_NOME = { bash: 'Bash', sh: 'Shell', shell: 'Shell', zsh: 'Shell', js: 'JavaScript', javascript: 'JavaScript',
+  ts: 'TypeScript', typescript: 'TypeScript', py: 'Python', python: 'Python', php: 'PHP', sql: 'SQL', json: 'JSON',
+  yaml: 'YAML', yml: 'YAML', html: 'HTML', xml: 'XML', css: 'CSS', scss: 'SCSS', go: 'Go', rust: 'Rust', java: 'Java',
+  kotlin: 'Kotlin', csharp: 'C#', cs: 'C#', cpp: 'C++', c: 'C', ruby: 'Ruby', rb: 'Ruby', ini: 'INI', toml: 'TOML',
+  markdown: 'Markdown', md: 'Markdown', dockerfile: 'Dockerfile', nginx: 'Nginx', graphql: 'GraphQL', lua: 'Lua', r: 'R', swift: 'Swift' };
+const sintaxeCache = new Map();
+function htmlSintaxe(lingua, cod) {
+  const h = window.hljs;
+  const l = lingua === 'toml' ? 'ini' : lingua === 'zsh' ? 'bash' : lingua;
+  if (!h || !l || !h.getLanguage(l)) return null;
+  const k = l + '\u0000' + cod;
+  if (sintaxeCache.has(k)) return sintaxeCache.get(k);
+  let v = null;
+  try { v = h.highlight(cod, { language: l, ignoreIllegals: true }).value; } catch (_) { v = null; }
+  if (sintaxeCache.size > 200) sintaxeCache.clear();
+  sintaxeCache.set(k, v);
+  return v;
+}
+function htmlDiff(cod) {
+  return cod.split('\n').map(x => {
+    const c = /^(\+\+\+ |--- |diff --git|index )/.test(x) ? 'd-meta' : x.startsWith('@@') ? 'd-hunk'
+      : x.startsWith('+') ? 'd-add' : x.startsWith('-') ? 'd-del' : 'd-ctx';
+    return `<span class="${c}">${esc(x)}\n</span>`;
+  }).join('');
+}
+const ICO_VISUAL = '<svg class="ico-vis" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M3.5 9h17"/></svg>';
 const ICONE_COPIAR = '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">' +
   '<rect x="8" y="8" width="12" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/>' +
   '<path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" ' +
@@ -849,7 +1182,47 @@ const ICONE_COPIAR = '<svg viewBox="0 0 24 24" width="17" height="17" aria-hidde
 
 function textoEmParagrafos(txt, fmt) {
   return txt.split(/\n[ \t]*\n+/).filter(p => p.trim() !== '')
-    .map(p => `<div class="p">${formata(linkify(esc(p.trim())), fmt)}</div>`).join('');
+    .map(p => paragrafoComTabelas(p.trim(), fmt)).join('');
+}
+
+/* Tabela em Markdown (| a | b | com a linha |---|) vira tabela de verdade (18/10/2026): os
+   agentes respondem dados assim e a linha crua cheia de barras era ilegível. O texto do
+   parágrafo antes e depois da tabela continua como parágrafo. Cada célula passa pelo mesmo
+   esc + linkify + formata do resto, então negrito e link funcionam dentro dela. */
+const RX_LINHA_TAB = /^\s*\|.*\|\s*$/;
+const RX_SEP_TAB = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+function celulasTab(linha) {
+  return linha.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+}
+function htmlTabela(linhas, fmt) {
+  const cab = celulasTab(linhas[0]);
+  const alin = celulasTab(linhas[1]).map(c => /^:-+:$/.test(c) ? 'center' : /-:$/.test(c) ? 'right' : '');
+  const corpo = linhas.slice(2).map(celulasTab);
+  const cel = c => formata(linkify(esc(c)), fmt);
+  // coluna só de números (1.234, 7,5%, R$ 10) alinha à direita, como planilha
+  const numerica = cab.map((_, i) => corpo.length > 0 && corpo.every(r => /^[\s*_]*[-+]?(R\$\s*)?[\d.,]+\s*%?[\s*_]*$/.test(r[i] || '')));
+  const st = i => { const a = alin[i] || (numerica[i] ? 'right' : ''); return a ? ` style="text-align:${a}"` : ''; };
+  return '<div class="tabela-md"><table><thead><tr>' + cab.map((c, i) => `<th${st(i)}>${cel(c)}</th>`).join('') +
+         '</tr></thead><tbody>' + corpo.map(r => '<tr>' + cab.map((_, i) => `<td${st(i)}>${cel(r[i] || '')}</td>`).join('') + '</tr>').join('') +
+         '</tbody></table></div>';
+}
+function paragrafoComTabelas(p, fmt) {
+  const linhas = p.split('\n');
+  let html = '', texto = [];
+  const soltaTexto = () => { if (texto.length) html += `<div class="p">${formata(linkify(esc(texto.join('\n').trim())), fmt)}</div>`; texto = []; };
+  for (let i = 0; i < linhas.length; i++) {
+    if (RX_LINHA_TAB.test(linhas[i]) && i + 1 < linhas.length && RX_SEP_TAB.test(linhas[i + 1])) {
+      let j = i + 2;
+      while (j < linhas.length && RX_LINHA_TAB.test(linhas[j])) j++;
+      soltaTexto();
+      html += htmlTabela(linhas.slice(i, j), fmt);
+      i = j - 1;
+    } else {
+      texto.push(linhas[i]);
+    }
+  }
+  soltaTexto();
+  return html;
 }
 
 /* ```bloco``` vira a "caixa de texto" com fundo mais escuro e o botão de
@@ -870,14 +1243,22 @@ function paragrafos(txt, fmt) {
     // ```dgcofre: campo de senha (campo-cofre.js); nome inválido cai no bloco normal
     const cofre = window.campoCofre && window.campoCofre.blocoParaHtml(partes[i], txt);
     if (cofre) { html += cofre; continue; }
+    // ```dgui: KPI, tabela e gráfico desenhados pela tela (dgui.js)
+    const ui = window.dgui && window.dgui.blocoParaHtml(partes[i]);
+    if (ui) { html += ui; continue; }
+    const lingua = ((/^([A-Za-z0-9_+.-]{1,20})\n/.exec(partes[i]) || [])[1] || '').toLowerCase();
     let cod = partes[i].replace(/^[A-Za-z0-9_+.-]{1,20}\n/, '')
                          .replace(/^\n+/, '').replace(/\s+$/, '');
     // no MarkdownV2, dentro do bloco só a crase e a barra vêm escapadas
     if (fmt === 'markdownv2') cod = cod.replace(/\\([`\\])/g, '$1');
     if (!cod) continue;
-    html += `<div class="cod"><button type="button" class="codcopia" ` +
-            `aria-label="Copiar o texto do bloco" title="Copiar o texto do bloco">` +
-            `${ICONE_COPIAR}</button><pre>${esc(cod)}</pre></div>`;
+    const diff = ehDiff(lingua, cod);
+    const cor = diff ? null : htmlSintaxe(lingua, cod);
+    // bloco de código com cara de código-fonte (19/10/2026): barra no topo com a língua e o Copiar
+    const nomeLingua = diff ? 'diff' : lingua && lingua !== 'text' && lingua !== 'plaintext' ? (SINTAXE_NOME[lingua] || lingua) : 'texto';
+    html += `<div class="cod${diff ? ' cod-diff' : ''}"><div class="cod-bar"><span class="cod-lingua">${esc(nomeLingua)}</span>` +
+            `<button type="button" class="codcopia" aria-label="Copiar o código" title="Copiar o código">${ICONE_COPIAR}<span>Copiar</span></button></div>` +
+            `<pre${cor != null ? ' class="hljs"' : ''}>${diff ? htmlDiff(cod) : (cor != null ? cor : esc(cod))}</pre></div>`;
   }
   return html;
 }
@@ -915,7 +1296,9 @@ function htmlMidia(m) {
            `data-aud="${esc(md.id)}" src="${esc(md.url)}"></audio>${botaoBaixaMidia(md, rot)}</span>`;
   }
   if (md.kind === 'document' && !md.thumb && !/\.pdf$/i.test(md.nome || '')) {
-    return `<span class="midcx cxarq">${cartaoArquivo(md, md.id)}${botaoBaixaMidia(md, rot)}</span>`;
+    // texto, .md e código abrem no leitor: o olho ao lado do baixar deixa isso à vista
+    const ver = ehTextoLegivel(md) ? `<button type="button" class="midver" data-mid="${esc(md.id)}" title="Ver ${esc(md.nome || '')}" aria-label="Ver o arquivo">${ICO_VER}</button>` : '';
+    return `<span class="midcx cxarq${ver ? ' comver' : ''}">${cartaoArquivo(md, md.id)}${ver}${botaoBaixaMidia(md, rot)}</span>`;
   }
   const legenda = esc(md.nome || '') + (md.bytes ? ' (' + tamanhoHumano(md.bytes) + ')' : '');
   if (md.thumb) {
@@ -927,28 +1310,27 @@ function htmlMidia(m) {
            `<span class="lupa">${md.kind === 'video' ? 'vídeo' : 'toque para abrir'}</span></button>` +
            `${botaoBaixaMidia(md, rot)}</span>`;
   }
-  return `<span class="midcx"><button class="mid semthumb" data-mid="${esc(md.id)}">` +
-         `<img alt="" src="" hidden><span class="midfb">${rot} ${legenda}</span></button>` +
-         `${botaoBaixaMidia(md, rot)}</span>`;
+  // sem miniatura (PDF, por exemplo): o mesmo cartão de arquivo, com o selo do tipo
+  return `<span class="midcx cxarq">${cartaoArquivo(md, md.id)}${botaoBaixaMidia(md, rot)}</span>`;
 }
 
 /* Cartão de arquivo que não é mídia (zip, planilha, texto, código...): ícone pelo tipo,
    nome como texto comum (outras partes da tela leem e mascaram o texto do balão, então
    o nome não pode ficar só em atributo) e "tamanho · TIPO". */
-const ICONES_ARQ = [
-  ['🗜️', /^(zip|rar|7z|tar|gz|tgz|bz2|xz)$/],
-  ['📊', /^(xlsx|xls|csv|tsv|ods|numbers)$/],
-  ['📝', /^(docx?|odt|rtf|txt|md|pages)$/],
-  ['📽️', /^(pptx?|key|odp)$/],
-  ['🧩', /^(js|mjs|cjs|ts|tsx|jsx|py|sh|bash|json|html?|css|ya?ml|xml|sql|toml|ini|rb|go|rs|java|c|cpp|h|php|ipynb)$/],
-];
 function extDe(nome) {
   const m = /\.([A-Za-z0-9]{1,8})$/.exec(nome || '');
   return m ? m[1].toLowerCase() : '';
 }
+// selo do tipo (PDF, XLSX...) com a cor discreta da família do arquivo, no lugar do emoji
+const FAMILIA_ARQ = [
+  ['pdf', /^pdf$/], ['planilha', /^(xlsx|xls|csv|tsv|ods|numbers)$/], ['texto', /^(docx?|odt|rtf|txt|md|pages)$/],
+  ['slide', /^(pptx?|key|odp)$/], ['zip', /^(zip|rar|7z|tar|gz|tgz|bz2|xz)$/],
+  ['codigo', /^(js|mjs|cjs|ts|tsx|jsx|py|sh|bash|json|html?|css|ya?ml|xml|sql|toml|ini|rb|go|rs|java|c|cpp|h|php|ipynb)$/],
+];
 function cartaoArquivo(md, mid) {
   const ext = extDe(md.nome);
-  const ic = (ICONES_ARQ.find(i => i[1].test(ext)) || ['📄'])[0];
+  const fam = (FAMILIA_ARQ.find(i => i[1].test(ext)) || ['outro'])[0];
+  const ic = `<span class="selo-arq ${fam}">${esc((ext || 'arq').slice(0, 4).toUpperCase())}</span>`;
   const info = [md.bytes ? tamanhoHumano(md.bytes) : '', ext ? ext.toUpperCase() : 'ARQUIVO']
     .filter(Boolean).join(' · ');
   const abre = mid ? ` data-mid="${esc(mid)}"` : '';
@@ -961,9 +1343,11 @@ function cartaoArquivo(md, mid) {
 
 /* O ⬇ de todo anexo da thread: um link com `download`, FORA do botão da mídia
    (botão dentro de botão não vale). */
+const ICO_VER = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 function botaoBaixaMidia(md, rot) {
   return `<a class="midbx" href="${esc(md.url)}" download="${esc(md.nome || '')}" ` +
-         `title="Baixar ${esc(md.nome || '')}" aria-label="Baixar ${rot.replace(/^\S+\s/, '')}">⬇</a>`;
+         `title="Baixar ${esc(md.nome || '')}" aria-label="Baixar ${rot.replace(/^\S+\s/, '')}">` +
+         '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg></a>';
 }
 
 /* Miniatura que não veio (documento que não é PDF, ou geração falhou): o balão
@@ -1119,6 +1503,74 @@ function separaDoVisual(txt) {
   return r ? { titulo: r[1].trim(), texto: r[2] } : null;
 }
 
+/* Hora discreta embaixo do balão, em linguagem de gente ("agora", "há 5 min", "ontem, 20:24").
+   O HTML leva só a hora fixa e o ep: o texto humano é posto no DOM por humanizaHoras(), assim
+   o render continua reaproveitando o nó (o HTML não muda a cada minuto). */
+/* ✓ entregue / ✓✓ azul lido, como no WhatsApp, nas mensagens do dono (18/10/2026): "lido" é o
+   agente ter feito algo depois dela (respondido ou rodado um comando). lidoAteEp vem do render. */
+let lidoAteEp = 0;
+// até onde VOCÊ já viu as mensagens do agente neste aparelho (as do agente ganham ✓ / ✓✓ também)
+let vistoAteEp = 0;
+try { vistoAteEp = Number(localStorage.getItem('dgclaw-visto-ate:' + AGENTE.id)) || 0; } catch (_) { /* sem storage */ }
+const CHECK_1 = '<svg viewBox="0 0 16 11" width="15" height="11" aria-hidden="true"><path d="M1.5 5.8l3 3L11 2.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const CHECK_2 = '<svg viewBox="0 0 20 11" width="18" height="11" aria-hidden="true"><path d="M1.5 5.8l3 3L11 2.2M7.5 8.6l.4.2L15 2.2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+function htmlHora(m, extra) {
+  if (!m || m.pendente || typeof m.ep !== 'number') return '';
+  const hora = `<span class="hora" data-ep="${m.ep}" title="${esc(m.dia + ' ' + m.hhmm)}">` +
+               `${m.editada ? 'editada · ' : ''}${esc(m.hhmm)}</span>`;
+  const lido = ehDono(m) ? lidoAteEp >= m.ep : vistoAteEp >= m.ep;
+  if (!ehDono(m)) {
+    return `<span class="hora-cx">${hora}<span class="checks${lido ? ' lido' : ''}" data-ep-chk="${m.ep}" title="${lido ? 'você viu' : 'chegou, você ainda não viu'}" ` +
+           `aria-label="${lido ? 'vista por você' : 'não vista'}">${lido ? CHECK_2 : CHECK_1}</span></span>`;
+  }
+  return `<span class="hora-cx">${hora}<span class="checks${lido ? ' lido' : ''}" title="${lido ? 'lida pelo agente' : 'entregue ao agente'}" ` +
+         `aria-label="${lido ? 'lida' : 'entregue'}">${lido ? CHECK_2 : CHECK_1}</span></span>`;
+}
+function horaHumana(ep, agora) {
+  const s = Math.max(0, agora / 1000 - ep);
+  if (s < 60) return 'agora';
+  if (s < 3600) return 'há ' + Math.floor(s / 60) + ' min';
+  const d = new Date(ep * 1000), h = new Date(agora);
+  const hhmm = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  const meiaNoite = new Date(h.getFullYear(), h.getMonth(), h.getDate()).getTime() / 1000;
+  if (ep >= meiaNoite) return s < 6 * 3600 ? 'há ' + Math.floor(s / 3600) + ' h' : 'hoje, ' + hhmm;
+  if (ep >= meiaNoite - 86400) return 'ontem, ' + hhmm;
+  return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + ', ' + hhmm;
+}
+function humanizaHoras() {
+  const agora = Date.now();
+  for (const el of wrap.querySelectorAll('.hora[data-ep]')) {
+    const txt = (el.textContent.startsWith('editada · ') ? 'editada · ' : '') + horaHumana(Number(el.dataset.ep), agora);
+    if (el.textContent !== txt) el.textContent = txt;
+  }
+}
+setInterval(humanizaHoras, 30000);
+
+const RX_LINHA_TAREFA = /^📋 Tarefa #(\d+) da Mesa:[^\n]*\n?/m;
+const RX_LINK_TAREFA = /(?:https?:\/\/[^\s/]+)?\/mesa(?:\?[^\s#]*)?#t(\d+)\b/g;
+const tarefasCache = new Map();   // n -> tarefa | null (não existe) ; ausente = ainda não buscou
+function htmlTarefaCartao(n) {
+  const t = tarefasCache.get(String(n));
+  if (!t) return `<span class="tf-k">▦ Tarefa do Board · #${esc(n)}</span><b>${t === null ? 'Tarefa não encontrada' : 'Carregando…'}</b>`;
+  const est = { fazendo: 'fazendo', esperando_dono: 'esperando você', travada: 'travada', concluida: 'concluída', cancelada: 'cancelada' }[t.estado] || t.estado || '';
+  const ag = (agentesMenu.find(a => a.id === t.agente) || {}).nome || t.agente || '';
+  return `<span class="tf-k">▦ Tarefa do Board · #${esc(n)}${est ? ' · ' + esc(est) : ''}</span><b>${esc(t.titulo || '')}</b>` +
+    `<small>${esc([ag, t.progresso != null ? t.progresso + '%' : '', t.nota || ''].filter(Boolean).join(' · '))}</small>`;
+}
+async function preencheTarefas() {
+  const els = wrap.querySelectorAll('.tf-cartao[data-tarefa]');
+  const faltam = new Set();
+  for (const el of els) { const n = el.dataset.tarefa; if (tarefasCache.has(n)) el.innerHTML = htmlTarefaCartao(n); else faltam.add(n); }
+  for (const n of faltam) {
+    tarefasCache.set(n, undefined);
+    try {
+      const r = await fetch('/api/v1/tarefas/' + encodeURIComponent(n), { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+      const d = r.ok ? await r.json() : null;
+      tarefasCache.set(n, d ? (d.tarefa || d) : null);
+    } catch (_) { tarefasCache.delete(n); continue; }
+    wrap.querySelectorAll('.tf-cartao[data-tarefa="' + n + '"]').forEach(el => { el.innerHTML = htmlTarefaCartao(n); });
+  }
+}
 function htmlCorpo(m) {
   let midia = '';
   if (m.local && m.local.anexos) {
@@ -1129,14 +1581,22 @@ function htmlCorpo(m) {
     // veio marcado como mídia e o arquivo não chegou até aqui: o rótulo explica o que era
     midia = `<span class="midia">${ROTULO_MIDIA[m.kind]} (não baixada)</span>`;
   }
-  const cita = m.cita ? `<div class="cita"><b>${ehDono({ origin: m.cita.origin }) ? 'Você' :
+  const cita = m.cita ? `<div class="cita"${m.cita.id ? ` role="button" tabindex="0" data-ir-msg="${esc(m.cita.id)}" title="Ir até a mensagem citada"` : ''}><b>${ehDono({ origin: m.cita.origin }) ? 'Você' :
       esc(AGENTE.nome)}</b>${esc(m.cita.texto)}</div>` : '';
   let leg = legendaUtil(m);
+  // tarefa da Mesa citada (19/10/2026, ideia 4): a linha "📋 Tarefa #N da Mesa: ..." vira cartão, e todo
+  // link /mesa#tN do texto ganha o cartão embaixo
+  const tarefas = [];
+  if (leg) {
+    leg = String(leg).replace(RX_LINHA_TAREFA, (_, n) => { tarefas.push(n); return ''; }).trim();
+    for (const r of String(leg).matchAll(RX_LINK_TAREFA)) if (!tarefas.includes(r[1])) tarefas.push(r[1]);
+  }
+  const cartoesTarefa = tarefas.slice(0, 4).map(n => `<a class="tf-cartao" href="/mesa#t${n}" data-tarefa="${n}">${htmlTarefaCartao(n)}</a>`).join('');
   let doVisual = '';
   const dv = ehDono(m) ? separaDoVisual(leg) : null;
   if (dv) {
     leg = dv.texto;
-    doVisual = `<div class="dovisual">📊 do visual${dv.titulo ? ': ' + esc(dv.titulo) : ''}</div>`;
+    doVisual = `<div class="dovisual">${ICO_VISUAL} do visual${dv.titulo ? ': ' + esc(dv.titulo) : ''}</div>`;
   }
   // [ver a criação] só vira botão em mensagem de quem não é o dono (o texto já sai escapado de paragrafos)
   let htmlLeg = leg ? paragrafos(leg, m.fmt) : '';
@@ -1144,33 +1604,33 @@ function htmlCorpo(m) {
   const corpo = leg ? doVisual + htmlLeg : doVisual;
   const reac = (m.reacoes && m.reacoes.length)
     ? `<span class="reac">${m.reacoes.map(esc).join(' ')}</span>` : '';
-  const meta = m.pendente ? metaPendente(m.local)
-    : `<span class="meta">${m.editada ? 'editada · ' : ''}${esc(m.hhmm)}</span>`;
-  return htmlSelo(m) + cita + midia + corpo + reac + meta;
+  // a hora das mensagens já entregues fica fora do balão (htmlHora); a do pendente segue dentro
+  const meta = m.pendente ? metaPendente(m.local) : '';
+  return htmlSelo(m) + cita + midia + cartoesTarefa + corpo + reac + meta;
 }
 
-/* Trilha de comandos: uma linha discreta e recolhível por sequência de comandos entre duas mensagens.
-   Fechada por padrão; o que a pessoa abriu continua aberto quando o grupo cresce (trilhaAbertas).
-   O texto vem do servidor já mascarado e cortado, e entra sempre escapado. */
+/* Trilha de comandos: o que a pessoa abriu (resumo ou passo) continua aberto quando a lista cresce
+   (trilhaAbertas). O texto vem do servidor já mascarado e cortado, e entra sempre escapado. */
 const trilhaAbertas = new Set();
-function htmlComando(i, aberto) {
-  const t = i.trilha;
-  const saida = t.saida ? `<pre class="tl-saida${t.erro ? ' erro' : ''}">${esc(t.saida)}${t.cortado ? '\n…' : ''}</pre>`
-    : `<div class="tl-vazio">${t.erro ? 'falhou, sem texto de saída' : 'sem saída'}</div>`;
-  return `<details class="tl-cmd${t.erro ? ' erro' : ''}" data-tl="${esc(i.id)}"${aberto ? ' open' : ''}>` +
-    `<summary>${t.erro ? 'falhou: ' : 'rodou: '}${esc(t.titulo)}<span class="tl-hora">${esc(i.hhmm)}</span></summary>` +
-    `<pre class="tl-cmdtxt">${esc(t.comando)}</pre>${saida}</details>`;
-}
-function htmlTrilha(itens) {
+/* "Fez 5 passos em 2 min": os passos de um pedido, recolhidos (abre com um toque). O tempo vai da fala
+   do dono até a última coisa do agente naquele pedido. */
+function htmlResumoPassos(itens, todas) {
   const id = itens[0].id;
-  if (itens.length === 1) {
-    return `<div class="row her trilha" data-msg="${esc(id)}">${htmlComando(itens[0], trilhaAbertas.has(itens[0].id))}</div>`;
+  const iniDono = todas.reduce((a, x) => (ehDono(x) && typeof x.ep === 'number' && x.ep <= itens[0].ep && x.ep > a ? x.ep : a), 0);
+  const ultimo = itens[itens.length - 1];
+  let fim = ultimo.ep;
+  for (const x of todas) {
+    if (typeof x.ep !== 'number' || x.ep <= ultimo.ep) continue;
+    if (ehDono(x)) break;
+    fim = x.ep;
   }
-  const erros = itens.some(i => i.trilha.erro);
-  const aberto = trilhaAbertas.has(id);
-  return `<div class="row her trilha" data-msg="${esc(id)}"><details class="tl-grupo${erros ? ' erro' : ''}" data-tl="${esc(id)}"${aberto ? ' open' : ''}>` +
-    `<summary>${esc(TR.rotuloGrupo(itens))}</summary>` +
-    itens.map(i => htmlComando(i, trilhaAbertas.has(i.id))).join('') + '</details></div>';
+  const ini = iniDono || itens[0].ep;
+  const erros = itens.filter(i => i.trilha.erro).length;
+  const rot = `Fez ${itens.length === 1 ? '1 passo' : itens.length + ' passos'}${fim - ini >= 1 ? ' em ' + TR.duracao(fim - ini) : ''}` +
+    (erros ? ` · ${erros === 1 ? '1 falhou' : erros + ' falharam'}` : '');
+  return `<div class="row her trilha" data-msg="${esc(id)}"><details class="pg-resumo${erros ? ' erro' : ''}" data-tl="${esc(id)}"${trilhaAbertas.has(id) ? ' open' : ''}>` +
+    `<summary>${erros ? IC_FALHOU : IC_FEITO}<span>${esc(rot)}</span>${SETA_BAIXO}</summary>` +
+    `<ul class="pg-passos">${htmlPassos(itens, fim)}</ul></details></div>`;
 }
 /* Resultado de um comando de barra (/context, /cost...): o que o terminal respondeu, num bloco fechado
    do lado do agente. O texto vem do servidor e entra sempre escapado. */
@@ -1200,32 +1660,125 @@ function fotoDoDono(m) {
   return !!(m && ehDono(m) && !m.pendente && m.media && m.media.disponivel && m.media.thumb &&
             !ehVisual(m.media) && (m.media.kind === 'photo' || m.media.kind === 'image' || m.media.kind === 'video'));
 }
+/* Imagens que o agente manda em sequência (19/10/2026): um carrossel, com a legenda de cada uma */
+function fotoDoAgente(m) {
+  return !!(m && !ehDono(m) && m.media && m.media.disponivel && m.media.thumb && !ehVisual(m.media) &&
+            (m.media.kind === 'photo' || m.media.kind === 'image'));
+}
+function htmlFotosAgente(grupo, troca) {
+  const n = grupo.length;
+  const slides = grupo.map((m, i) => {
+    const md = m.media; midias[md.id] = md;
+    const leg = legendaUtil(m);
+    return `<div class="dg-car-sl" data-msg="${esc(m.id)}"><span class="midcx"><button class="mid" data-mid="${esc(md.id)}" aria-label="Abrir a imagem ${i + 1} de ${n}">` +
+      `<img loading="lazy" alt="" src="${esc(md.url || md.thumb)}" onerror="this.src='${esc(md.thumb)}'"></button></span>` +
+      `<div class="dg-car-tx"><div class="dg-car-k">${i + 1} de ${n}</div>${leg ? `<div class="dg-car-d">${esc(leg)}</div>` : ''}</div></div>`;
+  });
+  const ultimo = grupo[n - 1];
+  return `<div class="row her${troca}" data-msg="${esc(grupo[0].id)}"><div class="bub">${window.dgui.htmlCarrossel(slides, 'dg-car-fotos')}</div>${htmlAcoes(ultimo, htmlHora(ultimo))}</div>`;
+}
 function htmlFotosDono(grupo, troca) {
   const fotos = grupo.map(m => `<span class="mfoto-item" data-msg="${esc(m.id)}">${htmlMidia(m)}</span>`).join('');
   const textos = grupo.map(m => {
     const leg = legendaUtil(m);
     return leg ? paragrafos(leg, m.fmt) : '';
   }).filter(Boolean).join('');
-  const ult = grupo[grupo.length - 1];
-  const meta = `<span class="meta">${ult.editada ? 'editada · ' : ''}${esc(ult.hhmm)}</span>`;
   return `<div class="row me mfotos-row${troca}" data-msg="${esc(grupo[0].id)}">` +
          `<div class="mfotos">${fotos}</div>` +
-         (textos ? `<div class="bub">${textos}${meta}</div>` : `<div class="mfotos-meta">${meta}</div>`) + '</div>';
+         (textos ? `<div class="bub">${textos}</div>` : '') + htmlHora(grupo[grupo.length - 1]) + '</div>';
 }
 
 /* Ações embaixo de cada resposta do agente, como no ChatGPT: copiar e ouvir. */
 const ICONE_ACAO = {
   copiar: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/></svg>',
   ok:     '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
-  ouvir:  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>'
+  ouvir:  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
+  bom: '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 10v10H4.5a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1zM7 10l4-7a2.2 2.2 0 0 1 2.6 2.6L13 9h5.4a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.2 20H7"/></svg>',
+  ruim: '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 14V4h2.5a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1zM17 14l-4 7a2.2 2.2 0 0 1-2.6-2.6L11 15H5.6a2 2 0 0 1-2-2.3l1.2-7A2 2 0 0 1 6.8 4H17"/></svg>',
+  responder: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H12"/></svg>'
 };
-function htmlAcoes(m) {
-  if (!m || m.pendente || !legendaUtil(m) || ehVisual(m.media)) return '';
-  return `<div class="acoes" data-acoes="${esc(m.id)}">` +
+/* 👍 / 👎 (19/10/2026, ideia 5): discretos, no estilo do ChatGPT. O voto fica no servidor (vale em todo
+   aparelho) e vira recado ao agente: 👍 ele guarda o que funcionou; 👎 ele pergunta o que melhorar. */
+let votos = {};
+api(API + '/feedback').then(d => { votos = (d && d.votos) || {}; if (carregouUmaVez) render({ semRolar: true }); }).catch(() => {});
+async function vota(m, tipo) {
+  const novo = votos[m.id] === tipo ? '' : tipo;
+  const antes = votos[m.id];
+  if (novo) votos[m.id] = novo; else delete votos[m.id];
+  render({ semRolar: true });
+  try { await api(API + '/feedback', { method: 'POST', body: { mensagem: m.id, tipo: novo } }); }
+  catch (e) { if (antes) votos[m.id] = antes; else delete votos[m.id]; render({ semRolar: true }); mostraErro('Não consegui registrar: ' + e.message); }
+}
+function htmlAcoes(m, hora) {
+  hora = hora || '';
+  if (!m || m.pendente || !legendaUtil(m) || ehVisual(m.media)) return hora ? `<div class="acoes so-hora">${hora}</div>` : '';
+  return chipMemoria(m) + `<div class="acoes" data-acoes="${esc(m.id)}">` +
          `<button type="button" class="ac" data-ac="copiar" title="Copiar" aria-label="Copiar a resposta">${ICONE_ACAO.copiar}</button>` +
          `<button type="button" class="ac ac-ouvir" data-ac="ouvir" title="Ouvir em voz alta" aria-label="Ouvir a resposta em voz alta">${ICONE_ACAO.ouvir}</button>` +
-         '</div>';
+         `<button type="button" class="ac${respondendo && respondendo.id === m.id ? ' acao-resp-on' : ''}" data-ac="responder" title="Responder citando" aria-label="Responder citando esta mensagem">${ICONE_ACAO.responder}</button>` +
+         (m.origin === 'agente' ? `<button type="button" class="ac ac-voto${votos[m.id] === 'bom' ? ' on' : ''}" data-ac="bom" title="Boa resposta" aria-label="Boa resposta" aria-pressed="${votos[m.id] === 'bom'}">${ICONE_ACAO.bom}</button>` +
+           `<button type="button" class="ac ac-voto${votos[m.id] === 'ruim' ? ' on' : ''}" data-ac="ruim" title="Resposta ruim" aria-label="Resposta ruim" aria-pressed="${votos[m.id] === 'ruim'}">${ICONE_ACAO.ruim}</button>` : '') +
+         hora + extrasDaResposta(m) + '</div>' + detalhesDaResposta(m);
 }
+/* Memória e tokens de cada resposta (20/10/2026, proposta B do dono). O servidor manda em m.memorias
+   ([{tipo, texto}]: o que o agente guardou na memória durante esta resposta) e m.uso ({entrada, cache,
+   saida, ms}). Na linha das ações: um cérebro com o número de memórias e, à direita, um ⓘ. Cada um abre um
+   bloco logo abaixo; a escolha de aberto sobrevive ao redesenho. */
+const memAbertas = new Set(), infoAbertas = new Set();
+const ICO_MEMORIA = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4.5a3 3 0 0 0-3 3 3 3 0 0 0-1.5 5.3A3 3 0 0 0 8 18a2.5 2.5 0 0 0 4 1.5V5.5A2.5 2.5 0 0 0 9 4.5zM15 4.5a3 3 0 0 1 3 3 3 3 0 0 1 1.5 5.3A3 3 0 0 1 16 18a2.5 2.5 0 0 1-4 1.5"/></svg>';
+const ICO_INFO = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>';
+function numCurto(n) {
+  if (!Number.isFinite(n)) return '–';
+  if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 2).replace('.', ',').replace(/,?0+$/, '') + ' mi';
+  if (n >= 1e3) return (n / 1e3).toFixed(n >= 1e5 ? 0 : 1).replace('.', ',').replace(/,0$/, '') + ' mil';
+  return String(n);
+}
+function duracao(ms) {
+  if (!Number.isFinite(ms)) return '';
+  const s = Math.round(ms / 1000);
+  return s < 60 ? s + ' s' : Math.floor(s / 60) + ' min' + (s % 60 ? ' ' + (s % 60) + ' s' : '');
+}
+/* Opção A (o dono trocou de B para A em 20/10/2026): "2 memórias" é um chip numa linha logo abaixo da
+   resposta (o toque abre o que foi guardado), e os tokens ficam sempre à vista à direita da linha das ações
+   ("↓ 853 mil · ↑ 7,8 mil"); o toque neles abre o detalhe (cache e tempo). */
+function chipMemoria(m) {
+  if (!m || m.origin !== 'agente') return '';
+  const n = Array.isArray(m.memorias) ? m.memorias.length : 0;
+  if (!n) return '';
+  const aberto = memAbertas.has(m.id);
+  return `<div class="resp-memchip" data-memchip="${esc(m.id)}"><button type="button" class="rmc-bt${aberto ? ' on' : ''}" data-memchip-bt aria-expanded="${aberto}">${ICO_MEMORIA}` +
+    `<b>${n} ${n === 1 ? 'memória' : 'memórias'}</b><svg class="rmc-seta" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>` +
+    (aberto ? `<div class="resp-mem">${m.memorias.map(x => `<div><span class="rm-tag">${esc(x.tipo || 'Fato')}</span><span>${esc(x.texto)}</span></div>`).join('')}</div>` : '') + '</div>';
+}
+function extrasDaResposta(m) {
+  if (!m || m.origin !== 'agente' || !m.uso) return '';
+  const aberto = infoAbertas.has(m.id);
+  return `<button type="button" class="ac ac-tok${aberto ? ' on' : ''}" data-ac="info" title="Tokens desta resposta: entrada e saída" aria-expanded="${aberto}">` +
+    `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3 5 13h6l-1 8 8-10h-6z"/></svg>` +
+    `<span>↓ ${numCurto(m.uso.entrada)} · ↑ ${numCurto(m.uso.saida)}</span></button>`;
+}
+function detalhesDaResposta(m) {
+  if (!m || m.origin !== 'agente') return '';
+  let html = '';
+  if (infoAbertas.has(m.id) && m.uso) {
+    const u = m.uso;
+    html += `<div class="resp-info" data-det="info"><span class="ri-t">Esta resposta</span>` +
+      `<div><span>Entrada</span><b>${numCurto(u.entrada)} tokens</b></div>` +
+      (u.cache ? `<div><span>· do cache (mais barato)</span><b>${numCurto(u.cache)}</b></div>` : '') +
+      `<div><span>Saída</span><b>${numCurto(u.saida)} tokens</b></div>` +
+      (Number.isFinite(u.ms) && u.ms > 0 ? `<div><span>Tempo</span><b>${duracao(u.ms)}</b></div>` : '') + '</div>';
+  }
+  return html;
+}
+wrap.addEventListener('click', ev => {
+  const bt = ev.target.closest ? ev.target.closest('[data-memchip-bt]') : null;
+  if (!bt) return;
+  const caixa = bt.closest('[data-memchip]'), id = caixa.dataset.memchip;
+  const m = msgs.find(x => x.id === id);
+  if (!m) return;
+  if (memAbertas.has(id)) memAbertas.delete(id); else memAbertas.add(id);
+  caixa.outerHTML = chipMemoria(m);
+});
 wrap.addEventListener('click', async ev => {
   const b = ev.target.closest ? ev.target.closest('.acoes .ac') : null;
   if (!b) return;
@@ -1233,6 +1786,20 @@ wrap.addEventListener('click', async ev => {
   const m = msgs.find(x => x.id === id);
   const texto = m ? legendaUtil(m) : '';
   if (!texto) return;
+  if (b.dataset.ac === 'mem' || b.dataset.ac === 'info') {
+    const conj = b.dataset.ac === 'mem' ? memAbertas : infoAbertas;
+    if (conj.has(m.id)) conj.delete(m.id); else conj.add(m.id);
+    const linha = b.closest('.acoes');
+    linha.parentElement.querySelectorAll(':scope > [data-det]').forEach(x => x.remove());
+    linha.insertAdjacentHTML('afterend', detalhesDaResposta(m));
+    linha.querySelectorAll('.ac-mem, .ac-info').forEach(x => {
+      const on = (x.dataset.ac === 'mem' ? memAbertas : infoAbertas).has(m.id);
+      x.classList.toggle('on', on); x.setAttribute('aria-expanded', String(on));
+    });
+    return;
+  }
+  if (b.dataset.ac === 'responder') { comecaResposta(m); acendeResp(m.id); return; }
+  if (b.dataset.ac === 'bom' || b.dataset.ac === 'ruim') { vota(m, b.dataset.ac); return; }
   if (b.dataset.ac === 'copiar') {
     try {
       await navigator.clipboard.writeText(texto);
@@ -1248,13 +1815,46 @@ wrap.addEventListener('click', async ev => {
   }
 });
 
-/* Conversa vazia: nunca tela em branco. */
-function htmlVazio() {
-  return '<div class="vazio"><div class="vz-ico" aria-hidden="true">🦞</div>' +
-    `<b>O ${esc(AGENTE.nome)} está acordando...</b>` +
-    '<small>Ele ainda não escreveu nada por aqui. Assim que responder, a conversa ' +
-    'aparece nesta tela sozinha. Você já pode mandar a primeira mensagem.</small></div>';
+/* Conversa vazia: nunca tela em branco (18/10/2026, no padrão de estado vazio): o avatar do agente,
+   uma pergunta curta e sugestões que só preenchem o campo (o dono revisa e envia). Depois de um
+   /clear, aponta para as conversas arquivadas no Histórico. */
+const SUGESTOES_VAZIO = ['O que você consegue fazer por mim?', 'O que ficou pendente da última conversa?', 'Me dê um resumo do que você sabe sobre o meu trabalho']
+  .map(texto => ({ texto, tipo: '' }));
+// As do próprio agente (objetivo dele e últimas conversas), em ~/.dgclaw/sugestoes.json; as de cima são o reserva.
+let sugestoesAgente = null;
+const ROTULO_SUGESTAO = { continuar: 'Continuar', insight: 'Ideia' };
+if (!EH_ADMIN) {
+  fetch('/api/v1/historico/' + encodeURIComponent(AGENTE.id) + '/sugestoes', { credentials: 'same-origin', cache: 'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (!d || !Array.isArray(d.sugestoes) || !d.sugestoes.length) return;
+      sugestoesAgente = d.sugestoes;
+      if (wrap.querySelector('.vazio')) render({ semRolar: true });
+    })
+    .catch(() => { /* fica com as genéricas */ });
 }
+function htmlVazio() {
+  const img = AGENTE.avatar_img || (/^https:\/\//i.test(AGENTE.avatar || '') ? AGENTE.avatar : '');
+  const foto = img ? `<img src="${esc(img)}" alt="">` : esc(AGENTE.avatar || (AGENTE.nome || '?').slice(0, 1));
+  const comHist = !EH_ADMIN && !!window.DGHistorico;
+  const sub = arquivadasTela && comHist
+    ? 'Conversa nova. As anteriores estão no <button type="button" class="vz-link" data-abre-historico>Histórico</button>.'
+    : `Mande a primeira mensagem para o ${esc(AGENTE.nome)}. A resposta aparece aqui.`;
+  const sug = EH_ADMIN ? '' : '<div class="vz-sug" role="list">' + (sugestoesAgente || SUGESTOES_VAZIO).map(t =>
+    `<button type="button" role="listitem" class="vz-chip" data-vz-sugestao="${esc(t.texto)}">` +
+    (ROTULO_SUGESTAO[t.tipo] ? `<span class="vz-tipo">${ROTULO_SUGESTAO[t.tipo]}</span>` : '') + `${esc(t.texto)}</button>`).join('') + '</div>';
+  return `<div class="vazio"><div class="vz-av" style="background:${esc(AGENTE.cor || '#2f9e5e')}" aria-hidden="true">${foto}</div>` +
+    `<b>Como posso ajudar?</b><small>${sub}</small>${sug}</div>`;
+}
+wrap.addEventListener('click', ev => {
+  const b = ev.target.closest('[data-vz-sugestao]');
+  if (!b) return;
+  const campo = $('entrada');
+  campo.value = b.dataset.vzSugestao;
+  campo.dispatchEvent(new Event('input', { bubbles: true }));
+  campo.focus();
+  try { campo.setSelectionRange(campo.value.length, campo.value.length); } catch (_) { /* campo sem seleção */ }
+});
 
 /* Dia e hora de cada mensagem no fuso de QUEM ESTÁ LENDO, a partir do ep. O servidor formata no
    fuso dele (a KVM de teste roda em UTC): depois das 21h de Brasília a mensagem virava "dia
@@ -1292,6 +1892,11 @@ function render(opt) {
     todas.push({ id: 'pend-' + p.n, ep: p.epLocal, dia: p.dia,
                  hhmm: p.hhmm, origin: 'dono', text: p.texto,
                  kind: p.kind || 'text', pendente: true, local: p });
+    const re = RX_CITA_LOCAL.exec(String(p.texto || ''));
+    if (re) {
+      const orig = re[1] ? msgs.find(x => x.id === re[1]) : null;
+      Object.assign(todas[todas.length - 1], { text: re[3], cita: { origin: orig ? orig.origin : 'agente', texto: re[2], id: re[1] || undefined } });
+    }
   }
   // cartões "X nasceu às HH:MM" (onboarding.js): entram na ordem cronológica como qualquer item
   if (window.DGOnboarding && window.DGOnboarding.cartoes) {
@@ -1303,10 +1908,20 @@ function render(opt) {
     itens.push(['topo', maisAntigas
       ? `<div class="topo">${carregandoAntigas ? 'carregando mensagens antigas…'
                                               : 'role para ver as antigas'}</div>`
-      : '<div class="topo">início da conversa</div>']);
+      : arquivadasTela && !EH_ADMIN && window.DGHistorico
+        ? '<div class="topo topo-arq">Conversa nova. As anteriores estão no <button type="button" data-abre-historico>Histórico</button></div>'
+        : '<div class="topo">início da conversa</div>']);
   }
   let dia = '', anterior = null;
-  const blocos = TR ? TR.agrupa(todas) : todas.map(x => ({ msg: x }));
+  lidoAteEp = 0;
+  for (const x of todas) if (!x.pendente && !x.cartaoNasc && !ehDono(x) && typeof x.ep === 'number' && x.ep > lidoAteEp) lidoAteEp = x.ep;
+  const blocos = TR ? TR.agrupaPorTurno(todas) : todas.map(x => ({ msg: x }));
+  // enquanto ele trabalha no último pedido, os passos dele ficam na linha do campo, não aqui
+  const fotoAtv = window.atividadeFoto && window.atividadeFoto.agentes ? window.atividadeFoto.agentes[AGENTE.id] : null;
+  const trabalhandoAgora = !!(fotoAtv && fotoAtv.estado === 'trabalhando' && streamAberto);
+  const ultDono = todas.reduce((a, x) => (ehDono(x) && typeof x.ep === 'number' && x.ep > a ? x.ep : a), 0);
+  let divisorPosto = false;
+  if (divisorEp != null && ultDono > divisorEp) divisorEp = null;   // você já escreveu depois: a linha sai
   for (let bi = 0; bi < blocos.length; bi++) {
     const bloco = blocos[bi];
     const m = bloco.msg || bloco.trilha[0];
@@ -1315,11 +1930,17 @@ function render(opt) {
       itens.push(['dia:' + dia, `<div class="dia"><span>${esc(dia)}</span></div>`]);
       anterior = null;
     }
+    if (divisorEp != null && !divisorPosto && m.ep >= divisorEp && !ehDono(m)) {
+      divisorPosto = true;
+      itens.push(['novas-sep', `<div class="novas-sep" role="separator"><span>${divisorN === 1 ? '1 nova mensagem' : divisorN + ' novas mensagens'}</span></div>`]);
+    }
     if (bloco.trilha) {
-      itens.push(['trilha:' + m.id, htmlTrilha(bloco.trilha)]);
+      if (trabalhandoAgora && m.ep > ultDono) continue;
+      itens.push(['trilha:' + m.id, htmlResumoPassos(bloco.trilha, todas)]);
       continue;
     }
     if (m.origin === 'comando') { itens.push([m.id, htmlResultadoComando(m)]); continue; }
+    if (m.origin === 'mencao' && m.mencao) { itens.push([m.id, htmlMencao(m)]); anterior = 'her'; continue; }
     if (m.cartaoNasc) { itens.push([m.id, window.DGOnboarding.htmlCartao(m.cartaoNasc)]); anterior = null; continue; }
     const lado = ehDono(m) ? 'me' : 'her';
     const troca = (anterior !== null && anterior !== lado ? ' gap' : '') +
@@ -1336,8 +1957,21 @@ function render(opt) {
       anterior = lado;
       continue;
     }
+    if (lado === 'her' && fotoDoAgente(m) && window.dgui && window.dgui.htmlCarrossel) {
+      const grupo = [m];
+      while (bi + 1 < blocos.length) {
+        const prox = blocos[bi + 1].msg;
+        if (!prox || !fotoDoAgente(prox) || prox.dia !== m.dia || prox.ep - grupo[grupo.length - 1].ep > 300) break;
+        grupo.push(prox); bi++;
+      }
+      if (grupo.length > 1) {
+        itens.push([m.id + '~car' + grupo.length, htmlFotosAgente(grupo, troca)]);
+        anterior = lado;
+        continue;
+      }
+    }
     itens.push([m.id, `<div class="row ${lado}${ehVisual(m.media) ? ' vis' : ''}${troca}" data-msg="${esc(m.id)}">` +
-                      `<div class="bub">${htmlCorpo(m)}</div>${lado === 'her' ? htmlAcoes(m) : ''}</div>`]);
+                      `<div class="bub">${m.mencaoPergunta ? destacaMencao(htmlCorpo(m), m) : htmlCorpo(m)}</div>${lado === 'her' ? htmlAcoes(m, htmlHora(m)) : htmlHora(m)}</div>`]);
     anterior = lado;
   }
   if (!itens.length && carregouUmaVez) itens.push(['vazio', htmlVazio()]);
@@ -1368,7 +2002,12 @@ function render(opt) {
   // Mensagens antigas entrando no topo, mensagem nova no fim, balão refeito: a posição
   // fica por conta do observador de rolagem (no fim acompanha, lendo mais acima não mexe).
   aplicaNos(nos);
+  humanizaHoras();
+  // os filtros nascem mais abaixo (alertas): antes disso, um render do cache não pode tocá-los
+  if (filtrosProntos) { aplicaFiltro(); observaVistos(); observaLeitura(); }
+  if (window.dgui && window.dgui.restauraEscolhas) window.dgui.restauraEscolhas(wrap);
   visuaisAposRender();
+  preencheTarefas();
   respiroDasFaixas();
   guardaCache();
   atualizaSeta();
@@ -1405,6 +2044,8 @@ const VIS_PRONTO_MS = 12000;
 const VIS_ALT_MIN = 40;
 const visuais = new Map();          // contentWindow -> estado (balão e tela cheia)
 const visEstados = new Set();       // estados dos balões na conversa
+// trocou o tema (tema.js): os visuais abertos acompanham na hora
+document.addEventListener('dgtema', () => { for (const est of visEstados) enviaAoVisual(est, { tipo: 'tema', valor: temaApp() }); });
 const visPorCaixa = new WeakMap();  // .visq -> estado
 const visAlturas = new Map();       // id da mídia -> última altura (sobrevive ao nó refeito)
 
@@ -1433,7 +2074,7 @@ function urlVisual(md) {
 function htmlVisual(m, md) {
   const tit = tituloProvisorio(md.nome);
   return `<div class="visb"><div class="vish">` +
-    `<span class="vist">📊 <span class="visn" data-visn="${esc(md.id)}">${esc(tit)}</span></span>` +
+    `<span class="vist">${ICO_VISUAL}<span class="visn" data-visn="${esc(md.id)}">${esc(tit)}</span></span>` +
     `<button type="button" class="visfull" data-visfull="${esc(md.id)}" ` +
     `title="Abrir em tela cheia" aria-label="Abrir o visual em tela cheia">⛶</button>` +
     `${botaoBaixaMidia(md, ROTULO_MIDIA.document)}</div>` +
@@ -1708,7 +2349,7 @@ window.addEventListener('message', ev => {
     const desc = typeof d.descricao === 'string' ? d.descricao.trim().slice(0, 300) : '';
     if (tit) {
       est.titulo = tit;
-      if (est.cheia) { if (visTelaNome) visTelaNome.textContent = '📊 ' + tit; }
+      if (est.cheia) { if (visTelaNome) visTelaNome.textContent = tit; }
       else {
         const n = est.caixa.parentElement.querySelector('.visn');
         if (n) n.textContent = tit;
@@ -1794,7 +2435,7 @@ function abreTelaVisual(md) {
   const jaAberta = visTelaAberta();
   limpaTelaVisual();
   midias[md.id] = md;
-  visTelaNome.textContent = '📊 ' + tituloProvisorio(md.nome);
+  visTelaNome.textContent = tituloProvisorio(md.nome);
   visTelaBaixa.innerHTML = botaoBaixaMidia(md, ROTULO_MIDIA.document);
   const est = { md, caixa: visTelaCorpo, iframe: null, win: null, pronto: false, falhou: false,
                 noViewport: true, relogio: null, tarja: null, cheia: true };
@@ -1864,7 +2505,7 @@ function limpaPendentes() {
       m.ep >= piso &&
       ((p.path && m.media && m.media.path === p.path) ||
        (p.anexos && m.media && p.anexos.some(a => a.path === m.media.path)) ||
-       (p.texto && normaliza(m.text) === normaliza(p.casa || p.texto))));
+       (p.texto && normaliza(m.text) === normaliza(semCita(p.casa || p.texto)))));
     if (!achou) return true;
     consumidas.add(achou.id);
     soltaPrevias(p);
@@ -1911,6 +2552,7 @@ function integra(d) {
    vezes precisar, até o começo da conversa. */
 const PAGINA = 60, PAGINA_ANTIGAS = 80;
 let maisAntigas = true, carregandoAntigas = false;
+let arquivadasTela = false;   // um /clear já mandou conversas para Histórico > Arquivadas
 /* Sobe a cada troca inteira de `msgs`: uma página pedida antes da troca chega
    depois e não pode ser colada na janela nova. */
 let geracaoJanela = 0;
@@ -1923,6 +2565,7 @@ async function carregar(primeiraVez) {
   try {
     const d = await api(API + '/messages?limit=' + PAGINA);
     const novas = d.msgs || [];
+    arquivadasTela = !!d.arquivadas;
     if (primeiraVez || !msgs.length) {
       geracaoJanela++;
       msgs = novas;
@@ -1936,8 +2579,11 @@ async function carregar(primeiraVez) {
     msgs.sort((a, b) => a.ep - b.ep);
     carregouUmaVez = true;
     limpaPendentes();
+    if (primeiraVez) marcaDivisor();
     render();
-    if (primeiraVez) {
+    const sep = primeiraVez && divisorEp != null ? wrap.querySelector('.novas-sep') : null;
+    if (sep) rolagem.mostra(sep, { block: 'start' });
+    else if (primeiraVez) {
       rolagem.aoFim();
       // conversa curta ou página que não encheu a tela: já pede as antigas
       verificaBordas();
@@ -2213,16 +2859,128 @@ window.addEventListener('popstate', () => {
   }
 });
 
-const ICONE_DOC = { document: '📄', photo: '🖼️', video: '🎬', audio: '🎤', voice: '🎤' };
-
+const ICO_ARQUIVO = '<svg viewBox="0 0 24 24" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3.5H7.5A2 2 0 0 0 5.5 5.5v13a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V8z"/><path d="M14 3.5V8h4.5M9 13h6M9 16.5h4"/></svg>';
 function cartaoDoc(md) {
-  const ico = ICONE_DOC[md.kind] || '📦';
   const tam = md.bytes ? tamanhoHumano(md.bytes) : '';
-  return `<div class="vcard"><div class="ico" aria-hidden="true">${ico}</div>` +
+  return `<div class="vcard"><div class="ico">${ICO_ARQUIVO}</div>` +
     `<b>${esc(md.nome || 'arquivo')}</b>` +
-    `<small>${esc(tam)}${tam ? ' · ' : ''}Esse tipo de arquivo não abre aqui dentro.</small>` +
-    `<a href="${esc(md.url)}" target="_blank" rel="noopener">Abrir em outra aba</a>` +
-    `<a class="sec" href="${esc(md.url)}" download="${esc(md.nome || '')}">Baixar</a></div>`;
+    `<small>${esc(tam)}${tam ? ' · ' : ''}Esse tipo de arquivo não tem prévia aqui.</small>` +
+    `<div class="vcard-acoes"><a class="pri" href="${esc(md.url)}" download="${esc(md.nome || '')}">Baixar</a>` +
+    `<a href="${esc(md.url)}" target="_blank" rel="noopener">Abrir em outra aba</a></div></div>`;
+}
+/* Arquivos de texto abrem formatados no visor: .md vira texto com títulos e listas; código, json,
+   csv e txt vão no bloco de código da conversa (com Copiar e cores de sintaxe). */
+const RX_TEXTO_LEGIVEL = /\.(md|markdown|txt|log|json|csv|tsv|ya?ml|toml|ini|env|sql|sh|bash|py|js|mjs|ts|php|html?|css|xml)$/i;
+function ehTextoLegivel(md) { return !!(md && md.url && RX_TEXTO_LEGIVEL.test(md.nome || '') && !ehVisual(md) && (!md.bytes || md.bytes <= 512 * 1024)); }
+// o Copiar dos blocos de código também funciona dentro do visor (ele fica fora do #wrap)
+lbCorpo.addEventListener('click', ev => {
+  const bt = ev.target.closest ? ev.target.closest('.codcopia') : null;
+  if (!bt) return;
+  const pre = bt.closest('.cod') && bt.closest('.cod').querySelector('pre');
+  if (!pre) return;
+  copiaTexto(pre.textContent).then(ok => { if (!ok) return; const tx = bt.querySelector('span'); bt.classList.add('ok'); if (tx) tx.textContent = 'Copiado'; setTimeout(() => { bt.classList.remove('ok'); if (tx) tx.textContent = 'Copiar'; }, 1600); });
+});
+/* No visor, o .md vira documento: títulos (# a ###), listas, citação (>) e linha (---), que a
+   conversa não usa. Parágrafos e tabelas seguem o mesmo paragrafos() das mensagens, e cada
+   linha passa pelo mesmo esc + linkify + formata, então negrito, `código` e link funcionam. */
+function mdComTitulos(t) {
+  const linha = x => formata(linkify(esc(x)), 'markdown');
+  const blocoTexto = linhas => {
+    let html = '', resto = [], i = 0;
+    const solta = () => { const r = resto.join('\n'); if (r.trim()) html += paragrafos(r, 'markdown'); resto = []; };
+    while (i < linhas.length) {
+      const l = linhas[i];
+      let m;
+      if ((m = /^(#{1,6})[ \t]+(.*?)[ \t#]*$/.exec(l))) {
+        solta(); const n = Math.min(m[1].length, 3) + 1;
+        html += `<h${n} class="lb-tit">${linha(m[2])}</h${n}>`; i++;
+      } else if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(l)) {
+        solta(); html += '<hr class="lb-hr">'; i++;
+      } else if (/^\s*>/.test(l)) {
+        solta(); const q = [];
+        while (i < linhas.length && /^\s*>/.test(linhas[i])) q.push(linhas[i++].replace(/^\s*>\s?/, ''));
+        html += `<blockquote class="lb-cita">${blocoTexto(q)}</blockquote>`;
+      } else if (/^\s*([-*+]|\d+[.)])\s+/.test(l)) {
+        solta(); const ord = /^\s*\d/.test(l), itens = [];
+        while (i < linhas.length && (/^\s*([-*+]|\d+[.)])\s+/.test(linhas[i]) || (/^\s{2,}\S/.test(linhas[i]) && itens.length))) {
+          const x = linhas[i++];
+          if (/^\s*([-*+]|\d+[.)])\s+/.test(x)) itens.push(x.replace(/^\s*([-*+]|\d+[.)])\s+/, ''));
+          else itens[itens.length - 1] += ' ' + x.trim();
+        }
+        const tag = ord ? 'ol' : 'ul';
+        html += `<${tag} class="lb-lista">${itens.map(x => `<li>${linha(x)}</li>`).join('')}</${tag}>`;
+      } else { resto.push(l); i++; }
+    }
+    solta();
+    return html;
+  };
+  return String(t).split(/(```[\s\S]*?```)/).map((p, i) => i % 2 ? paragrafos(p, 'markdown') : blocoTexto(p.split('\n'))).join('');
+}
+
+async function abreTextoNoVisor(md) {
+  const caixa = lbCorpo.querySelector('.lb-texto');
+  try {
+    const r = await fetch(md.url, { credentials: 'same-origin' });
+    if (!r.ok) throw new Error('o servidor respondeu ' + r.status);
+    const t = (await r.text()).slice(0, 512 * 1024);
+    if (!caixa.isConnected) return;
+    const ext = ((/\.([a-z0-9]+)$/i.exec(md.nome || '') || [])[1] || '').toLowerCase();
+    if (ext === 'md' || ext === 'markdown') caixa.innerHTML = `<div class="lb-md">${mdComTitulos(t)}</div>`;
+    else {
+      const lingua = { txt: 'text', log: 'text', csv: 'text', tsv: 'text', env: 'ini', yml: 'yaml', htm: 'html', mjs: 'javascript', js: 'javascript', ts: 'typescript', py: 'python', sh: 'bash' }[ext] || ext;
+      caixa.innerHTML = `<div class="lb-md">${paragrafos('```' + lingua + '\n' + t.replace(/```/g, 'ˋˋˋ') + '\n```', 'markdown')}</div>`;
+    }
+  } catch (e) {
+    if (caixa.isConnected) lbCorpo.innerHTML = cartaoDoc(md);
+  }
+}
+
+/* Zoom só da FOTO aberta no visor (a página nunca amplia; ver sem-zoom.js).
+   Pinça de dois dedos de 1x a 4x, um dedo arrasta quando ampliada, duplo toque
+   alterna 1x/2x. Cada abertura cria uma <img> nova, então volta a 1x ao fechar. */
+function ativaZoomImagem(img) {
+  img.dataset.zoomProprio = '1';
+  img.draggable = false;
+  img.style.touchAction = 'none';
+  img.style.transformOrigin = 'center center';
+  let esc = 1, tx = 0, ty = 0;
+  let dist0 = 0, esc0 = 1, ini = null, ultimoToque = 0, moveu = false;
+  const dist = t => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+  const aplica = () => {
+    if (esc <= 1.02) { esc = 1; tx = 0; ty = 0; }
+    const mx = img.offsetWidth * (esc - 1) / 2, my = img.offsetHeight * (esc - 1) / 2;
+    tx = Math.max(-mx, Math.min(mx, tx));
+    ty = Math.max(-my, Math.min(my, ty));
+    img.style.transform = esc === 1 ? '' : 'translate(' + tx + 'px,' + ty + 'px) scale(' + esc + ')';
+  };
+  const alterna = () => { esc = esc > 1 ? 1 : 2; tx = 0; ty = 0; aplica(); };
+  img.addEventListener('touchstart', ev => {
+    moveu = false;
+    if (ev.touches.length === 2) { dist0 = dist(ev.touches) || 1; esc0 = esc; ini = null; }
+    else if (ev.touches.length === 1) ini = { x: ev.touches[0].clientX, y: ev.touches[0].clientY, tx, ty };
+  }, { passive: true });
+  img.addEventListener('touchmove', ev => {
+    ev.preventDefault();
+    if (ev.touches.length === 2 && dist0) {
+      moveu = true;
+      esc = Math.max(1, Math.min(4, esc0 * dist(ev.touches) / dist0));
+      aplica();
+    } else if (ev.touches.length === 1 && ini && esc > 1) {
+      const dx = ev.touches[0].clientX - ini.x, dy = ev.touches[0].clientY - ini.y;
+      if (Math.abs(dx) + Math.abs(dy) > 6) moveu = true;
+      tx = ini.tx + dx; ty = ini.ty + dy;
+      aplica();
+    }
+  }, { passive: false });
+  img.addEventListener('touchend', ev => {
+    if (ev.touches.length) { ini = null; return; }
+    ini = null;
+    if (moveu) { ultimoToque = 0; return; }
+    const agora = Date.now();
+    if (agora - ultimoToque < 300) { ultimoToque = 0; ev.preventDefault(); alterna(); }
+    else ultimoToque = agora;
+  }, { passive: false });
+  if (!ehToque) img.addEventListener('dblclick', alterna);
 }
 
 function abreLightbox(mid, opt) {
@@ -2236,12 +2994,16 @@ function abreLightbox(mid, opt) {
   lbNome.textContent = md.nome || 'arquivo';
   lbBaixar.href = md.url;
   lbBaixar.setAttribute('download', md.nome || '');
+  const lbAbrir = document.getElementById('lbAbrir');
+  if (lbAbrir) lbAbrir.href = md.url;
+  lightbox.classList.toggle('lb-midia', md.kind === 'photo' || md.kind === 'video');
   const ehPdf = /\.pdf$/i.test(md.nome || '');
   if (md.kind === 'photo') {
     const img = document.createElement('img');
     img.alt = md.nome || 'foto';
     img.src = md.url;
     img.onerror = () => { lbCorpo.innerHTML = cartaoDoc(md); };
+    ativaZoomImagem(img);
     lbCorpo.appendChild(img);
   } else if (md.kind === 'video') {
     const v = document.createElement('video');
@@ -2257,6 +3019,10 @@ function abreLightbox(mid, opt) {
     f.src = md.url;
     f.title = md.nome || 'PDF';
     lbCorpo.appendChild(f);
+  } else if (ehTextoLegivel(md)) {
+    // texto, markdown, código, json, csv: abre formatado aqui mesmo (19/10/2026)
+    lbCorpo.innerHTML = '<div class="lb-texto"><p class="lb-carregando">Abrindo…</p></div>';
+    abreTextoNoVisor(md);
   } else {
     lbCorpo.innerHTML = cartaoDoc(md);
   }
@@ -2343,17 +3109,20 @@ wrap.addEventListener('click', ev => {
   if (!bt) return;
   ev.preventDefault();
   ev.stopPropagation();
-  const pre = bt.parentElement ? bt.parentElement.querySelector('pre') : null;
+  const cx = bt.closest('.cod');
+  const pre = cx ? cx.querySelector('pre') : (bt.parentElement ? bt.parentElement.querySelector('pre') : null);
   if (!pre) return;
   copiaTexto(pre.textContent).then(ok => {
     if (!ok) return;
+    const tx = bt.querySelector('span');
     bt.classList.add('ok');
-    setTimeout(() => bt.classList.remove('ok'), 1600);
+    if (tx) tx.textContent = 'Copiado';
+    setTimeout(() => { bt.classList.remove('ok'); if (tx) tx.textContent = 'Copiar'; }, 1600);
   });
 }, true);
 
 wrap.addEventListener('click', ev => {
-  const alvo = ev.target.closest ? ev.target.closest('.mid[data-mid], .cartaoarq[data-mid]') : null;
+  const alvo = ev.target.closest ? ev.target.closest('.mid[data-mid], .cartaoarq[data-mid], .midver[data-mid]') : null;
   if (alvo) { destravarAudio(); abreLightbox(alvo.getAttribute('data-mid')); }
 });
 
@@ -2512,7 +3281,7 @@ function despachaAnexos() {
   entrada.value = '';
   ajustaCampo();
   vozNoCampo = false;
-  enviarTexto(t, lista);
+  enviarTexto(respondendo && t ? comResposta(t) : t, lista);
 }
 
 btnAnexo.onclick = () => {
@@ -2571,6 +3340,30 @@ function pintaEnviar() {
   const vazio = !entrada.value.trim() && !(typeof anexos !== 'undefined' && anexos.length) &&
                 !(typeof gravando !== 'undefined' && gravando);
   btnEnviar.classList.toggle('apagado', vazio);
+  pintaParar();
+}
+/* Parar o trabalho (19/10/2026, pedido do dono, como no ChatGPT): enquanto o agente trabalha e o
+   campo está vazio, a setinha vira um quadrado. Um toque manda Esc ao terminal dele
+   (POST /interromper): para o turno de agora, sem apagar a conversa nem o que já foi feito. */
+const ICO_ENVIAR = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
+const ICO_PARAR = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/></svg>';
+function pintaParar() {
+  if (typeof btnEnviar === 'undefined' || !btnEnviar || typeof atividadeEl === 'undefined' || !atividadeEl) return;
+  const trabalhando = !atividadeEl.hidden && atividadeEl.classList.contains('trab');
+  const parar = trabalhando && btnEnviar.classList.contains('apagado') && !(typeof gravando !== 'undefined' && gravando);
+  if (btnEnviar.classList.contains('parar') === parar) return;
+  btnEnviar.classList.toggle('parar', parar);
+  btnEnviar.innerHTML = parar ? ICO_PARAR : ICO_ENVIAR;
+  btnEnviar.setAttribute('aria-label', parar ? 'Parar o que ' + AGENTE.nome + ' está fazendo' : 'Enviar');
+  btnEnviar.title = parar ? 'Parar o que ' + AGENTE.nome + ' está fazendo' : '';
+}
+async function interrompe() {
+  btnEnviar.disabled = true;
+  try {
+    await api(API + '/interromper', { method: 'POST', body: {} });
+    mostraAviso('Parei o que ' + AGENTE.nome + ' estava fazendo. A conversa e o que ele já fez continuam.');
+  } catch (e) { mostraErro('Não consegui parar: ' + e.message); }
+  finally { btnEnviar.disabled = false; }
 }
 function ajustaCampo() {
   const antes = entrada.offsetHeight;
@@ -3218,6 +4011,15 @@ async function entregaTranscricao(texto, manda) {
     setEstado('transcrição no campo: revise e envie');
     return;
   }
+  // Com anexos na bandeja (18/10/2026): a fala vira a legenda e vai junto com eles, como se a pessoa
+  // tivesse digitado e tocado na seta. Antes ia só o texto e os anexos ficavam para trás.
+  if (anexos.length) {
+    const atual = entrada.value.trim();
+    entrada.value = atual ? atual + ' ' + texto : texto;
+    ajustaCampo();
+    enviarComAnexos();
+    return;
+  }
   await enviarTexto(texto);
 }
 
@@ -3316,6 +4118,7 @@ function entregue(p, d) {
    (visuais) é chamado assim que o /send responde, sem esperar a agente. */
 async function enviarTexto(texto, anexosMsg, opts) {
   texto = (texto || '').trim();
+  if (texto && filtrosProntos) respondePedidos();
   const comAnexos = !!(anexosMsg && anexosMsg.length);
   if (!texto && !comAnexos) return;
   mostraErro('');
@@ -3377,6 +4180,12 @@ async function mandaTexto(pend, semEsperar) {
   const ficou = entregue(pend, d);
   avisaEntrega(pend, true);
   if (!ficou) return true;
+  // /clear ou /new: o servidor arquivou a conversa anterior; a tela recomeça limpa
+  if (d && d.arquivou) {
+    pendentes = pendentes.filter(x => x !== pend);
+    await carregar(true);
+    return true;
+  }
   // comando que não responde com fala (/compact, /context...): não fica no "esperando a resposta"
   const semResposta = !!(d && d.comando && d.comando.espera_resposta === false);
   if (!semEsperar && !semResposta && !esperando) await esperaResposta(d.ep_enviado);
@@ -3496,11 +4305,12 @@ function falaNovas() {
 ouvintesChegada.push(() => { if (!esperando) falaNovas(); });
 
 async function esperaResposta(since) {
+  // Sem "parar de esperar" nem "esperando…" no topo (18/10/2026, pedido do dono): a linha de
+  // andamento perto do campo já mostra o agente trabalhando. A espera segue por baixo, só para ler
+  // a resposta em voz alta quando ela chegar.
   esperando = true;
   pararPedido = false;
-  btnParar.style.display = '';
-  btnParar.textContent = 'parar de esperar';
-  setEstado('esperando a ' + AGENTE.nome + '…');
+  estadoOcioso();
   const limite = Date.now() + LIMITE_ESPERA_MS;
   const temResposta = () => msgs.some(m => ehResposta(m, since));
 
@@ -3513,7 +4323,6 @@ async function esperaResposta(since) {
   if (chegou && !pararPedido) {
     // ela costuma mandar 2 ou 3 balões seguidos: espera até 5 s sem balão
     // novo (no máximo 40 s) antes de começar a ler
-    setEstado('recebendo…');
     const teto = Date.now() + 40000;
     let qtd = -1, quieto = Date.now();
     while (!pararPedido && Date.now() < teto) {
@@ -3525,12 +4334,14 @@ async function esperaResposta(since) {
   }
 
   esperando = false;
-  btnParar.style.display = 'none';
   const respostas = msgs.filter(m => ehResposta(m, since));
   if (pararPedido) {
     setEstado('parei de esperar');
     mostraAviso('Parei de esperar. A mensagem foi entregue: a resposta aparece ' +
                 'aqui sozinha quando ela mandar.');
+  } else if (!respostas.length && (window.atividadeFoto?.agentes?.[AGENTE.id]?.estado === 'trabalhando')) {
+    estadoOcioso();   // ainda trabalhando: a linha de andamento já diz isso, sem aviso de demora
+    if (lerRespostas) escuta = { since: since, ate: Date.now() + ESCUTA_MS };
   } else if (!respostas.length) {
     setEstado('sem resposta ainda');
     mostraAviso('A ' + AGENTE.nome + ' não respondeu em 3 minutos. A mensagem foi ' +
@@ -3634,6 +4445,255 @@ async function falar(texto) {
 }
 
 /* ── Modo texto e toggles ─────────────────────────────────────────────────── */
+/* Responder citando (19/10/2026, ideia 2): o botão ↩ das respostas, ou deslizar qualquer mensagem
+   para a direita no celular, prende a mensagem acima do campo; o envio sai com "↩ [id] trecho" na
+   primeira linha, que o servidor transforma em citação (tocar nela leva até a original). */
+let respondendo = null;   // { id, texto, origin }
+const ICO_RESP_CAMPO = '<svg class="resp-ic" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H12"/></svg>';
+const ICO_X_CAMPO = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+const respChip = document.createElement('div');
+respChip.id = 'respChip'; respChip.hidden = true;
+// colada no topo da caixa do campo (.linha1), como uma linha dela (proposta B, 19/10/2026)
+document.querySelector('.linha1').before(respChip);
+function comecaResposta(m) {
+  const t = String(legendaUtil(m) || m.text || '').replace(/\s+/g, ' ').trim();
+  if (!t) return;
+  respondendo = { id: m.id, texto: t.length > 120 ? t.slice(0, 119) + '…' : t, origin: m.origin };
+  respChip.innerHTML = `${ICO_RESP_CAMPO}<span class="resp-tx">Respondendo a <b>${ehDono(m) ? 'você' : esc(AGENTE.nome)}</b>: ${esc(respondendo.texto)}</span>` +
+    `<button type="button" class="resp-x" aria-label="Não responder citando" title="Cancelar">${ICO_X_CAMPO}</button>`;
+  // outros itens (menções, modo equipe) entram antes da caixa depois; a citação volta a ficar colada nela
+  document.querySelector('.barra .linha1').before(respChip);
+  respChip.hidden = false;
+  entrada.focus();
+}
+function fimResposta() { respondendo = null; respChip.hidden = true; respChip.innerHTML = ''; acendeResp(null); }
+// o botão ↩ da mensagem citada fica aceso enquanto a citação está no campo
+function acendeResp(id) {
+  for (const b of wrap.querySelectorAll('.acao-resp-on')) b.classList.remove('acao-resp-on');
+  if (!id) return;
+  const el = wrap.querySelector('.acoes[data-acoes="' + CSS.escape(id) + '"] [data-ac="responder"]');
+  if (el) el.classList.add('acao-resp-on');
+}
+respChip.addEventListener('click', ev => { if (ev.target.closest('.resp-x')) fimResposta(); });
+function comResposta(t) {
+  if (!respondendo || !/^[a-f0-9]{8,40}$/.test(respondendo.id)) { fimResposta(); return t; }
+  const r = '↩ [' + respondendo.id + '] ' + respondendo.texto + '\n' + t;
+  fimResposta();
+  return r;
+}
+// tocar numa citação leva até a mensagem original (e pisca)
+wrap.addEventListener('click', ev => {
+  const c = ev.target.closest ? ev.target.closest('.cita[data-ir-msg]') : null;
+  if (!c) return;
+  const alvo = wrap.querySelector('[data-msg="' + CSS.escape(c.dataset.irMsg) + '"]');
+  if (!alvo) { mostraAviso('A mensagem citada é antiga e não está carregada; role para cima para encontrá-la.'); return; }
+  rolagem.mostra(alvo, { block: 'center' });
+  alvo.classList.remove('msg-achada'); void alvo.offsetWidth; alvo.classList.add('msg-achada');
+});
+// deslizar para a direita (celular) responde citando
+(function () {
+  let ini = null;
+  wrap.addEventListener('touchstart', ev => {
+    const row = ev.target.closest && ev.target.closest('.row[data-msg]');
+    if (!row || ev.touches.length !== 1 || ev.target.closest('.dg-car, .dgui, pre, .cod, table')) { ini = null; return; }
+    ini = { x: ev.touches[0].clientX, y: ev.touches[0].clientY, row, dx: 0 };
+  }, { passive: true });
+  wrap.addEventListener('touchmove', ev => {
+    if (!ini) return;
+    const dx = ev.touches[0].clientX - ini.x, dy = Math.abs(ev.touches[0].clientY - ini.y);
+    if (dy > 24 || dx < 0) { ini.row.style.transform = ''; if (dy > 24) ini = null; return; }
+    ini.dx = dx;
+    ini.row.style.transform = 'translateX(' + Math.min(dx, 70) + 'px)';
+  }, { passive: true });
+  wrap.addEventListener('touchend', () => {
+    if (!ini) return;
+    const { row, dx } = ini; ini = null;
+    row.style.transition = 'transform .15s'; row.style.transform = '';
+    setTimeout(() => { row.style.transition = ''; }, 160);
+    if (dx > 60) {
+      const m = msgs.find(x => x.id === row.dataset.msg);
+      if (m) comecaResposta(m);
+    }
+  });
+})();
+/* Número no ícone do app e no título da aba (19/10/2026, ideia 3): avisos não vistos de todos os agentes
+   (os desta conversa vêm de alertasLista; os outros, da conferência da fileira a cada 30 s). */
+let avisosOutros = 0;
+function pintaBadgeApp() {
+  let n = avisosOutros;
+  try { n += alertasLista.length; } catch (_) { /* a lista desta conversa ainda não nasceu */ }
+  document.title = (n ? '(' + n + ') ' : '') + AGENTE.nome + ' - S2 Bot';
+  try {
+    if (n && navigator.setAppBadge) navigator.setAppBadge(n).catch(() => {});
+    else if (!n && navigator.clearAppBadge) navigator.clearAppBadge().catch(() => {});
+  } catch (_) { /* sem suporte a badge: fica só o título */ }
+}
+/* "N novas mensagens" (ideia 3): ao abrir, uma linha antes da primeira mensagem do agente que você ainda
+   não tinha visto (o mesmo marcador do ✓✓ azul), e a tela abre nela em vez de no fim. Some quando você
+   escreve. */
+let divisorEp = null, divisorN = 0;
+function marcaDivisor() {
+  const novas = vistoAteEp > 0 ? msgs.filter(m => !ehDono(m) && m.origin !== 'trilha' && typeof m.ep === 'number' && m.ep > vistoAteEp) : [];
+  divisorEp = novas.length ? novas[0].ep : null;
+  divisorN = novas.length;
+}
+/* @mencionar outro agente (19/10/2026, ideia 1): "@" no campo abre a lista dos outros agentes (o Admin
+   fica de fora); a mensagem que começa com "@Nome" vai ao agente citado por POST /mencao, e a resposta
+   dele volta aqui num cartão (lib/mencoes.js), e este agente recebe a resposta para continuar. */
+const mencionaveis = () => agentesMenu.filter(a => a.tipo !== 'admin' && a.id !== AGENTE.id);
+const fotoAg = a => { const img = a && (a.avatar_img || (/^https:\/\//i.test(a.avatar || '') ? a.avatar : '')); return img ? `<img src="${esc(img)}" alt="">` : esc((a && (a.avatar || a.nome) || '?').slice(0, 1)); };
+function destacaMencao(html, m) {
+  if (m.mencaoPergunta.varios) return html.replace(/(^|>)((?:@[^\s<]+\s)+)/, (_, a, b) => a + b.trim().split(/\s+/).map(x => `<span class="mencao-nome">${x}</span>`).join(' ') + ' ');
+  const a = agentesMenu.find(x => x.id === m.mencaoPergunta.para);
+  if (!a) return html;
+  const marca = esc('@' + a.nome);
+  return html.replace(marca, `<span class="mencao-nome">${marca}</span>`);
+}
+function htmlEquipe(m) {
+  const me = m.mencao;
+  const chips = (me.paraNomes || []).map(n => {
+    const a = agentesMenu.find(x => x.nome === n) || { nome: n };
+    const st = me.tipo === 'pedido' && me.donoNome ? (me.donoNome === n ? ' on' : ' off') : '';
+    return `<span class="eq-ag${st}"><span class="men-foto" style="background:${esc(a.cor || '#2f9e5e')}">${fotoAg(a)}</span>${esc(n)}</span>`;
+  }).join('');
+  const quem = me.para && me.para[0] !== 'todos' ? (me.paraNomes || []).length + ' agentes' : 'todos';
+  let cab;
+  if (me.tipo === 'aviso') cab = `${ICO_AVISAR}<span>Aviso seu para ${quem} · no quadro de avisos</span>`;
+  else if (me.estado === 'aberto') cab = `${ICO_PEDIR}<span>Pedido seu para ${quem} · esperando alguém pegar</span><i class="men-gira" aria-hidden="true"></i>`;
+  else if (me.estado === 'fazendo') cab = `${ICO_PEDIR}<span>Pedido seu · <b>${esc(me.donoNome || '')}</b> pegou e está fazendo</span><i class="men-gira" aria-hidden="true"></i>`;
+  else if (me.estado === 'feito') cab = `${ICO_PEDIR}<span>Pedido seu · <b>${esc(me.donoNome || '')}</b> fez</span>`;
+  else cab = `${ICO_PEDIR}<span>Pedido seu · ${esc(me.motivo || 'ninguém pegou')}</span>`;
+  const corpo = me.tipo === 'pedido' && me.estado === 'feito' && m.text ? `<div class="men-txt">${htmlCorpo(Object.assign({}, m, { origin: 'agente', mencao: null }))}</div>` : '';
+  return `<div class="row her men eq" data-msg="${esc(m.id)}"><div class="men-cartao"><div class="men-cab">${cab}` +
+    (me.tipo === 'aviso' ? '<a class="men-abrir" href="/avisos">quadro</a>' : '') + `</div>` +
+    (me.tipo === 'aviso' || me.estado !== 'feito' ? `<div class="eq-ags">${chips}</div>` : '') + corpo + '</div></div>';
+}
+function htmlMencao(m) {
+  if (m.mencao && (m.mencao.tipo === 'aviso' || m.mencao.tipo === 'pedido')) return htmlEquipe(m);
+  const me = m.mencao, a = agentesMenu.find(x => x.id === me.para) || { nome: me.paraNome };
+  const cab = me.estado === 'respondida' ? `<b>${esc(a.nome)}</b> respondeu, a pedido ${EH_ADMIN ? 'seu' : 'do ' + esc(AGENTE.nome)}`
+    : me.estado === 'falhou' ? `<b>${esc(a.nome)}</b> não respondeu${me.motivo ? ': ' + esc(me.motivo) : ''}`
+    : `Perguntando ao <b>${esc(a.nome)}</b>…`;
+  const corpo = me.estado === 'respondida' ? `<div class="men-txt">${htmlCorpo(Object.assign({}, m, { origin: 'agente', mencao: null }))}</div>` : '';
+  return `<div class="row her men${me.estado === 'perguntando' ? ' men-esperando' : ''}" data-msg="${esc(m.id)}"><div class="men-cartao">` +
+    `<div class="men-cab"><span class="men-foto" style="background:${esc(a.cor || '#2f9e5e')}">${fotoAg(a)}</span><span>${cab}</span>` +
+    (me.estado === 'perguntando' ? '<i class="men-gira" aria-hidden="true"></i>' : '') +
+    `<a class="men-abrir" href="/a/${encodeURIComponent(me.para)}" title="Abrir a conversa do ${esc(a.nome)}">abrir</a></div>${corpo}</div></div>`;
+}
+const menLista = document.createElement('div');
+menLista.id = 'menLista'; menLista.hidden = true; menLista.setAttribute('role', 'listbox');
+document.querySelector('.barra').insertBefore(menLista, document.querySelector('.barra .linha1'));
+let menSel = 0;
+function menTrecho() {
+  const v = entrada.value.slice(0, entrada.selectionStart || 0);
+  const r = /(^|\s)@([^\s@]*)$/.exec(v);
+  return r ? { de: v.length - r[2].length - 1, q: r[2].toLowerCase() } : null;
+}
+function menPinta() {
+  const t = menTrecho();
+  const lista = t ? [{ id: 'todos', nome: 'todos', todos: true }].concat(mencionaveis()).filter(a => a.nome.toLowerCase().startsWith(t.q) || a.id.startsWith(t.q)) : [];
+  if (!lista.length) { menLista.hidden = true; return; }
+  menSel = Math.min(menSel, lista.length - 1);
+  menLista.innerHTML = lista.map((a, i) => `<button type="button" role="option" class="men-op${i === menSel ? ' on' : ''}" data-men="${esc(a.id)}">` +
+    (a.todos ? `<span class="men-foto men-todos" aria-hidden="true">@</span><span>todos</span><small>avisar ou pedir a todos os agentes</small>`
+      : `<span class="men-foto" style="background:${esc(a.cor || '#2f9e5e')}">${fotoAg(a)}</span><span>${esc(a.nome)}</span><small>${esc(a.subtitulo || a.papel || '')}</small>`) +
+    `</button>`).join('');
+  menLista.hidden = false;
+}
+function menEscolhe(id) {
+  const a = id === 'todos' ? { id: 'todos', nome: 'todos' } : mencionaveis().find(x => x.id === id), t = menTrecho();
+  if (!a || !t) return;
+  const fim = entrada.selectionStart || 0;
+  entrada.value = entrada.value.slice(0, t.de) + '@' + a.nome + ' ' + entrada.value.slice(fim);
+  const pos = t.de + a.nome.length + 2;
+  entrada.setSelectionRange(pos, pos); entrada.focus(); menLista.hidden = true; ajustaCampo(); pintaModo();
+}
+/* @todos ou dois ou mais @nomes (19/10/2026): Avisar (aviso seu no quadro) ou Pedir (o primeiro que puder faz).
+   O seletor pequeno aparece acima do campo só nesses casos. */
+let modoEquipe = 'pedir';
+const modoEl = document.createElement('div');
+modoEl.id = 'modoEquipe'; modoEl.hidden = true; modoEl.setAttribute('role', 'radiogroup'); modoEl.setAttribute('aria-label', 'Avisar ou pedir');
+const ICO_AVISAR = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4h3l6 4V6L7 10z"/><path d="M16.5 9a4 4 0 0 1 0 6"/></svg>';
+const ICO_PEDIR = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 11V5.5a1.5 1.5 0 0 1 3 0V11M11 10V4.5a1.5 1.5 0 0 1 3 0V10M14 10.5V6a1.5 1.5 0 0 1 3 0v7a6 6 0 0 1-6 6h-.5a6 6 0 0 1-5-2.7L3.6 13a1.5 1.5 0 0 1 2.4-1.8L8 13.5"/></svg>';
+document.querySelector('.barra').insertBefore(modoEl, document.querySelector('.barra .linha1'));
+function alvosEquipe(t) {
+  const r = /^((?:@\S+\s+)+)/.exec(t);
+  if (!r) return null;
+  const nomes = r[1].trim().split(/\s+/).map(x => x.slice(1).toLowerCase());
+  if (nomes.length === 1 && nomes[0] === 'todos') return { para: ['todos'], resto: t.slice(r[1].length).trim() };
+  if (nomes.length < 2 || nomes.includes('todos')) return null;
+  const ags = nomes.map(n => mencionaveis().find(a => a.nome.toLowerCase() === n || a.id === n));
+  if (ags.some(a => !a)) return null;
+  return { para: [...new Set(ags.map(a => a.id))], resto: t.slice(r[1].length).trim() };
+}
+function pintaModo() {
+  const alvo = !EH_ADMIN && alvosEquipe(entrada.value);
+  modoEl.hidden = !alvo;
+  if (!alvo) return;
+  modoEl.innerHTML = [['avisar', 'Avisar', ICO_AVISAR], ['pedir', 'Pedir', ICO_PEDIR]].map(([k, r, ic]) =>
+    `<button type="button" role="radio" aria-checked="${modoEquipe === k}" data-modo="${k}"${modoEquipe === k ? ' class="on"' : ''} title="${k === 'avisar' ? 'Só informa: ninguém responde' : 'O primeiro agente que puder faz'}">${ic}${r}</button>`).join('');
+}
+modoEl.addEventListener('mousedown', ev => ev.preventDefault());
+modoEl.addEventListener('click', ev => { const b = ev.target.closest('[data-modo]'); if (b) { modoEquipe = b.dataset.modo; pintaModo(); } });
+entrada.addEventListener('input', pintaModo);
+async function enviaEquipe(t) {
+  const alvo = alvosEquipe(t);
+  if (!alvo || !alvo.resto) return false;
+  modoEl.hidden = true;
+  try {
+    if (modoEquipe === 'avisar') {
+      if (alvo.resto.length > 280) { mostraErro('O aviso tem ' + alvo.resto.length + ' caracteres; o quadro aceita até 280. Encurte e mande de novo.'); entrada.value = t; ajustaCampo(); pintaModo(); return true; }
+      const d = await api('/api/v1/avisos', { method: 'POST', body: { texto: alvo.resto, tipo: 'decisao', para: alvo.para } });
+      const avisoId = d && (d.aviso ? d.aviso.id : d.id);
+      await api(API + '/aviso', { method: 'POST', body: { texto: alvo.resto, para: alvo.para, avisoId } });
+    } else {
+      await api(API + '/pedido', { method: 'POST', body: { texto: alvo.resto, para: alvo.para } });
+    }
+  } catch (e) { mostraErro('Não consegui ' + (modoEquipe === 'avisar' ? 'avisar' : 'pedir') + ': ' + e.message); entrada.value = t; ajustaCampo(); pintaModo(); }
+  return true;
+}
+entrada.addEventListener('input', () => { menSel = 0; menPinta(); });
+entrada.addEventListener('keydown', ev => {
+  if (menLista.hidden) return;
+  const ops = menLista.querySelectorAll('.men-op');
+  if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') { ev.preventDefault(); menSel = (menSel + (ev.key === 'ArrowDown' ? 1 : ops.length - 1)) % ops.length; menPinta(); }
+  else if ((ev.key === 'Enter' || ev.key === 'Tab') && ops[menSel]) { ev.preventDefault(); ev.stopImmediatePropagation(); menEscolhe(ops[menSel].dataset.men); }
+  else if (ev.key === 'Escape') { menLista.hidden = true; }
+}, true);
+menLista.addEventListener('mousedown', ev => ev.preventDefault());
+menLista.addEventListener('click', ev => { const b = ev.target.closest('.men-op'); if (b) menEscolhe(b.dataset.men); });
+async function enviaMencao(t) {
+  const r = /^@(\S+)\s+([\s\S]+)$/.exec(t);
+  if (!r) return false;
+  const a = mencionaveis().find(x => x.nome.toLowerCase() === r[1].toLowerCase() || x.id === r[1].toLowerCase());
+  if (!a) return false;
+  try {
+    await api(API + '/mencao', { method: 'POST', body: { para: a.id, pergunta: r[2].trim() } });
+  } catch (e) { mostraErro('Não consegui perguntar ao ' + a.nome + ': ' + e.message); entrada.value = t; ajustaCampo(); }
+  return true;
+}
+let tarefaPresa = null;
+(function () {
+  const n = new URLSearchParams(location.search).get('tarefa');
+  if (!n || !/^\d+$/.test(n)) return;
+  history.replaceState(null, '', location.pathname + location.hash);
+  tarefaPresa = n;
+  const chip = document.createElement('div');
+  chip.id = 'tarefaChip';
+  chip.innerHTML = `<a class="tf-cartao" data-tarefa="${n}" href="/mesa#t${n}">${htmlTarefaCartao(n)}</a><button type="button" class="resp-x" aria-label="Não citar a tarefa" title="Cancelar">✕</button>`;
+  document.querySelector('.barra').insertBefore(chip, document.querySelector('.barra').firstChild);
+  chip.querySelector('.resp-x').onclick = () => { tarefaPresa = null; chip.remove(); };
+  fetch('/api/v1/tarefas/' + encodeURIComponent(n), { credentials: 'same-origin', headers: { Accept: 'application/json' } })
+    .then(r => r.ok ? r.json() : null).then(d => { tarefasCache.set(n, d ? (d.tarefa || d) : null); const a = chip.querySelector('.tf-cartao'); if (a) a.innerHTML = htmlTarefaCartao(n); }).catch(() => {});
+  setTimeout(() => entrada.focus(), 300);
+})();
+function comTarefa(t) {
+  if (!tarefaPresa) return t;
+  const n = tarefaPresa, tt = tarefasCache.get(n);
+  tarefaPresa = null;
+  const chip = document.getElementById('tarefaChip'); if (chip) chip.remove();
+  return '📋 Tarefa #' + n + ' da Mesa: ' + ((tt && tt.titulo) || 'sem título') + ' (/mesa#t' + n + ')\n' + t;
+}
 function enviarDoCampo() {
   if (anexos.length) {
     // a legenda é o texto do campo: despachaAnexos lê e limpa o campo sozinho
@@ -3646,17 +4706,39 @@ function enviarDoCampo() {
   ajustaCampo();
   vozNoCampo = false;
   if (lcInterceptaLogin(t)) return;   // /login abre o cartão e não vai ao agente
-  enviarTexto(t);
+  menLista.hidden = true;
+  if (!EH_ADMIN && alvosEquipe(t)) { fimResposta(); enviaEquipe(t); return; }
+  if (!EH_ADMIN && /^@\S+\s/.test(t) && mencionaveis().some(a => t.toLowerCase().startsWith('@' + a.nome.toLowerCase() + ' '))) { fimResposta(); enviaMencao(t); return; }
+  const final = comResposta(comTarefa(t));
+  // cota acabada: fica guardada e vai sozinha na volta (cota.js)
+  if (window.DGCota && window.DGCota.guarda(final)) return;
+  enviarTexto(final);
 }
+// pergunta sugerida embaixo de um painel (dgui.js): vai ao agente como se a pessoa tivesse digitado
+document.addEventListener('dgui-pergunta', ev => {
+  const t = ev.detail && String(ev.detail.texto || '').trim();
+  if (!t) return;
+  destravarAudio();
+  // resposta a um cartão de escolha: a primeira linha cita a pergunta ("↩ Como seguimos?"); o servidor
+  // transforma em citação no balão, e o agente lê a que pergunta a resposta se refere
+  const perg = String(ev.detail.pergunta || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+  enviarTexto(perg ? '↩ ' + perg + '\n' + t : t);
+});
+const RX_CITA_LOCAL = /^↩ (?:\[([a-f0-9]{8,40})\] )?([^\n]{1,200})\n([\s\S]+)$/;
+const semCita = t => { const r = RX_CITA_LOCAL.exec(String(t || '')); return r ? r[3] : t; };
 btnEnviar.onclick = () => {
   destravarAudio();
+  // com texto no campo é sempre enviar, mesmo que o botão ainda mostre o quadrado
+  if (btnEnviar.classList.contains('parar') && !entrada.value.trim() && !anexos.length) { interrompe(); return; }
   if (gravando) { paraEEnvia(true); return; }
   enviarDoCampo();
 };
-// Enter manda (é a tecla "enviar" do teclado do iPhone); Shift+Enter, no
-// computador, quebra a linha. Durante a composição de acento não manda.
+// Computador: Enter manda e Shift+Enter quebra a linha. Celular e tablet (toque): Enter quebra a
+// linha e quem manda é a setinha, como no WhatsApp (19/10/2026, pedido do dono). Durante a
+// composição de acento não manda.
+entrada.enterKeyHint = ehToque ? 'enter' : 'send';
 entrada.addEventListener('keydown', ev => {
-  if (ev.key !== 'Enter' || ev.shiftKey || ev.isComposing) return;
+  if (ev.key !== 'Enter' || ev.shiftKey || ev.isComposing || ehToque) return;
   ev.preventDefault(); destravarAudio(); enviarDoCampo();
 });
 
@@ -3811,7 +4893,7 @@ function passosTutorial() {
   }
   if (!$('mlConfig').hidden) {
     passos.push({ alvo: '#mlConfig', antes: abreM, titulo: 'Configurações',
-      oque: 'Hoje tem um item: Instalar o app, que coloca o DG Claw como aplicativo na tela inicial do aparelho.',
+      oque: 'Hoje tem um item: Instalar o app, que coloca o S2 Bot como aplicativo na tela inicial do aparelho.',
       como: 'No Android e no computador, com Chrome ou Edge, o toque abre o pedido de instalação do navegador. No iPhone e no iPad, o item mostra o caminho: Compartilhar e depois Adicionar à Tela de Início. O item some sozinho quando o app já está instalado.',
       porque: 'O app instalado abre sem a barra do navegador e fica a um toque, como qualquer outro aplicativo.' });
   }
@@ -3826,15 +4908,21 @@ function passosTutorial() {
     oque: 'Um cartão que aparece no fim da conversa quando ' + nome + ' ainda não tem a sua conta do Claude ou do Codex conectada. O que você vê agora é só um exemplo.',
     como: 'Toque em Conectar, abra a página de login, entre com a sua conta e, no Claude, cole aqui o código que ela mostrar no fim. A tela confere sozinha e avisa quando terminar. Para abrir o cartão a qualquer hora, escreva /login no campo de mensagem e envie: nada vai para o agente.',
     porque: 'Sem conta conectada o agente não consegue responder. Assim você resolve aqui mesmo, sem abrir terminal.' });
+  if ($('btnSessoes') && !$('btnSessoes').hidden) {
+    passos.push({ alvo: '#btnSessoes', titulo: 'O botão Sessões',
+      oque: 'Um atalho para as sessões de trabalho de ' + nome + ': os cards que andam em paralelo com esta conversa. Uma bolinha vermelha avisa quando alguma espera uma decisão sua.',
+      como: 'Toque nele e a tela de Sessões abre dentro do painel do agente, na mesma janela. No celular o texto some e fica só o ícone 🖥.',
+      porque: 'É o mini-Bunker do agente: você acompanha e cria trabalhos longos sem sair procurando no menu, e o botão fica no topo, em todas as telas.' });
+  }
   if (!$('btnPainel').hidden) {
     passos.push({ alvo: '#btnPainel', titulo: 'O botão Painel',
       oque: 'Um atalho para o painel de ' + nome + ', com Status, Memória, Operações, Custos e as outras páginas.',
       como: 'Toque nele e o painel abre na mesma janela. Para voltar, use o item Conversa do menu do painel ou o voltar do navegador.',
       porque: 'Fica no topo para você passar da conversa ao painel com um toque, sem abrir o menu.' });
   }
-  passos.push({ alvo: '#btnMesa', titulo: 'O botão Mesa',
-    oque: 'Um atalho para a Mesa de tarefas, onde ficam as tarefas de todos os agentes.',
-    como: 'Toque nele e a Mesa abre na mesma janela. Lá você acompanha o que está pendente e o que já foi feito.',
+  passos.push({ alvo: '#btnMesa', titulo: 'O botão Board',
+    oque: 'Um atalho para o Board, onde ficam o seu dia e as tarefas de todos os agentes.',
+    como: 'Toque nele e o Board abre na mesma janela. Lá você acompanha o que está pendente e o que já foi feito.',
     porque: 'Você confere o andamento do trabalho sem sair procurando no menu.' });
   passos.push({ alvo: '#btnLembretes', titulo: 'O botão Lembretes',
     oque: 'Um atalho para a tela de lembretes.',
@@ -3881,27 +4969,40 @@ const acPainel = $('acervoPainel'), acLista = $('acervoLista');
 let acAba = 'midias';
 const cacheMidias = DGMidias.criar({ conta: caps.conta, agente: AGENTE.id, base: API,
   mudou: aba => { if (aba === acAba) pintaAcervo(); } });
+const ICO_AC = (() => {
+  const s = (d, t = 16) => `<svg viewBox="0 0 24 24" width="${t}" height="${t}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  return { link: s('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>', 18),
+           arquivo: s('<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>', 18),
+           play: '<svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>',
+           ir: s('<path d="M9 18l6-6-6-6"/>', 14) };
+})();
 function pintaAcervo() {
   if (acPainel.hidden) return;
   const d = cacheMidias.estado(acAba);
   $('acervoEstado').textContent = d.erro ? 'Não consegui atualizar: ' + d.erro :
-    (!d.carregou ? 'Carregando os itens recentes…' : d.itens.length + ' itens carregados' + (d.carregando ? ' · atualizando…' : '')) +
+    (!d.carregou ? 'Carregando os itens recentes…' : d.itens.length + (d.itens.length === 1 ? ' item' : ' itens') + (d.carregando ? ' · atualizando…' : '')) +
     (d.avisoCache ? ' · ' + d.avisoCache : '');
-  let html = acAba === 'midias' ? '<div class="acgrade">' : '';
+  let html = acAba === 'midias' ? '<div class="acgrade">' : '<div class="aclista">';
   for (const it of d.itens) {
+    const quando = esc(((it.dia || '') + ' ' + (it.hhmm || '')).trim());
     let corpo;
-    if (acAba === 'links') corpo = `<a class="aclinha" href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.dominio)}<small>${esc(it.url)}</small></a>`;
+    if (acAba === 'links') corpo = `<a class="aclinha" href="${esc(it.url)}" target="_blank" rel="noopener"><span class="ac-sim" aria-hidden="true">${ICO_AC.link}</span>` +
+      `<span class="ac-tx"><span>${esc(it.dominio)}</span><small>${quando} · ${esc(it.url)}</small></span></a>`;
     else {
       const md = it.media; midias[md.id] = md;
       const img = md.disponivel && md.thumb ? `<img src="${esc(md.thumb)}" loading="lazy" decoding="async" width="320" height="320" alt="${esc(md.nome)}" onerror="this.hidden=true">` : '';
-      corpo = `<button class="${acAba === 'midias' ? 'acfoto' : 'aclinha'}" data-midia="${esc(md.id)}">${esc(md.kind === 'video' ? '▶ ' : '📎 ')}${esc(md.nome)}${img}</button>`;
+      corpo = acAba === 'midias'
+        ? `<button class="acfoto" data-midia="${esc(md.id)}" aria-label="${esc(md.nome)}">${esc(md.nome)}${img}${md.kind === 'video' ? `<span class="ac-play" aria-hidden="true">${ICO_AC.play}</span>` : ''}</button>`
+        : `<button class="aclinha" data-midia="${esc(md.id)}"><span class="ac-sim" aria-hidden="true">${ICO_AC.arquivo}</span>` +
+          `<span class="ac-tx"><span>${esc(md.nome)}</span><small>${[quando, md.bytes ? tamanhoHumano(md.bytes) : ''].filter(Boolean).join(' · ')}</small></span></button>`;
     }
-    html += `<div class="acitem">${corpo}<button class="acir" data-origem="${esc(it.msg_id)}" title="Ir para a mensagem de origem">${esc(it.dia || '')} ${esc(it.hhmm || '')} ↪</button></div>`;
+    const ir = acAba === 'midias' ? `${quando}${ICO_AC.ir}` : ICO_AC.ir;
+    html += `<div class="acitem">${corpo}<button class="acir" data-origem="${esc(it.msg_id)}" title="Ir para a mensagem" aria-label="Ir para a mensagem">${ir}</button></div>`;
   }
-  if (acAba === 'midias') html += '</div>';
+  html += '</div>';
   if (d.erro) html += '<button class="acmais" data-tentar>Atualizar novamente</button>';
   if (d.proximo) html += `<button class="acmais" data-mais ${d.carregando ? 'disabled' : ''}>${d.carregando ? 'Carregando…' : 'Carregar anteriores'}</button>`;
-  else if (d.carregou && !d.itens.length) html += '<p>Nenhum item deste tipo na conversa disponível.</p>';
+  else if (d.carregou && !d.itens.length) html += '<p>Nada deste tipo na conversa ainda.</p>';
   acLista.innerHTML = html;
 }
 function abreAcervo(aba = acAba) {
@@ -3971,38 +5072,194 @@ const alertasEmCurso = new Set();
 function posicionaAlertas() {
   alertasCaixa.style.bottom = Math.round(fundoLivre() + 74) + 'px';
 }
+/* ── Filtros no topo (18/10/2026, opção 3 do dono) ─────────────────────────────
+   No lugar da pilha de bolinhas ✅/⚠️ na lateral: chips Tudo · Não vistas · Pedem ação ·
+   Entregas, que filtram a conversa, e uma etiqueta pequena ao lado da hora. O aviso some
+   sozinho quando a mensagem fica à vista por um instante (como o "lido" do WhatsApp). */
+const filtrosEl = $('filtros'), filtroVazioEl = $('filtroVazio');
+let filtro = 'tudo';
+const vistosEnviados = new Set();
+function contagensFiltro() {
+  // o número de cada chip é o que ainda não foi visto (19/10/2026: "Entregas 4" com tudo lido confundia);
+  // o filtro Entregas continua mostrando todas as entregas da conversa
+  return { nv: alertasLista.length, pedidos: alertasLista.filter(a => a.tipo === 'pedido').length,
+           entregas: alertasLista.filter(a => a.tipo === 'entrega').length,
+           temEntregas: msgs.some(m => m.alerta === 'entrega') };
+}
 function desenhaAlertas() {
-  alertasPilha.replaceChildren();
-  for (const a of alertasLista) {
-    if (alertasEmCurso.has(a.id)) continue;
-    const b = document.createElement('button');
-    b.type = 'button'; b.textContent = a.tipo === 'entrega' ? '✅' : '⚠️';
-    b.title = (a.tipo === 'entrega' ? 'Entrega pronta' : 'Pedido esperando sua decisão') + ': ir até a mensagem e retirar o aviso';
-    b.setAttribute('aria-label', b.title);
-    b.onclick = async () => {
-      alertasRevisao++; alertasEmCurso.add(a.id); desenhaAlertas();
+  pintaBadgeApp();
+  alertasCaixa.hidden = true;   // a pilha lateral antiga não aparece mais
+  const c = contagensFiltro();
+  // o Histórico fica sempre à mão nos agentes (o Admin não guarda histórico pesquisável)
+  const temHist = !EH_ADMIN && !!window.DGHistorico;
+  filtrosEl.hidden = !(temHist || c.nv || c.temEntregas || filtro !== 'tudo');
+  const chip = (k, rot, n, cls) => `<button type="button" class="filtro${filtro === k ? ' on' : ''}${cls ? ' ' + cls : ''}" data-filtro="${k}" aria-pressed="${filtro === k}">` +
+    `${rot}${n ? ` <b>${n}</b>` : ''}</button>`;
+  filtrosEl.innerHTML = chip('tudo', 'Tudo', 0) + chip('nao-vistas', 'Não vistas', c.nv) +
+    chip('pedidos', 'Pedem ação', c.pedidos, c.pedidos ? 'tem-pedido' : '') + chip('entregas', 'Entregas', c.entregas) +
+    (temHist ? `<button type="button" class="filtro filtro-hist" data-historico title="Buscar nas conversas antigas e ver as memórias">${window.DGHistorico.ICONE}Histórico</button>` : '');
+  aplicaFiltro();
+}
+function idsDoFiltro() {
+  if (filtro === 'nao-vistas') return new Set(alertasLista.map(a => a.mensagem_id));
+  if (filtro === 'pedidos') return new Set(alertasLista.filter(a => a.tipo === 'pedido').map(a => a.mensagem_id));
+  if (filtro === 'entregas') return new Set(msgs.filter(m => m.alerta === 'entrega').map(m => m.id));
+  return null;
+}
+function aplicaFiltro() {
+  const ids = idsDoFiltro();
+  const pendentes = new Set(alertasLista.map(a => a.mensagem_id));
+  let visiveis = 0;
+  for (const el of wrap.children) {
+    const id = el.dataset ? el.dataset.msg : '';
+    const dentro = !ids || (id && ids.has(id));
+    el.classList.toggle('fora-do-filtro', !dentro);
+    if (id) el.classList.toggle('alerta-pendente', pendentes.has(id));
+    if (dentro && id) visiveis++;
+  }
+  wrap.classList.toggle('filtrando', !!ids);
+  filtroVazioEl.hidden = !ids || visiveis > 0;
+  if (ids && !visiveis) filtroVazioEl.textContent = filtro === 'entregas' ? 'Nenhuma entrega nesta conversa.' : 'Tudo em dia: nada esperando você aqui.';
+}
+// mensagem de um aviso que ainda não está na tela (mais antiga): busca e junta ao histórico
+async function garanteMensagemDoAlerta(a) {
+  if (msgs.some(m => m.id === a.mensagem_id)) return;
+  const d = await api(API + '/alertas/' + encodeURIComponent(a.id) + '/mensagem');
+  const porId = new Map([...(d.msgs || []), ...msgs].map(m => [m.id, m]));
+  porId.set(d.mensagem.id, d.mensagem);
+  msgs = Array.from(porId.values()).sort((x, y) => x.ep - y.ep);
+  maisAntigas = !!d.mais_antigas;
+}
+wrap.addEventListener('click', ev => {
+  if (ev.target.closest('[data-abre-historico]')) window.DGHistorico.abre({ id: AGENTE.id, nome: AGENTE.nome || 'o agente' }, 'arquivadas');
+});
+filtrosEl.addEventListener('click', async ev => {
+  if (ev.target.closest('[data-historico]')) { window.DGHistorico.abre({ id: AGENTE.id, nome: AGENTE.nome || 'o agente' }); return; }
+  const b = ev.target.closest('[data-filtro]'); if (!b) return;
+  filtro = b.dataset.filtro;
+  try {
+    if (filtro === 'nao-vistas' || filtro === 'pedidos') {
+      for (const a of alertasLista) await garanteMensagemDoAlerta(a);
+      render({ semRolar: true });
+    }
+  } catch (e) { mostraErro('Não consegui trazer todas as mensagens do filtro: ' + e.message); }
+  desenhaAlertas();
+  const primeira = Array.from(wrap.children).find(el => el.dataset && el.dataset.msg && !el.classList.contains('fora-do-filtro'));
+  if (filtro !== 'tudo' && primeira) rolagem.mostra(primeira, { block: 'start' });
+  if (filtro === 'tudo') rolagem.mostra(wrap.lastElementChild || wrap, { block: 'end' });
+});
+/* Histórico (historico.js): leva até a mensagem de um trecho achado na busca. O trecho vem do
+   índice do agente (hora do registro dele); a mensagem do chat é a do mesmo lado mais perto dessa
+   hora, até 3 min. Se ela é antiga, traz as páginas de trás até chegar lá. */
+// "Nova conversa" do Histórico: é o mesmo /clear que o dono pode digitar (o servidor arquiva a anterior)
+window.DGConversaNova = () => enviarTexto('/clear');
+window.DGConversaIr = async (epMs, doDono) => {
+  const ep = epMs / 1000, JANELA = 3 * 60;   // as mensagens contam em segundos
+  const perto = () => {
+    let melhor = null, dist = Infinity;
+    for (const m of msgs) {
+      if (typeof m.ep !== 'number' || ehDono(m) !== doDono) continue;
+      const d = Math.abs(m.ep - ep);
+      if (d < dist) { dist = d; melhor = m; }
+    }
+    return dist <= JANELA ? melhor : null;
+  };
+  let m = perto();
+  for (let voltas = 0; !m && maisAntigas && msgs.length && menorEp() > ep - JANELA && voltas < 40; voltas++) {
+    if (carregandoAntigas) await new Promise(ok => setTimeout(ok, 250));
+    else await carregaAntigas();
+    m = perto();
+  }
+  if (!m) return false;
+  if (filtro !== 'tudo') { filtro = 'tudo'; desenhaAlertas(); }
+  const alvo = Array.from(wrap.children).find(el => el.dataset && el.dataset.msg === m.id);
+  if (!alvo) return false;
+  rolagem.mostra(alvo, { block: 'center' });
+  alvo.classList.remove('msg-achada'); void alvo.offsetWidth; alvo.classList.add('msg-achada');
+  return true;
+};
+// "visto": a mensagem de um aviso ficou à vista por 1,2 s com a tela aberta
+const olhoVisto = 'IntersectionObserver' in window ? new IntersectionObserver(entradas => {
+  for (const en of entradas) {
+    const el = en.target;
+    clearTimeout(el._vistoT);
+    if (!en.isIntersecting || en.intersectionRatio < 0.5) continue;
+    el._vistoT = setTimeout(async () => {
+      const a = alertasLista.find(x => x.mensagem_id === el.dataset.msg);
+      if (!a || document.hidden || vistosEnviados.has(a.id)) return;
+      vistosEnviados.add(a.id);
       try {
-        const d = await api(API + '/alertas/' + encodeURIComponent(a.id) + '/mensagem');
-        // Mescla também o que chegou pelo SSE enquanto a origem era carregada.
-        const porId = new Map([...(d.msgs || []), ...msgs].map(m => [m.id, m]));
-        porId.set(d.mensagem.id, d.mensagem);
-        msgs = Array.from(porId.values()).sort((a, b) => a.ep - b.ep);
-        maisAntigas = !!d.mais_antigas;
-        render({ semRolar: true });
-        const el = wrap.querySelector('[data-msg="' + CSS.escape(d.mensagem.id) + '"]');
-        if (!el) throw new Error('A mensagem não foi encontrada na tela. Tente novamente.');
-        el.classList.add('alerta-destaque');
-        rolagem.mostra(el, { block: 'center' });
-        setTimeout(() => el.classList.remove('alerta-destaque'), 3000);
         await api(API + '/alertas/' + encodeURIComponent(a.id) + '/visto', { method: 'POST', body: {} });
         alertasLista = alertasLista.filter(x => x.id !== a.id);
-      } catch (e) { mostraErro('O alerta foi mantido: ' + e.message); }
-      finally { alertasRevisao++; alertasEmCurso.delete(a.id); desenhaAlertas(); }
-    };
-    alertasPilha.append(b);
+        alertasRevisao++;
+        desenhaAlertas();
+      } catch (e) { vistosEnviados.delete(a.id); console.warn('visto:', e.message); }
+    }, 1200);
   }
-  alertasCaixa.hidden = !alertasPilha.childElementCount;
-  posicionaAlertas();
+}, { root: chat, threshold: [0, 0.5, 1] }) : null;
+/* ✓✓ azul nas mensagens do agente quando ficam à vista por 1 s (guardado por aparelho) */
+const olhoLeitura = 'IntersectionObserver' in window ? new IntersectionObserver(entradas => {
+  for (const en of entradas) {
+    const el = en.target;
+    clearTimeout(el._lerT);
+    if (!en.isIntersecting || en.intersectionRatio < 0.5) continue;
+    el._lerT = setTimeout(() => {
+      if (document.hidden) return;
+      const ep = Number(el.dataset.epChk) || 0;
+      if (ep <= vistoAteEp) return;
+      vistoAteEp = ep;
+      try { localStorage.setItem('dgclaw-visto-ate:' + AGENTE.id, String(vistoAteEp)); } catch (_) { /* sem storage */ }
+      for (const c of wrap.querySelectorAll('.checks[data-ep-chk]')) {
+        if (Number(c.dataset.epChk) <= vistoAteEp && !c.classList.contains('lido')) {
+          c.classList.add('lido'); c.innerHTML = CHECK_2; c.title = 'você viu'; c.setAttribute('aria-label', 'vista por você');
+        }
+      }
+      baixaAntigos();
+    }, 1000);
+  }
+}, { root: chat, threshold: [0, 0.5, 1] }) : null;
+function observaLeitura() {
+  if (!olhoLeitura) return;
+  olhoLeitura.disconnect();
+  for (const c of wrap.querySelectorAll('.checks[data-ep-chk]:not(.lido)')) olhoLeitura.observe(c);
+}
+filtrosProntos = true;
+function observaVistos() {
+  if (!olhoVisto) return;
+  olhoVisto.disconnect();
+  // só entrega some ao ser vista; pedido espera a sua resposta (respondePedidos)
+  const pend = new Set(alertasLista.filter(a => a.tipo !== 'pedido').map(a => a.mensagem_id));
+  for (const el of wrap.querySelectorAll('[data-msg]')) if (pend.has(el.dataset.msg)) olhoVisto.observe(el);
+}
+/* Aviso que ficou para trás (18/10/2026: o número na fileira não sumia mesmo com tudo lido): a
+   entrega sai quando você já viu uma mensagem do agente igual ou mais nova que ela (o ✓✓ azul), e o
+   pedido sai quando você já escreveu depois dele. Sem isso, entrega antiga, de uma página da conversa
+   que nunca voltou à tela, ficava "não vista" para sempre. */
+async function baixaAntigos() {
+  const dono = ultimaFalaDono();
+  const velhos = alertasLista.filter(a => !vistosEnviados.has(a.id) && typeof a.ep === 'number' &&
+    (a.tipo === 'pedido' ? a.ep < dono : a.ep <= vistoAteEp));
+  if (!velhos.length) return;
+  for (const a of velhos) {
+    vistosEnviados.add(a.id);
+    try {
+      await api(API + '/alertas/' + encodeURIComponent(a.id) + '/visto', { method: 'POST', body: {} });
+      alertasLista = alertasLista.filter(x => x.id !== a.id);
+    } catch (e) { vistosEnviados.delete(a.id); console.warn('aviso antigo:', e.message); }
+  }
+  alertasRevisao++; desenhaAlertas();
+}
+/* Você escreveu depois de um pedido: ele foi respondido e sai de "Pedem ação". */
+async function respondePedidos() {
+  const pedidos = alertasLista.filter(a => a.tipo === 'pedido' && !vistosEnviados.has(a.id));
+  for (const a of pedidos) {
+    vistosEnviados.add(a.id);
+    try {
+      await api(API + '/alertas/' + encodeURIComponent(a.id) + '/visto', { method: 'POST', body: {} });
+      alertasLista = alertasLista.filter(x => x.id !== a.id);
+    } catch (e) { vistosEnviados.delete(a.id); console.warn('pedido respondido:', e.message); }
+  }
+  if (pedidos.length) { alertasRevisao++; desenhaAlertas(); }
 }
 function passoAlertas() {
   return { alvo: '[data-tour="alertas"]', titulo: 'Entregas e pedidos',
@@ -4017,7 +5274,7 @@ async function consultaAlertas() {
   const revisao = alertasRevisao;
   try {
     const d = await api(API + '/alertas');
-    if (revisao === alertasRevisao) { alertasLista = d.alertas || []; desenhaAlertas(); }
+    if (revisao === alertasRevisao) { alertasLista = d.alertas || []; desenhaAlertas(); observaVistos(); baixaAntigos(); }
     if (d.avisos && d.avisos.length) mostraAviso(d.avisos.join(' '));
   } catch (e) { mostraErro('Não consegui atualizar os alertas: ' + e.message); }
   finally { alertasLendo = false; }

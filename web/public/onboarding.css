@@ -47,3 +47,63 @@ body.nas-modal-aberto{overflow:hidden}
   .nas-caixa .nas-topo{padding-right:36px}
 }
 @media(prefers-reduced-motion:reduce){.nas-modal,.nas-caixa{animation:none!important;transition:none!important}.nas-pilula{transition:none}}
+
+/* Design system (19/10/2026): a criação usa a paleta do tema.css nos dois temas, ícones de traço
+   e um destaque só (o botão principal). Fica no fim para valer sobre o visual verde original. */
+.nascimento{--nas-verde:var(--dg-texto);background:var(--dg-superficie);border-color:var(--dg-borda);color:var(--dg-texto);box-shadow:none}
+.nascimento :is(h1,h2,h3,h4,label,legend,li){color:inherit}
+.nascimento h2{font-size:clamp(22px,5vw,28px);letter-spacing:-.4px;font-weight:650;margin:14px 0 8px}
+.nascimento p{color:var(--dg-texto-2)}
+.nas-marca,.nas-status{font-size:11px;letter-spacing:.06em;font-weight:700;color:var(--dg-texto-3)}
+.nascimento button{background:transparent;color:var(--dg-texto);border-color:var(--dg-borda);border-radius:999px}
+.nascimento button:hover{background:var(--dg-superficie-2)}
+.nascimento .nas-tutorial,.nas-rotulo button{width:36px;min-width:36px;height:36px;min-height:36px;padding:0;border:0;border-radius:50%;
+  display:grid;place-items:center;color:var(--dg-texto-3)}
+.nascimento .nas-tutorial:hover,.nas-rotulo button:hover{color:var(--dg-texto)}
+.nas-rotulo{margin-top:6px}.nas-rotulo label{margin:6px 0}
+.nascimento label{font-weight:600;color:var(--dg-texto)}
+.nas-rotulo label span{font-weight:400;color:var(--dg-texto-3)}
+.nascimento input:not([type=file]),.nascimento textarea,.nascimento select{background:var(--dg-fundo);color:var(--dg-texto);border-color:var(--dg-borda);font-size:16px}
+.nascimento :is(input,textarea,select)::placeholder{color:var(--dg-texto-3)}
+.nascimento :is(input,textarea,select):focus{outline:none;border-color:var(--dg-azul)}
+.nascimento :focus-visible{outline:2px solid var(--dg-azul);outline-offset:2px}
+.nascimento .nas-principal{background:var(--dg-texto);color:var(--dg-fundo);border-radius:999px;padding:13px;font-weight:600}
+.nascimento .nas-principal:hover{background:var(--dg-texto);opacity:.88}
+.nas-nota,.nas-foto small{color:var(--dg-texto-3)}
+.nas-avatar{background:var(--dg-superficie-2);color:var(--dg-texto-3);border-radius:50%}
+.nas-foto input::file-selector-button{font:inherit;font-size:13px;font-weight:600;margin-right:10px;padding:7px 14px;border:1px solid var(--dg-borda);border-radius:999px;
+  background:transparent;color:var(--dg-texto);cursor:pointer}
+.nas-foto input{color:var(--dg-texto-3)}
+#nasGerarFoto{min-height:34px;padding:0 14px;font-size:13px;font-weight:600}
+.nas-erro,.nas-prog-erro{background:var(--dg-erro-fundo);color:var(--dg-erro-texto);border:1px solid var(--dg-erro-borda)}
+.nas-pct{color:var(--dg-texto);font-weight:650}.nas-etapa{color:var(--dg-texto-2)}
+.nas-trilho{height:8px;background:var(--dg-superficie-2)}.nas-barra{background:var(--dg-azul)}
+.nas-prog[data-estado=erro] .nas-pct{color:var(--dg-erro-texto)}.nas-prog[data-estado=erro] .nas-barra{background:var(--dg-erro-texto)}
+.nas-aura{background:var(--dg-azul-suave)}
+.nas-face{border-color:var(--dg-borda);background:linear-gradient(135deg,var(--dg-superficie),var(--dg-superficie-2));box-shadow:none}
+.nas-lado{background:var(--dg-superficie-2)}.nas-tampa{background:var(--dg-superficie)}
+.nas-frente:after{color:var(--dg-texto-3)}.nas-racha{background:var(--dg-fundo)}
+.nas-badge{background:var(--dg-superficie);border-color:var(--dg-borda);color:var(--dg-texto);box-shadow:var(--dg-sombra);transform:none}
+.nas-hist .nas-badge{box-shadow:none}
+.nas-badge>span{color:var(--dg-texto-2)}
+.nas-retrato{background:var(--dg-superficie-2);color:var(--dg-texto-3);border-radius:50%;box-shadow:none}
+.nas-cx>.nas-x,.nas-fechar{background:transparent;color:var(--dg-texto-2);font-size:0}
+.nas-cx>.nas-x:hover,.nas-fechar:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
+.nas-cx>.nas-x:focus-visible,.nas-fechar:focus-visible{outline:2px solid var(--dg-azul)}
+.nas-fechar{width:40px;height:40px;min-width:40px;top:10px;right:10px;background:var(--dg-superficie)}
+.nas-modal{background:var(--dg-sobreposicao)}
+.nas-caixa{background:var(--dg-superficie);border:1px solid var(--dg-borda);border-radius:20px;box-shadow:var(--dg-sombra)}
+.nas-pilula{background:var(--dg-texto);color:var(--dg-fundo);font-weight:600;box-shadow:var(--dg-sombra)}
+.nas-pilula:focus-visible{outline:2px solid var(--dg-azul)}
+.nas-reabrir{border-color:var(--dg-borda);border-radius:999px;color:var(--dg-texto);padding:6px 14px}
+.nas-reabrir:hover{background:var(--dg-superficie-2)}
+.nas-reabrir:focus-visible{outline:2px solid var(--dg-azul)}
+@keyframes nasNasce{0%,52%{opacity:0;transform:translateY(20px) scale(.88)}100%{opacity:1;transform:none}}
+@media(max-width:600px){.nas-caixa{border-radius:20px 20px 0 0;border-bottom:0}}
+
+/* "usar as mesmas chaves dos outros agentes" (18/10/2026) */
+.nas-chaves{padding-top:4px}
+.nascimento label.nas-marcar{display:flex!important;align-items:flex-start;gap:10px;margin:0;font-size:14.5px;font-weight:400;line-height:1.4;cursor:pointer}
+.nascimento .nas-marcar input{width:20px!important;height:20px;min-height:0;margin:1px 0 0;padding:0;flex:0 0 20px;accent-color:var(--dg-texto)}
+.nascimento .nas-marcar b{font-weight:650}
+.nascimento .nas-marcar small{opacity:.7;font-weight:400}

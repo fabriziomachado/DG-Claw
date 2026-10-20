@@ -1,6 +1,7 @@
 'use strict';
-// Trilha de comandos: transforma tool_use/tool_result do transcript em itens que a tela mostra
-// como "rodou: ..." (recolhíveis). Só o que mexe na máquina entra. Tudo passa pela máscara e é cortado.
+// Trilha de comandos: descreve o tool_use/tool_result do transcript (o que o agente vai rodar). Serve ao cartão
+// de permissão e à barrinha de status. Desde 18/10/2026 NÃO vira mais item no histórico da conversa (as linhas
+// "rodou: ..." saíram a pedido do dono). Só o que mexe na máquina entra. Tudo passa pela máscara e é cortado.
 
 const { mascarar } = require('./mascara');
 
@@ -9,17 +10,34 @@ const MAX_SAIDA = 700;
 const MAX_LINHAS_SAIDA = 8;
 const MAX_TITULO = 140;
 
-// Ferramentas do Claude Code que a trilha mostra. As de conversa (dgchat, telegram, whatsapp) e as de
-// leitura pura (Read, Grep, Glob) ficam de fora de propósito: não mudam nada e encheriam a conversa.
+// Ferramentas do Claude Code que a trilha mostra. As de conversa (dgchat, telegram, whatsapp) ficam de
+// fora. Desde 18/10/2026 os passos de cada pedido ficam recolhidos num resumo só ("Fez 5 passos"), então
+// as de leitura e pesquisa também entram, marcadas como leitura (sem a saída, que seria o arquivo lido).
 const FERRAMENTAS = new Set(['Bash', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
+const LEITURA = {
+  Read: (i) => i.file_path || i.path,
+  Grep: (i) => i.pattern && `"${i.pattern}"${i.path ? ` em ${i.path}` : ''}`,
+  Glob: (i) => i.pattern,
+  WebFetch: (i) => i.url,
+  WebSearch: (i) => i.query,
+  Skill: (i) => i.skill || i.name,
+  Task: (i) => i.description,
+  Agent: (i) => i.description,
+};
 
 const corta = (t, n) => (t.length > n ? t.slice(0, n) + '…' : t);
 const umaLinha = (t) => String(t).replace(/\s+/g, ' ').trim();
 
 /** Resumo do que a ferramenta vai fazer: { ferramenta, titulo, comando } já mascarado, ou null se não entra na trilha. */
 function descreveUso(nome, inp) {
-  if (!FERRAMENTAS.has(nome)) return null;
   const i = inp && typeof inp === 'object' ? inp : {};
+  if (LEITURA[nome]) {
+    const alvo = umaLinha(String(LEITURA[nome](i) || ''));
+    if (!alvo) return null;
+    const t = corta(mascarar(alvo), MAX_TITULO);
+    return { ferramenta: nome, titulo: t, comando: t, leitura: true };
+  }
+  if (!FERRAMENTAS.has(nome)) return null;
   if (nome === 'Bash') {
     const comando = typeof i.command === 'string' ? i.command : '';
     if (!comando.trim()) return null;
@@ -59,4 +77,4 @@ function resumoPendente(uso) {
   return uso ? { ferramenta: uso.ferramenta, titulo: uso.titulo, comando: uso.comando } : null;
 }
 
-module.exports = { descreveUso, descreveResultado, resumoPendente, textoDoResultado, FERRAMENTAS };
+module.exports = { descreveUso, descreveResultado, resumoPendente, textoDoResultado, FERRAMENTAS, LEITURA };

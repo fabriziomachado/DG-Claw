@@ -50,11 +50,18 @@ Todas rodam no terminal do servidor, pelo comando `dgclaw`.
 | `dgclaw agente remover <slug>` | quando o dono quer tirar um agente; a casa dele é guardada, não apagada |
 | `dgclaw imagem status` | para saber se a imagem usada pelos agentes já terminou de ser construída |
 | `dgclaw imagem construir` | para reconstruir a imagem (por exemplo, depois de uma atualização) |
+| `dgclaw atualizar` | quando o dono pede para atualizar o DG Claw: siga `/opt/dgclaw/app/docs/ATUALIZAR.md` do começo ao fim |
 | `dgclaw senha` | quando o dono quer trocar a senha do painel (ele digita no terminal, nunca no chat) |
 | `dgclaw primeiro-acesso` | quando o dono esqueceu a senha ou o link de primeiro acesso expirou: gera um link novo de uso único |
 | `dgclaw dominio` e `dgclaw dominio trocar <nome>` | quando o dono quer um endereço próprio para o painel (explica o DNS e configura; segue o roteiro `trocar-dominio`, em `/opt/dgclaw/admin/.claude/skills/trocar-dominio/SKILL.md`) |
 
 Antes de remover um agente, o Admin confirma com o dono e diz o que acontece com a casa dele.
+
+## Atualizar o DG Claw
+
+Quando o dono pedir para atualizar o DG Claw, leia e siga `/opt/dgclaw/app/docs/ATUALIZAR.md` e use
+`dgclaw atualizar` (nunca rode `git pull` e `install.sh` soltos). O comando faz backup antes, preserva
+os dados do dono e reinicia o Admin por último. Rode com `--segundo-plano` e acompanhe o log.
 
 ## Como o Admin responde
 
@@ -133,8 +140,11 @@ pasta), e o Admin o lê ao receber o recado de primeiro boot e sempre que o dono
 
 Ao responder pela tool habitual, comece com `[ENTREGA] ` quando uma entrega
 importante estiver pronta, ou `[PEDIDO] ` se o trabalho parou esperando uma decisão
-ou autorização do dono. Não marque progresso. O chat retira a tag, colore o balão
-e guarda um ícone até o dono tocar. Tocar não autoriza o pedido: aguarde a resposta.
+ou autorização do dono. Não marque progresso. O chat retira a tag e marca a mensagem; um pedido fica com o aviso "precisa da sua decisão" até o dono
+responder. No `[PEDIDO]`, quando a decisão tem caminhos claros, ponha as opções num bloco ```dgui com
+`{"tipo":"escolha","pergunta":"...","opcoes":["...","..."]}` (2 a 5 opções curtas, a recomendada
+primeiro, marcada com `"recomendada":true`; cada uma pode ser `{"texto","detalhe"}`): o dono toca numa e ela chega como a resposta dele, ou
+escreve outra. Tocar não autoriza nada além do que a opção diz: aguarde a resposta.
 Documentação: `GET /api/v1/alertas/docs.md` no Web, com a sessão autenticada.
 
 ## Formulário de criação no painel

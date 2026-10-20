@@ -34,12 +34,14 @@
     const rolo = document.createElement('div'); rolo.className = 'nas-rolo';
     const bFechar = document.createElement('button');
     bFechar.type = 'button'; bFechar.className = 'nas-fechar'; bFechar.setAttribute('aria-label', 'Fechar e continuar no chat');
-    bFechar.innerHTML = '<span aria-hidden="true">×</span>';
+    bFechar.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>';
     rolo.appendChild(host); caixa.append(bFechar, rolo); modal.appendChild(caixa);
     const pilula = document.createElement('button');
     pilula.type = 'button'; pilula.className = 'nas-pilula'; pilula.hidden = true;
     document.body.append(modal, pilula);
     let tela = '', preenchendo = false, id = '', foto = null, nome = '';
+    let outro = false;
+    let chavesComp = [];   // [{nome, deNome}] que outros agentes já têm: o formulário oferece usar as mesmas   // "+ Novo" da fileira: criar mais um agente, não o primeiro (18/10/2026)
     let minimizado = false, aberto = false, focoAnterior = null, finalDe = null;
     let faseAtual = '', comErroAtual = false, nomeAtual = '';
     /* Depois de tocar, a animação vira um cartão estático no histórico (posicionado pela hora em que a
@@ -182,6 +184,15 @@
       if (b) { ev.preventDefault(); reabrir(b); }
     });
     window.DGOnboarding.abrir = () => reabrir(null);
+    /* "+ Novo" da fileira: abre o cartão no nome de um agente novo. Se uma criação está em andamento
+       (preenchendo, criando, esperando o login), só reabre a janela dela. */
+    window.DGOnboarding.novo = () => {
+      const andando = tela === 'formulario' || (temConteudo() && faseAtual && !['pronto', 'inativo', 'boas-vindas'].includes(faseAtual));
+      if (andando) { minimizado = false; abreModal(); return; }
+      encerraModal();
+      outro = true; id = ''; nome = ''; foto = null; preenchendo = false; minimizado = false;
+      boasVindas();
+    };
     const dataHora = ep => {
       const dt = new Date(ep * 1000), z = n => String(n).padStart(2, '0');
       return { dia: z(dt.getDate()) + '/' + z(dt.getMonth() + 1) + '/' + dt.getFullYear(), hhmm: z(dt.getHours()) + ':' + z(dt.getMinutes()) };
@@ -198,7 +209,7 @@
     ];
     function tutorial(seletor) { if (window.DGTour) window.DGTour.inicia({ passos: seletor ? passos.filter(p=>p.alvo===seletor) : passos }); }
     function cab(titulo) {
-      return '<div class="nas-topo"><span class="nas-marca">DG CLAW · ADMIN</span><button type="button" class="nas-tutorial">Tutorial</button></div><h2>'+titulo+'</h2>';
+      return '<div class="nas-topo"><span class="nas-marca">DG CLAW · ADMIN</span><button type="button" class="nas-tutorial" aria-label="Tutorial" title="Tutorial"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10a2 2 0 0 1 2 2v14a1.5 1.5 0 0 0-1.5-1.5h-5A1.5 1.5 0 0 1 4 17zM20 5.5A1.5 1.5 0 0 0 18.5 4H14a2 2 0 0 0-2 2v14a1.5 1.5 0 0 1 1.5-1.5h5a1.5 1.5 0 0 0 1.5-1.5z"/></svg></button></div><h2>'+titulo+'</h2>';
     }
     function ligarAjuda() {
       host.querySelector('.nas-tutorial').onclick = () => tutorial();
@@ -207,7 +218,7 @@
     function inicio() {
       tela = 'inicio';
       document.body.classList.add('admin-primeiro-acesso');
-      host.innerHTML = cab('Bem-vindo ao seu DG Claw') + '<section data-tour="nas-inicio"><p>Eu sou o Admin. Cuido deste servidor e ajudo você a criar seus agentes.</p><p>Você escolhe um nome, conta o que quer delegar e acompanha tudo por aqui. Depois, é só conversar com seu agente pelo menu à esquerda.</p><button id="nasComecar" type="button" class="nas-principal" data-pergunta="Quero criar meu primeiro agente">Quero criar meu primeiro agente</button></section><p class="nas-erro" role="alert" hidden></p>';
+      host.innerHTML = cab('Bem-vindo ao seu S2 Bot') + '<section data-tour="nas-inicio"><p>Eu sou o Admin. Cuido deste servidor e ajudo você a criar seus agentes.</p><p>Você escolhe um nome, conta o que quer delegar e acompanha tudo por aqui. Depois, é só conversar com seu agente pelo menu à esquerda.</p><button id="nasComecar" type="button" class="nas-principal" data-pergunta="Quero criar meu primeiro agente">Quero criar meu primeiro agente</button></section><p class="nas-erro" role="alert" hidden></p>';
       abreModal();
       host.querySelector('.nas-tutorial').onclick = () => tutorial('[data-tour="nas-inicio"]');
       host.querySelector('#nasComecar').onclick = async () => {
@@ -218,7 +229,9 @@
     }
     function boasVindas() {
       tela = 'boas-vindas';
-      host.innerHTML = cab('Vamos criar seu primeiro agente?') + '<p>Eu sou o Admin. Cuido deste servidor e preparo seus agentes. Como vai se chamar o primeiro?</p><form id="nasNome"><section data-tour="nas-nome"><div class="nas-rotulo"><label for="nasNomeInput">Nome do agente</label><button type="button" data-ajuda="[data-tour=nas-nome]" aria-label="Ajuda sobre o nome">?</button></div><input id="nasNomeInput" name="nome" maxlength="70" placeholder="Ex.: Sofia" required autocomplete="off"><button class="nas-principal" type="submit" data-pergunta="Quero criar meu primeiro agente">Continuar</button></section></form><p class="nas-erro" role="alert" hidden></p>';
+      host.innerHTML = cab(outro ? 'Vamos criar um agente novo?' : 'Vamos criar seu primeiro agente?') + (outro
+        ? '<p>Eu preparo a caixa dele e te aviso quando estiver pronto. Como ele vai se chamar?</p>'
+        : '<p>Eu sou o Admin. Cuido deste servidor e preparo seus agentes. Como vai se chamar o primeiro?</p>') + '<form id="nasNome"><section data-tour="nas-nome"><div class="nas-rotulo"><label for="nasNomeInput">Nome do agente</label><button type="button" data-ajuda="[data-tour=nas-nome]" aria-label="Ajuda sobre o nome" title="Ajuda"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6M12 17h.01"/></svg></button></div><input id="nasNomeInput" name="nome" maxlength="70" placeholder="Ex.: Sofia" required autocomplete="off"><button class="nas-principal" type="submit" data-pergunta="Quero criar meu primeiro agente">Continuar</button></section></form><p class="nas-erro" role="alert" hidden></p>';
       abreModal();
       // Os seletores de tutorial são âncoras estáveis, sem dependência da aparência.
       host.querySelector('[data-ajuda]').onclick = () => tutorial('[data-tour="nas-nome"]');
@@ -226,7 +239,7 @@
       host.querySelector('form').onsubmit = async ev => {
         ev.preventDefault(); nome = host.querySelector('input').value.trim(); if (!nome) return;
         const bot = host.querySelector('[type=submit]'); bot.disabled = true;
-        try { await enviar('Quero criar meu primeiro agente. O nome será ' + nome + '. Vou preencher a função, o tom e a foto no formulário do painel. Aguarde minha confirmação em Criar meu agente.'); formulario(); }
+        try { await enviar((outro ? 'Quero criar um agente novo' : 'Quero criar meu primeiro agente') + '. O nome será ' + nome + '. Vou preencher a função, o tom e a foto no formulário do painel. Aguarde minha confirmação em Criar meu agente.'); formulario(); }
         catch (e) { erro(e.message); bot.disabled = false; }
       };
     }
@@ -235,16 +248,17 @@
     function formulario() {
       preenchendo = true; tela = 'formulario'; id = id || novoId();
       host.innerHTML = cab('Dê um jeito só dele') + '<p>Me conte o que você quer delegar. Eu preparo o resto.</p><form id="nasForm">'+
-        '<section data-tour="nas-nome"><div class="nas-rotulo"><label for="nasNomeCompleto">Nome</label><button type="button" data-ajuda="[data-tour=&quot;nas-nome&quot;]" aria-label="Ajuda sobre o nome">?</button></div><input id="nasNomeCompleto" name="nome" value="'+esc(nome)+'" maxlength="70" required><label for="nasDono">Como você quer ser chamado?</label><input id="nasDono" name="dono" maxlength="70" placeholder="Seu nome (opcional)" autocomplete="given-name"></section>'+
-        '<section data-tour="nas-papel"><div class="nas-rotulo"><label for="nasPapel">O que ele vai fazer por você?</label><button type="button" data-ajuda="[data-tour=&quot;nas-papel&quot;]" aria-label="Ajuda sobre função e tom">?</button></div><textarea id="nasPapel" name="papel" rows="3" maxlength="700" placeholder="Ex.: organizar minha agenda e me ajudar a escrever para o Instagram" required></textarea><label for="nasTom" title="O jeito de conversar que será gravado na identidade do agente">Tom da conversa</label><select id="nasTom" name="jeito"><option>Acolhedor e direto</option><option>Descontraído e bem-humorado</option><option>Formal e objetivo</option><option>Paciente e didático</option></select></section>'+
-        '<section data-tour="nas-foto"><div class="nas-rotulo"><label for="nasFoto">Foto <span>(opcional)</span></label><button type="button" data-ajuda="[data-tour=&quot;nas-foto&quot;]" aria-label="Ajuda sobre a foto">?</button></div><div class="nas-foto"><div class="nas-avatar" id="nasPrevia" aria-label="Avatar neutro">◉</div><div><input id="nasFoto" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG, JPEG ou WebP · até 5 MB</small><button type="button" id="nasGerarFoto" title="Cria um avatar ilustrado neste navegador, sem IA e sem custo">Gerar avatar</button></div></div></section>'+
+        '<section data-tour="nas-nome"><div class="nas-rotulo"><label for="nasNomeCompleto">Nome</label><button type="button" data-ajuda="[data-tour=&quot;nas-nome&quot;]" aria-label="Ajuda sobre o nome" title="Ajuda"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6M12 17h.01"/></svg></button></div><input id="nasNomeCompleto" name="nome" value="'+esc(nome)+'" maxlength="70" required><label for="nasDono">Como você quer ser chamado?</label><input id="nasDono" name="dono" maxlength="70" placeholder="Seu nome (opcional)" autocomplete="given-name"></section>'+
+        '<section data-tour="nas-papel"><div class="nas-rotulo"><label for="nasPapel">O que ele vai fazer por você?</label><button type="button" data-ajuda="[data-tour=&quot;nas-papel&quot;]" aria-label="Ajuda sobre função e tom" title="Ajuda"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6M12 17h.01"/></svg></button></div><textarea id="nasPapel" name="papel" rows="3" maxlength="700" placeholder="Ex.: organizar minha agenda e me ajudar a escrever para o Instagram" required></textarea><label for="nasTom" title="O jeito de conversar que será gravado na identidade do agente">Tom da conversa</label><select id="nasTom" name="jeito"><option>Acolhedor e direto</option><option>Descontraído e bem-humorado</option><option>Formal e objetivo</option><option>Paciente e didático</option></select></section>'+
+        (chavesComp.length ? '<section class="nas-chaves"><label class="nas-marcar"><input type="checkbox" name="usarChaves" checked> <span>Usar as mesmas chaves dos meus outros agentes: <b>' + esc(chavesComp.map(c => c.nome).join(' e ')) + '</b> <small>(do ' + esc([...new Set(chavesComp.map(c => c.deNome))].join(' e ')) + ')</small></span></label></section>' : '') +
+        '<section data-tour="nas-foto"><div class="nas-rotulo"><label for="nasFoto">Foto <span>(opcional)</span></label><button type="button" data-ajuda="[data-tour=&quot;nas-foto&quot;]" aria-label="Ajuda sobre a foto" title="Ajuda"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6M12 17h.01"/></svg></button></div><div class="nas-foto"><div class="nas-avatar" id="nasPrevia" aria-label="Avatar neutro"><svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="3.5"/><path d="M5.5 19.5a6.5 6.5 0 0 1 13 0"/></svg></div><div><input id="nasFoto" type="file" accept="image/png,image/jpeg,image/webp"><small>PNG, JPEG ou WebP · até 5 MB</small><button type="button" id="nasGerarFoto" title="Cria um avatar ilustrado neste navegador, sem IA e sem custo">Gerar avatar</button></div></div></section>'+
         '<p class="nas-nota">Ao tocar em criar, você confirma essas escolhas. Seu agente usará a mesma assinatura do Admin e vocês conversarão aqui no painel.</p><button type="submit" class="nas-principal" data-pergunta="Crie meu agente com as escolhas deste formulário">Criar meu agente</button></form><p class="nas-erro" role="alert" hidden></p>';
       abreModal();
       ligarAjuda();
       topoDoFormulario();
       host.querySelector('#nasFoto').onchange = () => {
         const f = host.querySelector('#nasFoto').files[0]; foto = null;
-        const prev = host.querySelector('#nasPrevia'); prev.textContent = '◉';
+        const prev = host.querySelector('#nasPrevia'); prev.innerHTML = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="3.5"/><path d="M5.5 19.5a6.5 6.5 0 0 1 13 0"/></svg>';
         if (!f) return;
         if (!['image/png','image/jpeg','image/webp'].includes(f.type) || f.size > 5*1024*1024) { erro('Escolha uma foto PNG, JPEG ou WebP de até 5 MB.'); host.querySelector('#nasFoto').value = ''; return; }
         foto = f;
@@ -273,9 +287,9 @@
         try {
           let fotoId = null;
           if (foto) { const fd = new FormData(); fd.append('file',foto); fd.append('enviar','0'); fd.append('cliente_id',id+'-foto'); const up = await json('/api/v1/agents/'+encodeURIComponent(agente.id)+'/upload',{method:'POST',body:fd}); fotoId = up.anexo.id; }
-          const pedido = { id, dono:f.elements.dono.value.trim() || undefined, nome:f.elements.nome.value.trim(), papel:f.elements.papel.value.trim().replace(/\s+/g,' '), jeito:f.elements.jeito.value, foto:fotoId };
+          const pedido = { id, dono:f.elements.dono.value.trim() || undefined, nome:f.elements.nome.value.trim(), papel:f.elements.papel.value.trim().replace(/\s+/g,' '), jeito:f.elements.jeito.value, foto:fotoId, usarChaves: !!(f.elements.usarChaves && f.elements.usarChaves.checked) };
           const d = await json('/api/v1/onboarding',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(pedido)});
-          preenchendo = false; mostrar(d);
+          preenchendo = false; outro = false; mostrar(d);
         } catch(e) { erro(e.message); bot.disabled = false; bot.textContent = 'Tentar enviar novamente'; }
       };
     }
@@ -329,11 +343,12 @@
     }
     function mostrar(d) { mostrarInterno(d); atualizaPilula(); }
     function mostrarInterno(d) {
+      if (Array.isArray(d.chavesCompartilhaveis)) chavesComp = d.chavesCompartilhaveis;
       faseAtual = d.fase; comErroAtual = !!(d.progresso && d.progresso.erro); nomeAtual = d.nome || nomeAtual;
       let novos = false;
       for (const c of d.cartoes || []) if (c.id !== animando && !cartoes.has(c.id) && !dispensados.has(c.id)) { cartoes.set(c.id, c); novos = true; }
       if (novos) pedeRender();
-      if (preenchendo) return;
+      if (preenchendo || (outro && (tela === 'boas-vindas' || tela === 'formulario'))) return;
       if (d.fase === 'pronto' && (d.cartaoDispensado || dispensados.has(d.id))) {
         encerraModal(); return;
       }
@@ -356,8 +371,8 @@
       const pronto = d.fase === 'pronto' && d.conversa;
       const ocupado = ['solicitado','enviando','criando','testando'].includes(d.fase);
       const tit = pronto ? 'Seu agente chegou.' : d.fase === 'login' ? 'Falta conectar sua assinatura' : d.fase === 'erro' || d.fase === 'erro-envio' ? 'Vamos resolver juntos' : 'Um começo só seu';
-      const fotoHtml = d.foto ? '<img src="'+esc(d.foto)+'" alt="Foto de '+esc(d.nome)+'">' : '<span aria-label="Avatar neutro">◉</span>';
-      host.innerHTML = cab(tit) + '<section data-tour="nas-estado"><div class="nas-rotulo"><span class="nas-status">'+(pronto?'PRONTO PARA CONVERSAR':ocupado?'PREPARANDO '+esc(d.nome).toUpperCase():'PRÓXIMO PASSO')+'</span><button type="button" data-ajuda="[data-tour=&quot;nas-estado&quot;]" aria-label="Entenda esta etapa">?</button></div><div class="nas-palco '+(pronto?'nas-abriu':ocupado?'nas-gerando':'')+'" aria-hidden="true"><div class="nas-aura"></div><div class="nas-cubo"><div class="nas-face nas-frente"></div><div class="nas-face nas-lado"></div><div class="nas-face nas-tampa"></div><div class="nas-racha"></div></div></div>'+
+      const fotoHtml = d.foto ? '<img src="'+esc(d.foto)+'" alt="Foto de '+esc(d.nome)+'">' : '<span aria-label="Avatar neutro"><svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="3.5"/><path d="M5.5 19.5a6.5 6.5 0 0 1 13 0"/></svg></span>';
+      host.innerHTML = cab(tit) + '<section data-tour="nas-estado"><div class="nas-rotulo"><span class="nas-status">'+(pronto?'PRONTO PARA CONVERSAR':ocupado?'PREPARANDO '+esc(d.nome).toUpperCase():'PRÓXIMO PASSO')+'</span><button type="button" data-ajuda="[data-tour=&quot;nas-estado&quot;]" aria-label="Entenda esta etapa" title="Ajuda"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6M12 17h.01"/></svg></button></div><div class="nas-palco '+(pronto?'nas-abriu':ocupado?'nas-gerando':'')+'" aria-hidden="true"><div class="nas-aura"></div><div class="nas-cubo"><div class="nas-face nas-frente"></div><div class="nas-face nas-lado"></div><div class="nas-face nas-tampa"></div><div class="nas-racha"></div></div></div>'+
         barraHtml()+
         (pronto?'<div class="nas-cx">'+botaoX(d.id, d.nome)+'<a class="nas-badge" href="'+esc(d.conversa)+'"><div class="nas-retrato">'+fotoHtml+'</div><strong>Oi, eu sou '+esc(d.nome)+'.</strong><span>Clique aqui pra gente começar a conversar <b aria-hidden="true">↗</b></span></a></div>':'<p class="nas-andamento" role="status" aria-live="polite">'+esc(d.mensagem)+'</p>')+
         (d.fase==='login' && d.login?'<a class="nas-principal" href="'+esc(d.login)+'" target="_blank" rel="noopener">Conectar minha assinatura</a><button type="button" id="nasTestar">Já entrei. Pode testar.</button>':'')+
@@ -398,9 +413,9 @@
     atualizar();
     window.addEventListener('pagehide',()=>clearTimeout(timer),{once:true});
   }
-  const botaoX = (id, nome) => '<button type="button" class="nas-x" data-dispensar="' + esc(id) + '" aria-label="' + esc('Dispensar o cartão de ' + nome) + '"><span aria-hidden="true">×</span></button>';
+  const botaoX = (id, nome) => '<button type="button" class="nas-x" data-dispensar="' + esc(id) + '" aria-label="' + esc('Dispensar o cartão de ' + nome) + '"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>';
   function htmlCartao(c) {
-    const retrato = c.foto ? '<img src="' + esc(c.foto) + '" alt="Foto de ' + esc(c.nome) + '" loading="lazy">' : '<span aria-label="Avatar neutro">◉</span>';
+    const retrato = c.foto ? '<img src="' + esc(c.foto) + '" alt="Foto de ' + esc(c.nome) + '" loading="lazy">' : '<span aria-label="Avatar neutro"><svg viewBox="0 0 24 24" width="44" height="44" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9" r="3.5"/><path d="M5.5 19.5a6.5 6.5 0 0 1 13 0"/></svg></span>';
     const miolo = '<div class="nas-retrato">' + retrato + '</div><strong>' + esc(c.nome) + ' nasceu às ' + esc(c.hhmm) + '</strong>' +
       (c.conversa ? '<span>Clique aqui pra conversar com ' + esc(c.nome) + ' <b aria-hidden="true">↗</b></span>' : '');
     return '<div class="nas-hist" data-msg="' + esc('nasc-' + c.id) + '"><div class="nas-cx">' + botaoX(c.id, c.nome) + (c.conversa ? '<a class="nas-badge" href="' + esc(c.conversa) + '">' + miolo + '</a>' : '<div class="nas-badge">' + miolo + '</div>') + '</div></div>';

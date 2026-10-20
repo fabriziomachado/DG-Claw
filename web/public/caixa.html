@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Caixa de entrada - S2 Bot</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#2f9e5e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="S2 Bot">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/tema.css">
+<script src="/tema.js"></script>
+<link rel="stylesheet" href="/caixa.css">
+<link rel="stylesheet" href="/casca.css">
+<link rel="stylesheet" href="/menu-lado.css">
+<link rel="stylesheet" href="/sem-zoom.css">
+<script src="/sem-zoom.js"></script>
+</head>
+<body class="cx-pag">
+<main class="cx-main">
+  <nav class="cx-filtros" id="cxFiltros" role="tablist" aria-label="Filtrar a caixa de entrada" data-tour="cx-filtros">
+    <button type="button" class="cx-chip on" data-f="tudo" role="tab" aria-selected="true">Tudo</button>
+    <button type="button" class="cx-chip" data-f="pedido" role="tab" aria-selected="false">Decidir</button>
+    <button type="button" class="cx-chip" data-f="lembrete" role="tab" aria-selected="false">Lembretes</button>
+    <button type="button" class="cx-chip" data-f="entrega" role="tab" aria-selected="false">Entregas</button>
+  </nav>
+  <p class="cx-msg" id="cxMsg" role="status" hidden></p>
+  <div id="cxLista" class="cx-lista" data-tour="cx-lista" aria-live="polite"></div>
+</main>
+<script src="/tour.js"></script>
+<script src="/menu-lado.js"></script>
+<script src="/casca.js"></script>
+<script src="/caixa.js"></script>
+<script>
+DGCasca.monta({ pagina: 'caixa', titulo: 'Caixa de entrada', aoTutorial: function () { if (window.DGCaixaTutorial) window.DGCaixaTutorial(); } });
+</script>
+</body>
+</html>

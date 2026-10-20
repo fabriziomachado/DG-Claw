@@ -286,7 +286,7 @@ test('rotas: teste devolve 409 sem aparelho, 200 com envio, 502 com recusa e 409
     assert.equal(ok.json.ok, true); assert.equal(ok.json.inscricoes, 2); assert.equal(ok.json.enviados, 2);
     assert.equal(estado.pedidos.length, 2);
     const claro = JSON.parse(decifra(estado.pedidos[0].corpo, ap.ecdh, ap.auth).toString('utf8'));
-    assert.equal(claro.titulo, 'DG Claw'); assert.equal(claro.tag, 'teste-aviso');
+    assert.equal(claro.titulo, 'S2 Bot'); assert.equal(claro.tag, 'teste-aviso');
 
     estado.pedidos.length = 0;
     const so = await t.c.post('/api/v1/push/teste', { json: { endpoint: ap2.sub.endpoint } });

@@ -8,7 +8,8 @@
    Celular: gaveta (o #menu, o véu #overlayMenu e o ☰ continuam sendo do conversa.css).
    Computador (>= 1100px): barra fixa de 240px à esquerda, sem ☰ e sem véu. */
 aside#menu{
-  --ml-painel:#fff; --ml-fundo2:#f0f4f1; --ml-linha:#e1e8e3; --ml-texto:#0f1c14; --ml-fraco:#6c8172;
+  --ml-painel:var(--dg-lado,#fff); --ml-fundo2:var(--dg-superficie-2,#f0f4f1); --ml-linha:var(--dg-borda,#e1e8e3);
+  --ml-texto:var(--dg-texto,#0f1c14); --ml-fraco:var(--dg-texto-2,#6c8172);
   --ml-a1:var(--accent); --ml-a2:color-mix(in srgb,var(--accent) 70%,#1d3b8f);
   background:var(--ml-painel);color:var(--ml-texto);overflow-y:auto;overflow-x:hidden;
   padding:22px 14px 10px;gap:14px;
@@ -37,7 +38,7 @@ aside#menu{
 .ml-troca > button:hover{background:var(--ml-fundo2);color:var(--ml-texto)}
 .ml-seta{opacity:.7}
 .ml-lista{position:absolute;z-index:5;top:calc(100% + 6px);left:0;right:0;background:var(--ml-painel);
-  border:1px solid var(--ml-linha);border-radius:12px;box-shadow:0 8px 24px rgba(16,20,40,.14);padding:6px;
+  border:1px solid var(--ml-linha);border-radius:12px;box-shadow:var(--dg-sombra,0 8px 24px rgba(16,20,40,.14));padding:6px;
   display:none;max-height:50vh;overflow-y:auto;text-align:left}
 .ml-troca.aberto .ml-lista{display:block}
 .ml-ag{display:flex;align-items:center;gap:9px;min-height:44px;padding:6px 8px;border-radius:9px;
@@ -63,7 +64,8 @@ aside#menu{
 .ml-tab:hover{background:var(--ml-fundo2);color:var(--ml-texto)}
 .ml-tab.ativo{background:linear-gradient(135deg,var(--ml-a1),var(--ml-a2));color:#fff;
   box-shadow:0 1px 2px rgba(16,20,40,.06),0 8px 24px rgba(16,20,40,.08)}
-.ml-ico{width:18px;text-align:center;opacity:.9;flex-shrink:0}
+.ml-ico{width:18px;text-align:center;opacity:.9;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center}
+.ml-ico svg{width:18px;height:18px;display:block}
 .ml-tx{display:flex;flex-direction:column;min-width:0}
 .ml-tx small{font-size:11.5px;color:var(--ml-fraco);line-height:1.3}
 
@@ -87,3 +89,149 @@ aside#menu .pe{margin-top:auto;padding-top:6px}
   /* as faixas são fixed e nasciam coladas na borda da tela, por baixo do menu */
   .faixa{left:248px}
 }
+
+/* seletor de tema em Configurações: Automático, Claro, Escuro (18/10/2026) */
+.ml-tema{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;padding:9px 10px;font-size:14px;color:var(--ml-fraco)}
+.ml-tema-rot{flex:1}
+.ml-tema-opcoes{display:flex;flex:0 0 100%;background:var(--ml-fundo2);border-radius:10px;padding:3px;gap:2px}
+.ml-tema-opcoes button{flex:1;min-height:32px;border:0;border-radius:8px;background:transparent;color:var(--ml-fraco);
+  font:inherit;font-size:12px;cursor:pointer;padding:0 2px;white-space:nowrap}
+.ml-tema-opcoes button:hover{color:var(--ml-texto)}
+.ml-tema-opcoes button.on{background:var(--dg-superficie,#fff);color:var(--ml-texto);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+#mlInstalar[hidden]{display:none!important}
+
+/* foto grande que abre "Trocar foto" (18/10/2026) */
+.ml-foto-btn{position:relative;z-index:1;display:grid;place-items:center;padding:0;border:0;background:none;
+  border-radius:50%;cursor:pointer;color:inherit;font:inherit}
+.ml-foto-btn:focus-visible{outline:2px solid var(--dg-azul);outline-offset:6px}
+.ml-foto-selo{position:absolute;right:2px;bottom:2px;z-index:2;width:30px;height:30px;border-radius:50%;
+  display:grid;place-items:center;background:var(--dg-superficie);color:var(--dg-texto);
+  border:1px solid var(--dg-borda);box-shadow:var(--dg-sombra);transition:transform .15s}
+.ml-foto-btn:hover .ml-foto-selo{transform:scale(1.08)}
+.ml-foto-selo svg{width:16px;height:16px}
+.ml-foto-selo svg,.ml-fs svg{fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+/* folha "Trocar foto": sobe de baixo no celular, janela no meio no computador */
+.ml-fs-veu{position:fixed;inset:0;z-index:80;background:var(--dg-sobreposicao);display:flex;align-items:flex-end;
+  justify-content:center;opacity:0;transition:opacity .18s}
+.ml-fs-veu[hidden]{display:none}
+.ml-fs-veu.aberto{opacity:1}
+.ml-fs{width:100%;max-width:420px;background:var(--dg-superficie);color:var(--dg-texto);border:1px solid var(--dg-borda);
+  border-bottom:0;border-radius:18px 18px 0 0;padding:16px 18px calc(18px + env(safe-area-inset-bottom));
+  box-shadow:0 -8px 30px rgba(0,0,0,.18);display:flex;flex-direction:column;align-items:center;gap:12px;
+  transform:translateY(16px);transition:transform .2s;max-height:92vh;overflow-y:auto}
+.ml-fs-veu.aberto .ml-fs{transform:none}
+@media (min-width:600px){
+  .ml-fs-veu{align-items:center}
+  .ml-fs{border-radius:16px;border-bottom:1px solid var(--dg-borda);padding-bottom:18px;box-shadow:0 12px 40px rgba(0,0,0,.2)}
+}
+.ml-fs-cab{width:100%;display:flex;align-items:center;justify-content:space-between}
+.ml-fs-cab h2{margin:0;font-size:17px;font-weight:600;letter-spacing:-.01em}
+.ml-fs-x{width:36px;height:36px;border:0;border-radius:10px;background:none;color:var(--dg-texto-2);cursor:pointer;
+  display:grid;place-items:center;margin-right:-8px}
+.ml-fs-x:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
+.ml-fs-x svg{width:20px;height:20px}
+.ml-fs-sub{margin:-6px 0 0;width:100%;font-size:13px;color:var(--dg-texto-2);line-height:1.45}
+.ml-fs-previa{width:128px;height:128px;border-radius:50%;overflow:hidden;display:grid;place-items:center;
+  color:#fff;font-size:46px;font-weight:600;margin:6px 0 2px;box-shadow:0 0 0 1px var(--dg-borda)}
+.ml-fs-previa img{width:100%;height:100%;object-fit:cover;display:block}
+.ml-fs-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:40px;padding:0 14px;
+  border:1px solid var(--dg-borda);border-radius:999px;background:var(--dg-superficie);color:var(--dg-texto);
+  font:inherit;font-size:14px;cursor:pointer;white-space:nowrap}
+.ml-fs-btn:hover:not(:disabled){background:var(--dg-superficie-2)}
+.ml-fs-btn:disabled{opacity:.45;cursor:default}
+.ml-fs-btn[hidden]{display:none}
+.ml-fs-btn svg{width:18px;height:18px;flex:0 0 auto}
+.ml-fs-btn:focus-visible,.ml-fs-x:focus-visible{outline:2px solid var(--dg-azul);outline-offset:2px}
+.ml-fs-salvar{background:var(--dg-texto);border-color:var(--dg-texto);color:var(--dg-superficie);font-weight:600}
+.ml-fs-salvar:hover:not(:disabled){background:var(--dg-texto);opacity:.88}
+.ml-fs-remover{color:var(--dg-erro-texto);border-color:var(--dg-erro-borda)}
+.ml-fs-remover:hover:not(:disabled){background:var(--dg-erro-fundo)}
+.ml-fs-dica{margin:-4px 0 0;font-size:12px;color:var(--dg-texto-3);text-align:center}
+.ml-fs-erro{margin:0;width:100%;padding:9px 12px;border-radius:10px;font-size:13px;line-height:1.45;
+  background:var(--dg-erro-fundo);border:1px solid var(--dg-erro-borda);color:var(--dg-erro-texto)}
+.ml-fs-erro[hidden]{display:none}
+.ml-fs-acoes{width:100%;display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:6px;
+  padding-top:14px;border-top:1px solid var(--dg-borda)}
+.ml-fs-esp{flex:1}
+@media (max-width:380px){ .ml-fs-remover{flex:1 0 100%} }
+.ml-fs:focus{outline:none}
+
+/* enquadramento da foto (18/10/2026): o quadro é o quadrado do círculo; fora dele, véu */
+.ml-fs-previa[hidden],.ml-fs-corte[hidden],.ml-fs-ajuste[hidden],.ml-fs-zoom[hidden],.ml-fs-dica[hidden]{display:none}
+.ml-fs-corte{position:relative;width:min(248px,68vw);aspect-ratio:1;flex:0 0 auto;overflow:hidden;border-radius:14px;
+  background:var(--dg-superficie-2);touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab;
+  margin:2px 0 0;outline:none}
+.ml-fs-corte.arrastando{cursor:grabbing}
+.ml-fs-corte:focus-visible{box-shadow:0 0 0 2px var(--dg-superficie),0 0 0 4px var(--dg-azul)}
+.ml-fs-tela{position:absolute;left:0;top:0;transform-origin:0 0;display:block;pointer-events:none;max-width:none}
+.ml-fs-mascara{position:absolute;inset:0;border-radius:50%;pointer-events:none;
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--dg-superficie) 85%,transparent),
+             0 0 0 200px color-mix(in srgb,var(--dg-superficie) 72%,transparent)}
+.ml-fs-ajuste{margin:-2px 0 0;font-size:12.5px;color:var(--dg-texto-2);text-align:center;line-height:1.4}
+.ml-fs-ajuste b{font-weight:600;color:var(--dg-texto)}
+.ml-fs-zoom{display:flex;align-items:center;gap:10px;width:min(280px,100%);color:var(--dg-texto-2)}
+.ml-fs-zoom > svg{width:16px;height:16px;flex:0 0 auto}
+.ml-fs-zoom > svg:nth-of-type(2){width:20px;height:20px}
+.ml-fs-zoom input[type=range]{flex:1;min-width:0;height:28px;margin:0;accent-color:var(--dg-texto);cursor:pointer;background:none}
+.ml-fs-centro{margin:0 -6px 0 2px;width:32px;height:32px}
+.ml-fs-centro svg{width:17px;height:17px}
+.ml-fs-oculto{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Bolinha de pedidos das Sessões (item do menu e botão 🖥 do cabeçalho): há sessão esperando o dono decidir */
+.sx-bol{display:inline-block;width:9px;height:9px;border-radius:50%;background:#e0453a;flex:0 0 auto}
+.sx-bol[hidden]{display:none}
+.ml-tab .sx-bol{margin-left:auto}
+#btnSessoes{position:relative}
+#btnSessoes .sx-bol{position:absolute;top:6px;right:5px}
+
+/* No iPhone, campo com fonte abaixo de 16px dá zoom quando recebe o foco. Regra: nada dá zoom no app instalado. */
+@media (pointer:coarse){input,textarea,select{font-size:16px!important}}
+
+/* ── Menu em grupos (19/10/2026, proposta A do dono) ───────────────────────────────────────────────
+   Topo enxuto: foto pequena e nome numa linha (trocar de agente fica na fileira do cabeçalho, e o
+   Tutorial vai para o rodapé). Os itens em quatro grupos que fecham. Configurações e Sair viram
+   ícones no rodapé. */
+aside#menu{padding-top:calc(14px + env(safe-area-inset-top));padding-bottom:calc(10px + env(safe-area-inset-bottom));gap:8px}
+.ml-marca{display:grid;grid-template-columns:40px minmax(0,1fr);column-gap:10px;align-items:center;text-align:left;
+  padding:0 6px 4px}
+.ml-moldura{grid-row:1/3;width:40px;height:40px;margin:0}
+.ml-moldura::before{inset:-2px}
+.ml-moldura::after{inset:1px}
+.ml-foto{width:36px;height:36px;font-size:15px;box-shadow:none}
+.ml-foto-selo{display:none}
+.ml-nome{font-size:15px;line-height:1.2}
+.ml-sub{font-size:12px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ml-marca .gm-tut,.ml-marca .ml-troca{display:none!important}
+#mlConfig{display:none!important}
+/* grupos */
+.ml-grupo{display:flex;flex-direction:column;gap:2px}
+.ml-grupo[hidden]{display:none}
+.ml-gcab{display:flex;align-items:center;gap:6px;width:100%;min-height:32px;padding:10px 10px 4px;border:0;background:none;cursor:pointer;
+  font:inherit;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dg-texto-3);text-align:left}
+.ml-gcab:hover{color:var(--ml-texto)}
+.ml-gcab svg{flex:0 0 13px;transition:transform .15s}
+.ml-grupo.aberto .ml-gcab svg{transform:rotate(90deg)}
+.ml-gqt{margin-left:auto;font-size:11px;font-weight:600;letter-spacing:0;text-transform:none}
+.ml-gitens{display:flex;flex-direction:column;gap:2px}
+.ml-gitens[hidden]{display:none}
+.ml-tab{min-height:36px;padding:7px 10px}
+/* item ativo discreto, como o resto do app (antes era um degradê na cor do agente) */
+.ml-tab.ativo{background:var(--dg-superficie-2);color:var(--dg-texto);font-weight:600;box-shadow:none}
+@media(prefers-reduced-motion:reduce){.ml-gcab svg{transition:none}}
+/* rodapé de ícones */
+aside#menu .pe{border-top:1px solid var(--ml-linha);padding:8px 2px 2px}
+aside#menu .pe .conta{display:none}
+.ml-rodape{display:flex;align-items:center;gap:2px}
+.ml-resp{flex:1}
+.ml-rodape form{margin:0}
+.ml-rb{width:38px;height:38px;flex:0 0 38px;border:0;border-radius:50%;background:transparent;color:var(--dg-texto-2);cursor:pointer;
+  display:grid;place-items:center;padding:0;text-decoration:none}
+.ml-rb:hover{background:var(--ml-fundo2);color:var(--dg-texto)}
+.ml-rb[hidden]{display:none}
+.ml-rb:focus-visible{outline:2px solid var(--dg-azul);outline-offset:1px}
+aside#menu .pe .ml-ajuda{margin:0 4px 8px}
+/* número da Caixa de entrada: vermelho, como no ícone do app (19/10/2026) */
+.ml-tab .ml-n{margin-left:auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#e0453a;color:#fff;
+  font-size:11.5px;font-weight:700;line-height:20px;text-align:center;box-sizing:border-box}
+.ml-tab .ml-n[hidden]{display:none}

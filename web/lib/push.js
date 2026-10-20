@@ -92,6 +92,7 @@ function montaPayload(aviso) {
   if (typeof aviso.titulo !== 'string' || !aviso.titulo.trim()) throw new TypeError('O aviso precisa de "titulo" (texto não vazio).');
   if (aviso.corpo != null && typeof aviso.corpo !== 'string') throw new TypeError('O "corpo" do aviso precisa ser texto.');
   if (aviso.tag != null && (typeof aviso.tag !== 'string' || aviso.tag.length > 100)) throw new TypeError('A "tag" do aviso precisa ser um texto de até 100 caracteres.');
+  if (aviso.contador != null && (!Number.isInteger(aviso.contador) || aviso.contador < 0)) throw new TypeError('O "contador" do aviso (número no ícone do app) precisa ser um inteiro de 0 para cima.');
   let acoes = [];
   if (aviso.acoes != null) {
     if (!Array.isArray(aviso.acoes) || aviso.acoes.length > 2) throw new TypeError('"acoes" precisa ser uma lista de no máximo 2 botões.');
@@ -108,6 +109,8 @@ function montaPayload(aviso) {
     imagem: aviso.imagem == null ? null : caminhoRelativo(aviso.imagem, 'imagem'),
     acoes,
     exigir_interacao: !!aviso.exigir_interacao,
+    // número no ícone do app: só vai quando a frente manda (a vigia de alertas)
+    ...(aviso.contador == null ? {} : { contador: aviso.contador }),
   };
 }
 
@@ -394,7 +397,7 @@ function criarPush({ dataDir, log, agora, enviarHttp }) {
       if (p === '/api/v1/push/teste') {
         if (m !== 'POST') return metodoErrado('POST');
         const c = await H.lerJson(req, 4 * 1024);
-        const r = await enviar({ titulo: 'DG Claw', corpo: 'Aviso de teste: se você está lendo isto, os avisos neste aparelho funcionam.', tag: 'teste-aviso', url: '/' }, typeof c.endpoint === 'string' ? { endpoint: c.endpoint } : undefined);
+        const r = await enviar({ titulo: 'S2 Bot', corpo: 'Aviso de teste: se você está lendo isto, os avisos neste aparelho funcionam.', tag: 'teste-aviso', url: '/' }, typeof c.endpoint === 'string' ? { endpoint: c.endpoint } : undefined);
         if (r.inscricoes === 0) { H.erroJson(res, 409, 'Nenhum aparelho está com os avisos ativados. Toque em "Ativar avisos neste aparelho" e tente de novo.', r); return true; }
         if (r.ok === 0 && r.falhas.length) {
           const f = r.falhas[0];

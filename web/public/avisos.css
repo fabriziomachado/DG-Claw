@@ -1,14 +1,14 @@
 /* avisos.css: a tela do quadro de avisos (classes av-). Celular primeiro. */
-.av-raiz{--av-linha:#e1e8e3;--av-texto:#0f1c14;--av-fraco:#6c8172;--av-fundo2:#f0f4f1;--av-acento:#2f9e5e;
+.av-raiz{--av-linha:var(--dg-borda,#e1e8e3);--av-texto:var(--dg-texto,#0f1c14);--av-fraco:var(--dg-texto-2,#6c8172);--av-fundo2:var(--dg-superficie-2,#f0f4f1);--av-acento:#2f9e5e;
   max-width:760px;margin:0 auto;padding:12px 12px 40px;color:var(--av-texto);box-sizing:border-box;
   overflow-wrap:anywhere;word-break:break-word}
 .av-raiz *{box-sizing:border-box}
 .av-cab{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px}
 .av-cab h1{margin:0;font-size:22px;letter-spacing:-.01em}
-.av-sec{background:#fff;border:1px solid var(--av-linha);border-radius:14px;padding:12px 14px;margin:12px 0}
+.av-sec{background:var(--dg-superficie,#fff);border:1px solid var(--av-linha);border-radius:14px;padding:12px 14px;margin:12px 0}
 .av-sec h2{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:13px;text-transform:uppercase;
   letter-spacing:.6px;color:var(--av-fraco)}
-.av-btn{min-height:36px;padding:0 14px;border:1px solid var(--av-linha);border-radius:18px;background:#fff;
+.av-btn{min-height:36px;padding:0 14px;border:1px solid var(--av-linha);border-radius:18px;background:var(--dg-superficie,#fff);
   font:inherit;font-size:14px;color:var(--av-texto);cursor:pointer}
 .av-btn:hover{background:var(--av-fundo2)}
 .av-btn:disabled{opacity:.5;cursor:default}
@@ -17,7 +17,7 @@
 .av-perigo{background:#c0392b;border-color:#c0392b;color:#fff}
 .av-perigo:hover{background:#a93226}
 .av-mini{min-height:32px;padding:0 12px;font-size:13px}
-.av-ajuda{width:32px;height:32px;border-radius:50%;border:1px solid var(--av-linha);background:#fff;
+.av-ajuda{width:32px;height:32px;border-radius:50%;border:1px solid var(--av-linha);background:var(--dg-superficie,#fff);
   color:var(--av-fraco);font:inherit;font-size:14px;font-weight:700;cursor:pointer;padding:0}
 .av-ajuda:hover{background:var(--av-fundo2);color:var(--av-texto)}
 .av-form,.av-filtros{display:flex;flex-direction:column;gap:12px}
@@ -25,7 +25,7 @@
 .av-campo label,.av-rot{font-size:13px;font-weight:600}
 .av-raiz select,.av-raiz input[type=text],.av-raiz input[type=url],.av-raiz textarea{width:100%;min-height:40px;
   padding:8px 10px;border:1px solid var(--av-linha);border-radius:10px;font:inherit;font-size:16px;
-  background:#fff;color:var(--av-texto)}
+  background:var(--dg-superficie,#fff);color:var(--av-texto)}
 .av-raiz textarea{resize:vertical;min-height:76px}
 .av-raiz select:focus,.av-raiz input:focus,.av-raiz textarea:focus{outline:2px solid var(--av-acento);outline-offset:1px}
 .av-para-lista{display:flex;flex-direction:column;gap:2px}
@@ -47,7 +47,7 @@
 .av-dia-t{margin:14px 0 6px;font-size:13px;color:var(--av-fraco);font-weight:700}
 .av-dia:first-child .av-dia-t{margin-top:0}
 .av-aviso{border:1px solid var(--av-linha);border-left:4px solid var(--av-cor,#6c8172);border-radius:10px;
-  padding:10px 12px;margin-bottom:8px;background:#fff}
+  padding:10px 12px;margin-bottom:8px;background:var(--dg-superficie,#fff)}
 .av-t-decisao{--av-cor:#2f6fd0}.av-t-preferencia{--av-cor:#8e44ad}.av-t-entrega{--av-cor:#2f9e5e}
 .av-t-aprendizado{--av-cor:#d68910}.av-t-referencia{--av-cor:#16a0a0}.av-t-pedido{--av-cor:#d35400}
 .av-t-resumo_do_dia{--av-cor:#6c8172}
@@ -76,22 +76,7 @@
   .av-retirada label{flex:1}
 }
 
-/* Visita guiada (tour.js): mesmas regras da conversa, com as variáveis daqui */
-#tourFundo{position:fixed;inset:0;z-index:90}
-#tourLuz{position:fixed;z-index:91;border-radius:10px;pointer-events:none;
-  box-shadow:0 0 0 9999px rgba(10,24,16,.66);outline:2px solid #fff}
-#tourCaixa{position:fixed;z-index:92;left:12px;right:12px;max-width:400px;margin:0 auto;background:#fff;
-  color:#0f1c14;border-radius:14px;padding:14px 16px;box-shadow:0 6px 28px rgba(0,0,0,.35);
-  font-size:14px;line-height:1.45;max-height:70dvh;overflow-y:auto}
-#tourCaixa:focus{outline:none}
-#tourCaixa h4{margin:0 0 2px;font-size:15.5px}
-#tourCaixa .tour-n{font-size:11.5px;color:#6c8172;margin-bottom:6px}
-#tourCaixa p{margin:0 0 6px}
-#tourCaixa p b{color:#1f7a45}
-#tourCaixa .tour-acoes{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap}
-#tourCaixa button{min-height:36px;padding:0 14px;border-radius:18px;border:1px solid #e1e8e3;
-  background:#fff;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;color:#38523f}
-#tourCaixa button.pri{background:#2f9e5e;border-color:#2f9e5e;color:#fff}
-#tourCaixa button:disabled{opacity:.4;cursor:default}
-#tourCaixa .tour-x{margin-right:auto}
 [hidden]{display:none !important}
+
+/* campos no tema escuro (18/10/2026) */
+.av-raiz select,.av-raiz input,.av-raiz textarea{color:var(--av-texto);background:var(--dg-superficie,#fff)}

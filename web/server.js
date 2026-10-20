@@ -22,7 +22,13 @@ const { abrirStream } = require('./lib/sse');
 const { criarProxy } = require('./lib/proxy');
 const { criarCofreAgente } = require('./lib/cofre-agente');
 const { criarCofreRotas } = require('./lib/cofre-rotas');
+const { criarPaineisVivos } = require('./lib/paineis-vivos');
+const { criarMencoes } = require('./lib/mencoes');
+const { criarFeedback } = require('./lib/feedback');
 const { criarAlertas } = require('./lib/alertas');
+const { criarVigiaAlertas } = require('./lib/vigia-alertas');
+const { criarCaixaEntrada } = require('./lib/caixa-entrada');
+const { criarSaudeServidor } = require('./lib/saude-servidor');
 const { criarFoco } = require('./lib/foco');
 const { criarVoz } = require('./lib/voz');
 const { criarSigilo } = require('./lib/sigilo');
@@ -34,6 +40,10 @@ const { criarPush } = require('./lib/push');
 const { criarLembretes } = require('./lib/lembretes');
 const { criarMesa } = require('./lib/mesa');
 const { criarAvisos } = require('./lib/avisos');
+const { criarIntegracoes } = require('./lib/integracoes');
+const { criarHistorico } = require('./lib/historico');
+const { criarArquivoConversa } = require('./lib/arquivo-conversa');
+const { criarAvatares } = require('./lib/avatar');
 
 const METODOS_QUE_ESCREVEM = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const TIPOS_ESTATICOS = {
@@ -45,9 +55,9 @@ const TIPOS_ESTATICOS = {
 };
 const RX_SLUG_ROTA = /^[a-z0-9][a-z0-9-]{0,31}$/;
 
-const LOGIN_RESERVA = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Entrar</title>' +
+const LOGIN_RESERVA = '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"><title>Entrar</title>' +
   '<style>body{font-family:system-ui,sans-serif;max-width:22rem;margin:14vh auto;padding:0 1rem}input,button{display:block;width:100%;margin:.5rem 0;padding:.6rem;font-size:1rem}</style></head><body>' +
-  '<h1>DG Claw</h1><p id="e" style="color:#b00"></p><form method="post" action="/login"><input name="usuario" placeholder="Usuário" autocomplete="username" required>' +
+  '<h1>S2 Bot</h1><p id="e" style="color:#b00"></p><form method="post" action="/login"><input name="usuario" placeholder="Usuário" autocomplete="username" required>' +
   '<input name="senha" type="password" placeholder="Senha" autocomplete="current-password" required><input type="hidden" name="next" value=""><button>Entrar</button></form>' +
   '<script>var q=new URLSearchParams(location.search);document.getElementById("e").textContent=q.get("erro")||"";document.querySelector("[name=next]").value=q.get("next")||"/"</script></body></html>';
 
@@ -77,7 +87,9 @@ function criarServidor(opcoes) {
   const midia = criarMidia({ dataDir: config.dataDir, log, registro, publicDir: config.publicDir });
   const leitor = criarLeitor({ log, tz: config.tz, canalTelegram: config.canalTelegram, midia });
   const leitorRollout = criarLeitorRollout({ log, tz: config.tz, midia });
-  const alertas = agente => criarAlertas(path.join(config.dataDir, 'alertas', agente.slug + '.json'), agente.chat_id);
+  let vigiaAlertas = null;   // criada depois do push; o alerta novo de qualquer conversa vira aviso no celular
+  const alertas = agente => criarAlertas(path.join(config.dataDir, 'alertas', agente.slug + '.json'), agente.chat_id,
+    item => { if (vigiaAlertas) vigiaAlertas.aoNovo(agente, item); });
   const comandos = criarComandos({ runner, log, agora: opcoes.agora });
   const conversa = criarConversa({ comandos, alertas, config, runner, leitor, leitorRollout, midia, log, agora: opcoes.agora, gravaToken: opcoes.gravaToken });
   const compartilhados = criarCompartilhados(conversa);
@@ -86,12 +98,14 @@ function criarServidor(opcoes) {
   const cofreAgente = criarCofreAgente({ config, log, reiniciar: opcoes.reiniciarCofre });
   const voz = opcoes.voz || criarVoz({ env: config.env, log });
   const sigilo = opcoes.sigilo || criarSigilo({ env: config.env, registro, dataDir: config.dataDir, log, timeoutMs: opcoes.timeoutSigiloMs });
-  const cofreRotas = criarCofreRotas({ config, runner, cofre: cofreAgente, voz, log });
+  const cofreRotas = criarCofreRotas({ config, runner, cofre: cofreAgente, voz, log, registro });
   const proxy = criarProxy({ config, registro, log, cofreRotas });
   const caixa = criarCaixaAgente({ config, registro, log, porta: () => servidor.address().port, agora: opcoes.agora });
   const push = criarPush({ dataDir: config.dataDir, log, agora: opcoes.agora, enviarHttp: opcoes.enviarPush });
   try { push.garantirChaves(); } catch (e) { log('erro', e.message); }
   const lembretes = criarLembretes({ config, registro, runner, push, log, agora: opcoes.agora });
+  vigiaAlertas = criarVigiaAlertas({ registro, conversa, alertas, push, log, agora: opcoes.agora });
+  if (!opcoes.semVigiaAlertas) vigiaAlertas.iniciar();
   caixa.permitir('/api/v1/lembretes');
   // Modo foco: o agente chega pela caixa (dgclaw-api), o retrato vai para a casa dele e o PUT do agente avisa o celular.
   const foco = criarFoco({ dir: path.join(config.dataDir, 'foco'), tz: config.tz, log, registro, gravaRetrato: opcoes.gravaRetrato || caixa.gravaRetrato, push: opcoes.push || push, quemChamou: opcoes.quemChamou || quemChamou });
@@ -100,7 +114,21 @@ function criarServidor(opcoes) {
   // O agente fala com a Mesa pelo dgclaw-mesa, que passa pela caixa: a rota precisa estar liberada.
   caixa.permitir('/api/v1/tarefas');
   const avisos = criarAvisos({ config, registro, runner, caixa, log, agora: opcoes.agora });
+  const integracoes = criarIntegracoes({ registro, log });
+  const arquivoConversa = criarArquivoConversa({ dataDir: config.dataDir, log });
+  const caixaEntrada = criarCaixaEntrada({ registro, alertas, corteDe: (slug) => arquivoConversa.ultimoCorte(slug), log });
+  const saudeServidor = criarSaudeServidor({ registro, conversa, log });
+  // A conversa como a tela vê: depois do último /clear (o antes fica em Histórico > Arquivadas).
+  const mencoes = criarMencoes({ config, registro, conversa, log });
+  mencoes.retoma();
+  const feedback = criarFeedback({ config, conversa, log });
+  const threadTela = async (agente) => mencoes.junta(agente.slug, arquivoConversa.visivel(agente.slug, await conversa.thread(agente)));
+  const historico = criarHistorico({ registro, log, conversa, arquivoConversa });
+  const paineisVivos = opcoes.paineisVivos || criarPaineisVivos({ registro, log });
+  // Foto trocada pelo dono no menu: vale por cima da foto da criação e do avatar do registro.
+  const avatares = criarAvatares({ dataDir: config.dataDir, registro, log });
   caixa.permitir('/api/v1/avisos');
+  caixa.permitir('/api/v1/pedidos');
 
   let versaoJsCache = { ts: 0, valor: '0' };
   /** Versão da tela: mtime de conversa.js. A tela compara com a que carregou e se recarrega sozinha. */
@@ -158,6 +186,18 @@ function criarServidor(opcoes) {
   function semSessaoPagina(req, res, url) {
     res.writeHead(302, { Location: `/login?next=${encodeURIComponent(url.pathname + url.search)}`, 'Cache-Control': 'no-store' });
     res.end();
+  }
+
+  /* A rota "/" abre o último agente usado (cookie dgclaw_agente, gravado pela casca), se ele ainda existe no registro;
+     senão o primeiro que não é o Admin (é com ele que a pessoa trabalha); senão o Admin. */
+  function agenteInicial(req) {
+    const agentes = registro.estado().agentes;
+    let guardado = H.parseCookies(req.headers.cookie).dgclaw_agente;
+    try { guardado = guardado && decodeURIComponent(guardado); } catch (_) { guardado = null; /* cookie ilegível: cai no primeiro agente */ }
+    const doCookie = guardado && agentes.find((a) => a.slug === guardado);
+    if (doCookie) return doCookie.slug;
+    const trabalho = agentes.find((a) => a.tipo !== 'admin');
+    return (trabalho || agentes[0]).slug;
   }
 
   function falhaDoRegistro(req, res, api) {
@@ -240,6 +280,10 @@ function criarServidor(opcoes) {
 
   // ── API ──────────────────────────────────────────────────────────────────
   function avatarDe(a) {
+    const inicial = (a.nome[0] || '?').toUpperCase();
+    const trocada = avatares.estado(a.slug);
+    if (trocada && trocada.url) return { avatar: inicial, avatar_img: trocada.url };
+    if (trocada && trocada.removida) return { avatar: inicial, avatar_img: null };
     const foto = onboarding.foto(a.slug);
     if (foto) return { avatar: a.nome.slice(0, 1), avatar_img: foto };
     const av = a.avatar || '';
@@ -281,6 +325,8 @@ function criarServidor(opcoes) {
     if (await foco.tratarRota(req, res, url, sessao)) return undefined;
 
     if ((p === '/api/v1/lembretes' || p.startsWith('/api/v1/lembretes/')) && await lembretes.rotas(req, res, url, sessao)) return undefined;
+    if (p === '/api/v1/caixa' && await caixaEntrada.rotas(req, res, url, sessao)) return undefined;
+    if (p === '/api/v1/saude-servidor' && await saudeServidor.rotas(req, res, url, sessao)) return undefined;
 
     if (p === '/api/v1/onboarding') {
       if (falhaDoRegistro(req, res, true)) return;
@@ -314,6 +360,19 @@ function criarServidor(opcoes) {
 
     if (p === '/api/v1/eu' && m === 'GET') return H.enviaJson(res, 200, { ok: true, usuario: sessao.usuario });
 
+    // Quem está trabalhando agora, todos de uma vez (18/10/2026): a borda que gira na fileira de agentes.
+    // Só o estado, sem passo nem detalhe; a caixa do agente não lê isto.
+    if (p === '/api/v1/atividade' && m === 'GET') {
+      if (sessao.via === 'caixa') return H.erroJson(res, 403, 'A atividade dos agentes só é vista pelo dono, no navegador.');
+      if (falhaDoRegistro(req, res, true)) return undefined;
+      const agentes = {};
+      await Promise.all(registro.estado().agentes.map(async (a) => {
+        try { const e = await conversa.atividade(a); agentes[a.slug] = { estado: e.estado }; }
+        catch (_) { agentes[a.slug] = { estado: 'sem_sinal' }; }
+      }));
+      return H.enviaJson(res, 200, { ok: true, agentes });
+    }
+
     if (p === '/api/v1/agents' && m === 'GET') {
       if (falhaDoRegistro(req, res, true)) return undefined;
       const lista = await Promise.all(registro.estado().agentes.map(agentePublico));
@@ -337,15 +396,16 @@ function criarServidor(opcoes) {
       try {
         const loja = alertas(agente);
         if (!ar[2] && m === 'GET') {
-          const t = await conversa.thread(agente);
-          return H.enviaJson(res, 200, { ok: true, alertas: loja.listar(), avisos: t.avisos });
+          const t = await threadTela(agente);
+          const corte = arquivoConversa.ultimoCorte(agente.slug);
+          return H.enviaJson(res, 200, { ok: true, alertas: loja.listar().filter(a => a.ep > corte), avisos: t.avisos });
         }
         if (ar[3] === 'visto' && m === 'POST') {
           if (!loja.reconhecer(ar[2])) return H.erroJson(res, 404, 'Esse alerta não existe nesta conversa. Atualize a página.');
           return H.enviaJson(res, 200, { ok: true });
         }
         if (ar[3] === 'mensagem' && m === 'GET') {
-          const t = await conversa.thread(agente);
+          const t = await threadTela(agente);
           const mensagem = loja.mensagem(ar[2]);
           if (!mensagem) return H.erroJson(res, 404, 'Esse alerta não existe nesta conversa. Atualize a página.');
           // Carrega a origem e a sequência até o fim, sem lacuna na rolagem.
@@ -393,6 +453,25 @@ function criarServidor(opcoes) {
     if (p === '/api/v1/avisos' || p.startsWith('/api/v1/avisos/')) {
       if (await avisos.tratar(req, res, url, sessao)) return undefined;
     }
+    if (p === '/api/v1/integracoes' || p.startsWith('/api/v1/integracoes/')) {
+      if (await integracoes.tratar(req, res, url, sessao)) return undefined;
+    }
+    // Pedido para a equipe (lib/mencoes.js): o agente pega e entrega pela caixa (dgclaw-api)
+    const mp = /^\/api\/v1\/pedidos\/([a-f0-9]{16})\/(pegar|entregar)$/.exec(p);
+    if (mp) {
+      if (m !== 'POST') return H.erroJson(res, 405, 'Use POST.');
+      if (sessao.via !== 'caixa' || !sessao.agente) return H.erroJson(res, 403, 'Só um agente pega ou entrega um pedido, pela caixa dele.');
+      const corpo = mp[2] === 'entregar' ? await lerEnvio(req, res) : (req.resume(), {});
+      if (!corpo) return undefined;
+      const r = mp[2] === 'pegar' ? mencoes.pegar(sessao.agente, mp[1]) : mencoes.entregarPedido(sessao.agente, mp[1], corpo);
+      return H.enviaJson(res, r.status, r.corpo);
+    }
+    if (p.startsWith('/api/v1/paineis/')) {
+      if (await paineisVivos.tratar(req, res, url, sessao)) return undefined;
+    }
+    if (p === '/api/v1/historico' || p.startsWith('/api/v1/historico/')) {
+      if (await historico.tratar(req, res, url, sessao)) return undefined;
+    }
     if (p === '/api/v1/push' || p.startsWith('/api/v1/push/')) {
       if (await push.rotas(req, res, url, sessao)) return undefined;
     }
@@ -407,6 +486,11 @@ function criarServidor(opcoes) {
       return res.end(fs.readFileSync(path.join(__dirname, 'docs', 'TRILHA-E-PERMISSAO.md'), 'utf8'));
     }
 
+    if (/^\/api\/v1\/agents\/[^/]+\/avatar$/.test(p)) {
+      if (falhaDoRegistro(req, res, true)) return undefined;
+      if (await avatares.tratar(req, res, url, sessao, { enviaJson: H.enviaJson, erroJson: H.erroJson, lerCorpo: H.lerCorpo, agentePublico })) return undefined;
+    }
+
     let mm = /^\/api\/v1\/agents\/([^/]+)(?:\/([a-z]+))?$/.exec(p);
     if (mm) {
       if (falhaDoRegistro(req, res, true)) return undefined;
@@ -417,7 +501,7 @@ function criarServidor(opcoes) {
       if (acao === 'compartilhados' && m === 'GET') {
         try {
           if (url.searchParams.has('mensagem')) {
-            const t = await conversa.thread(agente), id = url.searchParams.get('mensagem');
+            const t = await threadTela(agente), id = url.searchParams.get('mensagem');
             const origem = t.msgs.find(x => x.id === id);
             if (!origem) return H.erroJson(res, 404, 'A mensagem não está nesta sessão. Atualize a lista.');
             return H.enviaJson(res, 200, { ok: true, mensagem: origem, msgs: t.msgs.filter(x => x.ep >= origem.ep) });
@@ -430,6 +514,43 @@ function criarServidor(opcoes) {
       if (acao === 'stream' && m === 'GET') return stream(req, res, url, agente);
       if (acao === 'wait' && m === 'GET') return esperar(req, res, url, agente);
       if (acao === 'send' && m === 'POST') return enviar(req, res, agente);
+      // Cancelar o que o agente está fazendo (19/10/2026, pedido do dono): manda a tecla Esc crua ao
+      // terminal dele, o mesmo que apertar Esc no Claude Code. Para o turno de agora; a conversa e o que
+      // ele já fez continuam. Só o dono, pela sessão do login (um agente não cancela o outro pela caixa).
+      if (acao === 'interromper' && m === 'POST') {
+        if (sessao && sessao.via === 'caixa') return H.erroJson(res, 403, 'Só o dono interrompe um agente, pelo painel.');
+        const r = await runner.input(agente, { text: '\u001b', submit: false });
+        if (!r || r.ok === false) return H.erroJson(res, 502, `Não consegui interromper ${agente.nome}: ${(r && r.erro) || 'o runner não respondeu'}.`);
+        log('info', `${agente.slug}: o dono interrompeu o trabalho em andamento (Esc).`);
+        return H.enviaJson(res, 200, { ok: true });
+      }
+      // 👍 / 👎 numa resposta (lib/feedback.js); GET devolve os votos desta conversa
+      if (acao === 'feedback') {
+        if (sessao.via === 'caixa') return H.erroJson(res, 403, 'O 👍 👎 é do dono, no navegador.');
+        if (m === 'GET') return H.enviaJson(res, 200, { ok: true, votos: feedback.votos(agente.slug) });
+        if (m === 'POST') {
+          const corpo = await lerEnvio(req, res);
+          if (!corpo) return undefined;
+          const r = await feedback.votar(agente, await conversa.thread(agente), { mensagem: String(corpo.mensagem || ''), tipo: String(corpo.tipo || '') });
+          return H.enviaJson(res, r.status, r.corpo);
+        }
+      }
+      // @todos / @vários (lib/mencoes.js): o cartão do aviso e o pedido para a equipe; só o dono
+      if ((acao === 'aviso' || acao === 'pedido') && m === 'POST') {
+        if (sessao.via === 'caixa') return H.erroJson(res, 403, 'Isso é coisa do dono, no navegador.');
+        const corpo = await lerEnvio(req, res);
+        if (!corpo) return undefined;
+        const r = acao === 'aviso' ? mencoes.registrarAviso(agente, corpo) : await mencoes.pedir(agente, corpo);
+        return H.enviaJson(res, r.status, r.corpo);
+      }
+      // @mencionar outro agente na conversa deste (lib/mencoes.js); só o dono, no navegador
+      if (acao === 'mencao' && m === 'POST') {
+        if (sessao.via === 'caixa') return H.erroJson(res, 403, 'Mencionar outro agente é coisa do dono, no navegador.');
+        const corpo = await lerEnvio(req, res);
+        if (!corpo) return undefined;
+        const r = await mencoes.criar(agente, corpo);
+        return H.enviaJson(res, r.status, r.corpo);
+      }
       if (acao === 'permissao' && m === 'POST') {
         const corpo = await lerEnvio(req, res);
         if (!corpo) return undefined;
@@ -439,7 +560,7 @@ function criarServidor(opcoes) {
       if (acao === 'upload' && m === 'POST') return upload(req, res, agente);
       if (acao === 'comandos' && m === 'GET') return H.enviaJson(res, 200, Object.assign({ ok: true, agente: agente.slug }, await comandos.catalogo(agente)));
       if (acao === 'comando' && m === 'POST') return comandoPost(req, res, agente);
-      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'upload', 'permissao', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
+      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'interromper', 'mencao', 'aviso', 'pedido', 'upload', 'permissao', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
     }
 
     mm = /^\/api\/v1\/media\/([0-9a-f]{16})\/visual$/.exec(p);
@@ -474,7 +595,7 @@ function criarServidor(opcoes) {
 
   async function mensagens(req, res, url, agente) {
     const q = url.searchParams;
-    const t = await conversa.thread(agente);
+    const t = await threadTela(agente);
     const todas = t.msgs;
     if (q.get('after') != null) {
       const after = numeroOuErro(res, 'after', q.get('after'), 0);
@@ -490,7 +611,7 @@ function criarServidor(opcoes) {
     if (before === undefined) return undefined;
     const base = before == null ? todas : todas.filter((x) => x.ep < before);
     const msgs = base.slice(Math.max(0, base.length - limite));
-    return H.enviaJson(res, 200, { ok: true, msgs, avisos: t.avisos, mais_antigas: base.length > limite, before, limit: limite });
+    return H.enviaJson(res, 200, { ok: true, msgs, avisos: t.avisos, mais_antigas: base.length > limite, before, limit: limite, arquivadas: !!t.corte });
   }
 
   async function esperar(req, res, url, agente) {
@@ -505,9 +626,9 @@ function criarServidor(opcoes) {
     let fechou = false;
     res.on('close', () => { fechou = true; });
     for (;;) {
-      const t = await conversa.thread(agente);
+      const t = await threadTela(agente);
       const novas = t.msgs.filter((x) => x.ep > since);
-      const doAgente = novas.some((x) => x.origin === 'agente');
+      const doAgente = novas.some((x) => x.origin === 'agente' && !x.sistema); // aviso de sistema (compactação) não é resposta
       if (doAgente || Date.now() >= fim || fechou) {
         if (fechou) return undefined;
         return H.enviaJson(res, 200, { ok: true, msgs: novas, timeout: !doAgente, avisos: t.avisos });
@@ -528,7 +649,7 @@ function criarServidor(opcoes) {
     if (since == null || since <= 0) since = Date.now() / 1000 - 60;
     abrirStream({
       req, res, agente, since, log, tickMs: opcoes.tickSseMs,
-      fontes: { thread: conversa.thread, atividade: conversa.atividade, versaoJs, foco: (a) => foco.lista(a.slug) },
+      fontes: { thread: threadTela, atividade: conversa.atividade, versaoJs, foco: (a) => foco.lista(a.slug) },
     });
     return undefined;
   }
@@ -545,6 +666,7 @@ function criarServidor(opcoes) {
       return H.erroJson(res, 400, `O "cliente_id" veio como ${JSON.stringify(String(cid).slice(0, 80))}, que não vale: use de 8 a 64 caracteres entre letras, números, "-" e "_". Nada foi enviado.`);
     }
     const r = await conversa.umaVez(agente, 'send', cid || null, () => conversa.enviar(agente, corpo));
+    arquivaSeLimpou(agente, r);
     return H.enviaJson(res, r.status, r.corpo);
   }
 
@@ -556,7 +678,19 @@ function criarServidor(opcoes) {
       return H.erroJson(res, 400, `O "cliente_id" veio como ${JSON.stringify(String(cid).slice(0, 80))}, que não vale: use de 8 a 64 caracteres entre letras, números, "-" e "_". Nada foi enviado.`);
     }
     const r = await conversa.umaVez(agente, 'comando', cid || null, () => conversa.comando(agente, corpo));
+    arquivaSeLimpou(agente, r);
     return H.enviaJson(res, r.status, r.corpo);
+  }
+
+  // /clear ou /new entregue ao agente: a conversa da tela recomeça e a anterior vai para as Arquivadas.
+  function arquivaSeLimpou(agente, r) {
+    const c = r && r.status < 300 && r.corpo && r.corpo.comando;
+    if (!c || !['/clear', '/new'].includes(c.executado_como || c.nome)) return;
+    try {
+      if (arquivoConversa.cortar(agente.slug, Date.now() / 1000)) r.corpo.arquivou = true;
+    } catch (e) {
+      log('erro', `Conversa de ${agente.slug}: o ${c.nome} foi entregue, mas não consegui arquivar a anterior: ${e.message}`);
+    }
   }
 
   async function upload(req, res, agente) {
@@ -705,8 +839,35 @@ function criarServidor(opcoes) {
     if (p === '/' && (m === 'GET' || m === 'HEAD')) {
       if (!sessao) return semSessaoPagina(req, res, url);
       if (falhaDoRegistro(req, res, false)) return undefined;
-      res.writeHead(302, { Location: `/a/${registro.estado().agentes[0].slug}`, 'Cache-Control': 'no-store' });
+      res.writeHead(302, { Location: `/a/${agenteInicial(req)}`, 'Cache-Control': 'no-store' });
       return res.end();
+    }
+
+    if (p === '/integracoes' && (m === 'GET' || m === 'HEAD')) {
+      if (!sessao) return semSessaoPagina(req, res, url);
+      if (!servirArquivo(req, res, path.join(config.publicDir, 'integracoes.html'), 'no-store')) {
+        log('erro', `A tela de integrações não está instalada: falta ${path.join(config.publicDir, 'integracoes.html')}.`);
+        H.paginaErro(res, 500, 'Tela não instalada', 'O arquivo da tela de integrações não foi encontrado no servidor. Reinstale o DG Claw Web.');
+      }
+      return undefined;
+    }
+
+    if (p === '/saude' && (m === 'GET' || m === 'HEAD')) {
+      if (!sessao) return semSessaoPagina(req, res, url);
+      if (!servirArquivo(req, res, path.join(config.publicDir, 'saude.html'), 'no-store')) {
+        log('erro', `A tela da saúde do servidor não está instalada: falta ${path.join(config.publicDir, 'saude.html')}.`);
+        H.paginaErro(res, 500, 'Tela não instalada', 'O arquivo da saúde do servidor não foi encontrado. Reinstale o DG Claw Web.');
+      }
+      return undefined;
+    }
+
+    if (p === '/caixa' && (m === 'GET' || m === 'HEAD')) {
+      if (!sessao) return semSessaoPagina(req, res, url);
+      if (!servirArquivo(req, res, path.join(config.publicDir, 'caixa.html'), 'no-store')) {
+        log('erro', `A tela da caixa de entrada não está instalada: falta ${path.join(config.publicDir, 'caixa.html')}.`);
+        H.paginaErro(res, 500, 'Tela não instalada', 'O arquivo da caixa de entrada não foi encontrado no servidor. Reinstale o DG Claw Web.');
+      }
+      return undefined;
     }
 
     if (p === '/lembretes' && (m === 'GET' || m === 'HEAD')) {
@@ -793,7 +954,7 @@ function criarServidor(opcoes) {
   });
 
   return {
-    servidor, config, registro, auth, midia, conversa, log, caixa, push, lembretes, avisos,
+    servidor, config, registro, auth, midia, conversa, log, caixa, push, lembretes, avisos, cofreAgente,
     ouvir(porta, host) {
       return new Promise((resolve, reject) => {
         servidor.once('error', reject);
@@ -806,7 +967,7 @@ function criarServidor(opcoes) {
         });
       });
     },
-    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); avisos.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
+    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); vigiaAlertas.parar(); avisos.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
   };
 }
 

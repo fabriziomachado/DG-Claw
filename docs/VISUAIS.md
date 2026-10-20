@@ -1,4 +1,6 @@
-# Visuais na conversa
+# Lousa (visuais na conversa)
+
+**Nome oficial: lousa.** É assim que o dono e os agentes chamam o visual interativo que aparece dentro do balão ("me explica isso na lousa", "manda a visão na lousa"). O arquivo continua com o prefixo `vis-`.
 
 O agente pode explicar com desenho, número ou animação dentro do balão do chat do DG Claw
 Web, em vez de despejar um textão. Ele escreve um arquivo `.html`, manda pelo `send_file` do
@@ -41,6 +43,10 @@ a animação que explica e desligue o enfeite), `visivel`, `on(evento, fn)`, `co
 `anima(el)` e `formata(n, opts)`. A sintaxe de cada peça está nos exemplos de
 `docs/VISUAIS-EXEMPLOS/` (`vis-catalogo-pecas.html` mostra todas).
 
+Campo de texto (`input`, `textarea`, `select`) sempre com 16px ou mais: abaixo disso o iPhone dá
+zoom no foco. A base já força 16px nos campos, então um `.cx{font:15px ...}` do visual não
+consegue diminuir.
+
 ## Perguntar de dentro do visual
 
 O visual nunca manda mensagem sozinho: ele só PEDE. Qualquer elemento com `data-pergunta="texto"`
@@ -53,6 +59,15 @@ entre pedidos e recusa quando o visual não está à vista. O visual recebe de v
 limite, ocupado, fora, cancelado, envio). Peças novas que também emitem eventos: `.dv-abas`,
 `.dv-passos[data-play]`, `.dv-acordeao`, `.dv-slider`, `.dv-opcoes` e `.dv-botao`. O exemplo
 completo está em `docs/VISUAIS-EXEMPLOS/vis-exemplo-interativo.html`.
+
+## Texto pra copiar: na mensagem, não no visual
+
+Comando, frase, prompt, configuração ou qualquer texto que o dono vai copiar vai **na própria mensagem**,
+num bloco de código com a linguagem (```bash, ```sql, ```text). A conversa desenha o bloco com a barra no
+topo (nome da linguagem e Copiar), cores de sintaxe e rolagem lateral, nos dois temas. Passo a passo com
+vários comandos vai no componente `passos` do bloco dgui (skill `ui-generativa`). Não monte visual só para
+isso: ele fica com outra cara e sem o destaque de código. (Mudou em 19/10/2026, a pedido do dono; a regra
+antiga da caixinha com botão Copiar dentro do visual saiu.)
 
 ## O que a caixa bloqueia
 

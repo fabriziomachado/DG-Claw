@@ -687,7 +687,13 @@ function buildOperacoes(config, deps = {}) {
           : quadradosDeServico({ eventos: porServico.get(o.unit) || [], agora, ativoAgora: st.ativo, ativoDesde: st.desde });
         let estado;
         let frase;
-        if (st.existe === false) {
+        if (st.existe === false && o.chave === 'painel') {
+          // Dentro da caixa do agente o painel não é uma unidade do systemd: ele é o próprio processo que
+          // está respondendo esta conferência. Se a conta chegou até aqui, ele está de pé (19/10/2026: o
+          // Status acusava "pede atenção" falso no Data).
+          estado = 'ok';
+          frase = 'de pé (é esta tela: ela está respondendo agora)';
+        } else if (st.existe === false) {
           estado = 'atencao';
           frase = `o sistema não conhece a unidade "${o.unit}": ou ela nunca foi instalada, ou tem outro nome`;
         } else if (st.ativo === true) {

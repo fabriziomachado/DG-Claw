@@ -2,21 +2,25 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Mesa de tarefas - DG Claw</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Board - S2 Bot</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#2f9e5e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="DG Claw">
+<meta name="apple-mobile-web-app-title" content="S2 Bot">
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/tema.css">
+<script src="/tema.js"></script>
 <link rel="stylesheet" href="/mesa.css">
 <link rel="stylesheet" href="/casca.css">
 <link rel="stylesheet" href="/menu-lado.css">
 <!-- Quadro de avisos (frente 5) -->
 <link rel="stylesheet" href="/avisos.css">
+<link rel="stylesheet" href="/sem-zoom.css">
+<script src="/sem-zoom.js"></script>
 </head>
 <body>
 
@@ -29,11 +33,12 @@
 <script src="/tour.js"></script>
 <script src="/menu-lado.js"></script>
 <script src="/casca.js"></script>
+<script src="/board-hoje.js"></script>
 <script src="/mesa.js"></script>
 <!-- Quadro de avisos (frente 5) -->
 <script src="/avisos.js"></script>
 <script>
-DGCasca.monta({ pagina: 'mesa', titulo: 'Mesa de tarefas', aoTutorial: function () { if (window.DGMesaTutorial) window.DGMesaTutorial(); } });
+DGCasca.monta({ pagina: 'mesa', titulo: 'Board', aoTutorial: function () { if (window.DGMesaTutorial) window.DGMesaTutorial(); } });
 </script>
 </body>
 </html>

@@ -227,12 +227,16 @@
     if (!el) return;
     el.innerHTML = '<div class="app-carregando">Carregando...</div>';
 
-    const r = await pegar('/api/apps');
+    const [r, rp] = await Promise.all([pegar('/api/apps'), pegar('/api/apps/paineis')]);
     if (!r.ok) { el.innerHTML = erro(r.corpo.error || `O painel respondeu ${r.status}.`); return; }
 
     const { apps, motivo } = r.corpo;
+    paineis = rp.ok && Array.isArray(rp.corpo.paineis) ? rp.corpo.paineis : [];
+    const secao = secaoPaineis();
     if (!apps || !apps.length) {
-      el.innerHTML = vazio('Nenhum aplicativo instalado', motivo);
+      el.innerHTML = secao || vazio('Nenhum aplicativo ainda',
+        'Quando este agente montar um painel vivo para você (um painel que ele atualiza sozinho), ele aparece aqui como app. Peça na conversa, por exemplo: "monte um painel vivo dos chamados abertos".');
+      ligarPaineis();
       return;
     }
     if (!appAtual || !apps.some((a) => a.key === appAtual)) appAtual = apps[0].key;
@@ -247,7 +251,7 @@
 
     const atual = apps.find((a) => a.key === appAtual);
     if (!atual.suportado) {
-      el.innerHTML = seletor + vazio(
+      el.innerHTML = secao + seletor + vazio(
         `O app "${atual.nome}" ainda não tem tela`,
         `Ele é do tipo "${atual.tipo}", que este painel ainda não sabe mostrar. O agente continua operando o app normalmente; o que falta é a visualização aqui.`,
       );
@@ -255,7 +259,7 @@
       return;
     }
 
-    el.innerHTML = seletor + `<div class="app-cabeca">
+    el.innerHTML = secao + seletor + `<div class="app-cabeca">
         <div class="app-cabeca-linha">
           <h2 title="${esc(atual.descricao)}">${esc(atual.nome)}</h2>
           <button type="button" class="app-tutorial-abrir" id="app-tutorial-abrir"
@@ -267,6 +271,7 @@
       </div>
       <div id="app-corpo"><div class="app-carregando">Carregando...</div></div>`;
     ligarSeletor();
+    ligarPaineis();
     const btnTutorial = document.getElementById('app-tutorial-abrir');
     if (btnTutorial) btnTutorial.addEventListener('click', () => abrirTutorial());
     // Delegação: os "?" das seções nascem e morrem a cada redesenho, e um listener
@@ -281,6 +286,102 @@
       });
     }
     await carregarConteudos();
+  }
+
+  // ─── Painéis vivos como apps (19/10/2026) ─────────────────────
+  // A lista vem do painel (/api/apps/paineis); mostrar e atualizar usa o Web (/api/v1/paineis/<slug>/<id>)
+  // e o mesmo desenho dos painéis da conversa (/dgui.js e /dgui.css, carregados na primeira abertura).
+  let paineis = [];
+  const SLUG = (/^\/p\/([^/]+)/.exec(BASE || location.pathname) || [])[1] || '';
+  function haQuanto(iso) {
+    if (!iso) return '';
+    const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
+    if (s < 90) return 'agora';
+    if (s < 3600) return `há ${Math.round(s / 60)} min`;
+    if (s < 86400) return `há ${Math.round(s / 3600)} h`;
+    return `há ${Math.round(s / 86400)} dias`;
+  }
+  function secaoPaineis() {
+    if (!paineis.length) return '';
+    const vis = paineis.filter((p) => !p.oculto), ocu = paineis.filter((p) => p.oculto);
+    const cartao = (p) => `<div class="apv-card" data-painel="${esc(p.id)}">
+        <button type="button" class="apv-abre" data-abre="${esc(p.id)}">
+          <span class="apv-ico" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg></span>
+          <span class="apv-tx"><b>${esc(p.titulo)}</b><small>painel vivo · atualizado ${esc(haQuanto(p.atualizado))}</small></span></button>
+        <button type="button" class="apv-x" data-ocultar="${esc(p.id)}" title="Tirar da aba Apps" aria-label="Tirar ${esc(p.titulo)} da aba Apps">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>`;
+    return `<section class="apv"><div class="apv-tit">Painéis</div>
+      ${vis.length ? `<div class="apv-grade">${vis.map(cartao).join('')}</div>` : '<p class="apv-fraco">Todos os painéis estão fora da aba.</p>'}
+      ${ocu.length ? `<details class="apv-ocultos"><summary>Fora da aba (${ocu.length})</summary>${ocu.map((p) => `<div class="apv-oc"><span>${esc(p.titulo)}</span><button type="button" class="apv-volta" data-mostrar="${esc(p.id)}">Pôr de volta</button></div>`).join('')}</details>` : ''}
+    </section>`;
+  }
+  function ligarPaineis() {
+    const el = raiz();
+    if (!el || el.dataset.paineisLigado) return;
+    el.dataset.paineisLigado = '1';
+    el.addEventListener('click', async (ev) => {
+      const ab = ev.target.closest('[data-abre]');
+      if (ab) { abrePainel(ab.dataset.abre); return; }
+      const oc = ev.target.closest('[data-ocultar], [data-mostrar]');
+      if (!oc) return;
+      const id = oc.dataset.ocultar || oc.dataset.mostrar;
+      oc.disabled = true;
+      const r = await enviar(`/api/apps/paineis/${encodeURIComponent(id)}/ocultar`, { oculto: !!oc.dataset.ocultar });
+      if (!r.ok) { oc.disabled = false; alert(r.corpo.error || 'Não consegui guardar a escolha.'); return; }
+      carregar();
+    });
+  }
+  let dguiPronto = null;
+  function carregaDgui() {
+    if (window.dgui) return Promise.resolve();
+    if (dguiPronto) return dguiPronto;
+    dguiPronto = new Promise((ok, falha) => {
+      const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = '/dgui.css'; document.head.appendChild(css);
+      const js = document.createElement('script'); js.src = '/dgui.js'; js.onload = ok; js.onerror = () => falha(new Error('não carreguei o desenho dos painéis'));
+      document.head.appendChild(js);
+    });
+    return dguiPronto;
+  }
+  async function abrePainel(id) {
+    const p = paineis.find((x) => x.id === id) || { id, titulo: id };
+    const veu = document.createElement('div');
+    veu.className = 'apv-veu';
+    veu.innerHTML = `<div class="apv-janela" role="dialog" aria-modal="true" aria-label="${esc(p.titulo)}">
+      <header class="apv-topo"><b>${esc(p.titulo)}</b><span class="apv-quando"></span>
+        ${p.atualizavel ? '<button type="button" class="apv-bt" data-atualiza title="Atualizar agora" aria-label="Atualizar agora"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg></button>' : ''}
+        <button type="button" class="apv-bt" data-fecha title="Fechar" aria-label="Fechar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
+      <div class="apv-corpo"><div class="app-carregando">Carregando...</div></div></div>`;
+    document.body.appendChild(veu);
+    document.body.classList.add('apv-aberto');
+    const corpo = veu.querySelector('.apv-corpo'), quando = veu.querySelector('.apv-quando');
+    const fecha = () => { veu.remove(); document.body.classList.remove('apv-aberto'); document.removeEventListener('keydown', tecla); };
+    const tecla = (ev) => { if (ev.key === 'Escape') fecha(); };
+    document.addEventListener('keydown', tecla);
+    veu.addEventListener('click', async (ev) => {
+      if (ev.target === veu || ev.target.closest('[data-fecha]')) { fecha(); return; }
+      const at = ev.target.closest('[data-atualiza]');
+      if (at) {
+        at.disabled = true; at.classList.add('girando');
+        try {
+          const r = await fetch(`/api/v1/paineis/${encodeURIComponent(SLUG)}/${encodeURIComponent(id)}/atualizar`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+          const d = await r.json().catch(() => null);
+          if (!r.ok || !d || d.ok === false) throw new Error((d && (d.erro || d.error)) || `o servidor respondeu ${r.status}`);
+          await desenha();
+        } catch (e) { quando.textContent = 'Não atualizei: ' + e.message; }
+        finally { at.disabled = false; at.classList.remove('girando'); }
+      }
+    });
+    async function desenha() {
+      await carregaDgui();
+      const r = await fetch(`/api/v1/paineis/${encodeURIComponent(SLUG)}/${encodeURIComponent(id)}`, { credentials: 'same-origin', cache: 'no-store' });
+      const d = await r.json().catch(() => null);
+      if (!r.ok || !d || !d.painel) throw new Error((d && (d.erro || d.error)) || 'o painel ainda não tem uma versão salva');
+      // sem o "vivo": aqui quem atualiza é o botão do topo da janela, não o painel por dentro
+      const pn = Object.assign({}, d.painel); delete pn.vivo;
+      corpo.innerHTML = window.dgui.blocoParaHtml('dgui\n' + JSON.stringify(pn)) || '<p>Não consegui desenhar este painel.</p>';
+      if (d.atualizado) quando.textContent = 'atualizado ' + haQuanto(typeof d.atualizado === 'number' ? new Date(d.atualizado * (d.atualizado < 1e12 ? 1000 : 1)).toISOString() : d.atualizado);
+    }
+    try { await desenha(); } catch (e) { corpo.innerHTML = erro(e.message); }
   }
 
   function ligarSeletor() {

@@ -10,6 +10,8 @@
 //   POST   /p/<slug>/api/cofre            guardar {envName, valor, provedor, aplicar}   (PUT igual)
 //   DELETE /p/<slug>/api/cofre?envName=X  revogar
 //   POST   /p/<slug>/api/cofre/aplicar    reiniciar o agente
+//   POST   /p/<slug>/api/cofre/copiar     copiar {de, envName, aplicar} do cofre de outro agente
+//          (o GET do cofre traz `outros`: as chaves dos outros agentes, só os nomes)
 //   POST   /p/<slug>/api/provedor         só o ramo com chave (ver `provedor` abaixo)
 //   POST   /p/<slug>/api/chat/transcrever transcrever o áudio do microfone (ver `transcreverRota`)
 //
@@ -31,7 +33,7 @@ const SEM_RUNNER = {
 
 const LIMITE_AUDIO = 25 * 1024 * 1024;
 
-function criarCofreRotas({ config, runner, cofre, voz, log }) {
+function criarCofreRotas({ config, runner, cofre, voz, log, registro }) {
   let catalogoCache = null;
   async function catalogo() {
     if (catalogoCache) return catalogoCache;
@@ -54,6 +56,7 @@ function criarCofreRotas({ config, runner, cofre, voz, log }) {
     const m = req.method;
     if (resto === '/api/cofre' && (m === 'GET' || m === 'POST' || m === 'PUT' || m === 'DELETE')) return 'cofre';
     if (resto === '/api/cofre/aplicar' && m === 'POST') return 'aplicar';
+    if (resto === '/api/cofre/copiar' && m === 'POST') return 'copiar';
     if (resto === '/api/provedor' && m === 'POST') return 'provedor';
     if (resto === '/api/chat/transcrever' && m === 'POST') return 'transcrever';
     return null;
@@ -113,13 +116,46 @@ function criarCofreRotas({ config, runner, cofre, voz, log }) {
 
   function recusarOuJson(res, r) { if (r && r.erro) return recusar(res, r); return enviaJson(res, 200, r); }
 
+  /** As chaves que os outros agentes têm (nome e serviço, nunca o valor), para a tela oferecer copiar. */
+  function outros(agente) {
+    const lista = [];
+    const todos = registro && registro.estado ? (registro.estado().agentes || []) : [];
+    for (const a of todos) {
+      if (a.slug === agente.slug || !a.cofre_arquivo) continue;
+      for (const c of cofre.ativas(a)) lista.push(Object.assign({ de: a.slug, deNome: a.nome || a.slug }, c));
+    }
+    return lista;
+  }
+
   async function cofreRota(req, res, agente, usuario) {
-    if (req.method === 'GET') return recusarOuJson(res, cofre.estado(agente));
+    if (req.method === 'GET') {
+      const e = cofre.estado(agente);
+      if (e.erro) return recusar(res, e);
+      return enviaJson(res, 200, Object.assign({}, e, { outros: outros(agente) }));
+    }
     if (req.method === 'DELETE') {
       const envName = new URL(req.url, 'http://local').searchParams.get('envName') || '';
       return recusarOuJson(res, cofre.revogar(agente, envName, usuario));
     }
     return guardarRota(req, res, agente, usuario);
+  }
+
+  async function copiarRota(req, res, agente, usuario) {
+    const p = await lerJsonDoPedido(req, res, agente.slug); if (!p) return;
+    const b = p.json;
+    const de = registro && typeof b.de === 'string' ? registro.obter(b.de) : null;
+    const g = cofre.copiar(de, agente, b.envName, usuario);
+    if (g.erro || b.aplicar !== true) return recusarOuJson(res, g);
+    const a = await cofre.aplicar(agente);
+    if (a.erro) {
+      return enviaJson(res, a.status || 500, {
+        error: `A chave foi copiada. ${a.erro}`,
+        howToFix: a.howToFix || 'Copiar já foi feito; falta só reiniciar o agente (aba Cofre, "aplicar e reiniciar").',
+        guardado: g,
+        aplicado: { ok: false, erro: a.erro },
+      });
+    }
+    enviaJson(res, 200, Object.assign({}, g, { aplicado: a }));
   }
 
   async function aplicarRota(req, res, agente) {
@@ -292,6 +328,7 @@ function criarCofreRotas({ config, runner, cofre, voz, log }) {
     try {
       if (qual === 'cofre') return await cofreRota(req, res, agente, usuario);
       if (qual === 'aplicar') return await aplicarRota(req, res, agente);
+      if (qual === 'copiar') return await copiarRota(req, res, agente, usuario);
       if (qual === 'transcrever') return await transcreverRota(req, res, agente);
       return await provedorRota(req, res, agente, usuario);
     } catch (e) {

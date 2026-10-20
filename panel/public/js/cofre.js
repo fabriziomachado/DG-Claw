@@ -239,6 +239,36 @@
       </div>`;
   }
 
+  // ─── Usar chave de outro agente ─────────────────────────────
+  // Pedido do dono em 18/10/2026: as mesmas chaves (Groq, Gemini...) servem a vários
+  // agentes, e colar de novo em cada um é chato. O servidor manda em `outros` só o NOME
+  // das chaves que os outros agentes têm; o botão pede ao servidor para copiar, e o valor
+  // nunca passa pelo navegador. Quem escolhe é o dono, por agente: o agente não pega
+  // sozinho a chave de outro.
+  function blocoOutros() {
+    const meus = new Set(((dados && dados.chaves) || []).filter((c) => !c.revogadaEm).map((c) => c.envName));
+    const todos = (dados && dados.outros) || [];
+    const vistos = new Set();
+    const lista = todos.filter((o) => {
+      if (meus.has(o.envName) || vistos.has(o.envName)) return false;
+      vistos.add(o.envName);
+      return true;
+    });
+    if (!lista.length) return '';
+    const itens = lista.map((o) => `<li>
+        <div class="cofre-outro-txt"><code>${esc(o.envName)}</code>
+          <span>${o.provedor && o.provedor !== 'outro' ? esc(o.provedorNome || o.provedor) + ' · ' : ''}no cofre de <b>${esc(o.deNome || o.de)}</b> · ••••${esc(o.ultimos4 || '')}</span></div>
+        <button type="button" class="btn-leve cofre-usar" data-de="${esc(o.de)}" data-env="${esc(o.envName)}" data-de-nome="${esc(o.deNome || o.de)}"
+                title="Copia esta chave para o cofre deste agente e o reinicia. O valor não aparece em lugar nenhum.">usar aqui</button>
+      </li>`).join('');
+    return `<div class="cartao cofre-outros">
+        <div class="section-title">Usar chave de outro agente</div>
+        <p class="ajuda-secao">Seus outros agentes já têm estas chaves. Toque em "usar aqui" para copiar uma para este agente,
+          sem precisar colar de novo. A cópia é independente: trocar ou revogar num agente não muda o outro.</p>
+        <ul class="cofre-outros-lista">${itens}</ul>
+      </div>`;
+  }
+
   function blocoNova() {
     const provedores = (dados && dados.provedores) || [];
     const opcoes = provedores.map((p) => `<option value="${esc(p.id)}" data-sugestao="${esc(p.sugestao || '')}" data-onde="${esc(p.onde || '')}" data-dica="${esc(p.dica || '')}">${esc(p.nome)}</option>`).join('');
@@ -400,7 +430,7 @@
   function desenhar() {
     const corpo = document.getElementById('cofre-corpo');
     if (!corpo) return;
-    corpo.innerHTML = blocoAviso() + blocoConta() + blocoLista() + blocoNova() + blocoAplicar() + blocoApi() + blocoGuarda();
+    corpo.innerHTML = blocoAviso() + blocoConta() + blocoLista() + blocoOutros() + blocoNova() + blocoAplicar() + blocoApi() + blocoGuarda();
     ligarCorpo();
   }
 
@@ -458,6 +488,10 @@
     const aplicar = document.getElementById('cofre-aplicar');
     if (aplicar) aplicar.addEventListener('click', aplicarCofre);
 
+    document.querySelectorAll('#cofre-corpo .cofre-usar').forEach((b) => {
+      b.addEventListener('click', () => usarDeOutro(b.dataset.de, b.dataset.env, b.dataset.deNome));
+    });
+
     document.querySelectorAll('#cofre-corpo .cofre-revogar').forEach((b) => {
       b.addEventListener('click', () => revogarChave(b.dataset.env));
     });
@@ -506,6 +540,25 @@
     // fazer, à mercê do próximo que passar na frente do computador.
     const campo = document.getElementById('cofre-valor');
     if (campo) { campo.value = ''; campo.type = 'password'; }
+  }
+
+  async function usarDeOutro(de, envName, deNome) {
+    if (ocupado || !de || !envName) return;
+    const certeza = window.confirm(
+      `Copiar ${envName} do cofre de ${deNome} para este agente?\n\n` +
+      'O agente reinicia para ler a chave. Se ele estiver no meio de um trabalho, o trabalho é interrompido; a conversa não se perde.',
+    );
+    if (!certeza) return;
+    ocupado = true;
+    mostrarAviso('andando', `Copiando ${envName}...`);
+    const r = await chamar('/api/cofre/copiar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ de, envName, aplicar: true }),
+    });
+    ocupado = false;
+    if (!r.ok) { await recarregar({ tipo: 'erro', texto: motivoDoErro(r) }); return; }
+    await recarregar({ tipo: 'ok', texto: `${envName} copiada de ${deNome} (terminada em ${(r.corpo && r.corpo.ultimos4) || ''}). O agente foi reiniciado e já pode usar.` });
   }
 
   async function revogarChave(envName) {

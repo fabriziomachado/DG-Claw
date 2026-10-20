@@ -2,14 +2,14 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
-<title>Conversa - DG Claw</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+<title>Conversa - S2 Bot</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <meta name="theme-color" content="#2f9e5e">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="DG Claw">
+<meta name="apple-mobile-web-app-title" content="S2 Bot">
 <script>
 /* App instalado (Tela de Início) ou navegador? Decidido antes da primeira
    pintura: no navegador a barra precisa ficar acima da barra do Safari; no app
@@ -21,15 +21,22 @@ if (navigator.standalone === true ||
 </script>
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
 <link rel="icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/tema.css">
+<script src="/tema.js"></script>
 <link rel="stylesheet" href="/chat.css">
 <link rel="stylesheet" href="/conversa.css">
+<link rel="stylesheet" href="/fileira.css">
 <link rel="stylesheet" href="/onboarding.css">
 <link rel="stylesheet" href="/menu-lado.css">
 <link rel="stylesheet" href="/campo-cofre.css">
+<link rel="stylesheet" href="/dgui.css">
+<link rel="stylesheet" href="/historico.css">
 <link rel="stylesheet" href="/barra.css">
 <link rel="stylesheet" href="/sigilo.css">
 <link rel="stylesheet" href="/lembretes.css">
 <link rel="stylesheet" href="/foco-tela.css">
+<link rel="stylesheet" href="/sem-zoom.css">
+<script src="/sem-zoom.js"></script>
 </head>
 <body>
 
@@ -44,14 +51,15 @@ if (navigator.standalone === true ||
   <button class="btn ghost" id="btnMenu" aria-label="Abrir o menu" data-tour="menu">☰</button>
   <div class="av" id="av" aria-hidden="true"></div>
   <div class="who" id="who" data-tour="titulo" role="button" tabindex="0" title="Mídias, links e arquivos desta conversa">
-    <b id="nomeAgente">DG Claw</b>
+    <b id="nomeAgente">S2 Bot</b>
     <span id="estado">conectando…</span>
   </div>
   <button class="btn" id="btnTutorial" type="button" title="Visita guiada desta tela: o que é cada parte e por que está aqui">Tutorial</button>
   <div class="ferr" id="ferr">
     <div class="tools" id="tools" role="toolbar" aria-label="Ferramentas da conversa">
       <a id="btnPainel" class="btn" href="#" hidden data-tour="btn-painel" title="Abrir o painel deste agente (status, memória, custos)" aria-label="Abrir o painel deste agente">🦞 <span class="lbl">Painel</span></a>
-      <a id="btnMesa" class="btn" href="/mesa" data-tour="btn-mesa" title="Abrir a Mesa de tarefas" aria-label="Abrir a Mesa de tarefas">📋 <span class="lbl">Mesa</span></a>
+      <a id="btnMesa" class="btn" href="/mesa" data-tour="btn-mesa" title="Abrir o Board" aria-label="Abrir o Board">📋 <span class="lbl">Mesa</span></a>
+      <a id="btnSessoes" class="btn" href="#" hidden data-tour="btn-sessoes" title="Sessões de trabalho deste agente" aria-label="Abrir as Sessões deste agente">🖥 <span class="lbl">Sessões</span></a>
       <a id="btnLembretes" class="btn" href="/lembretes" data-tour="btn-lembretes" title="Abrir os lembretes" aria-label="Abrir os lembretes">⏰ <span class="lbl">Lembretes</span></a>
       <button id="btnLer" class="btn" title="Ler as respostas em voz alta" data-tour="ler">🔊 <span class="lbl">ler</span></button>
       <button id="btnContinua" class="btn" type="button" aria-pressed="false"
@@ -63,36 +71,11 @@ if (navigator.standalone === true ||
     <i class="ferr-sombra dir" id="ferrDir" aria-hidden="true"></i>
   </div>
 </header>
+<nav id="filtros" class="filtros" data-tour="filtros" aria-label="Filtrar a conversa" hidden></nav>
+<p id="filtroVazio" class="filtro-vazio" hidden></p>
 
-<div id="overlayMenu"></div>
-<aside id="menu" aria-label="Menu do agente">
-  <button class="fechar" id="btnFechaMenu" aria-label="Fechar o menu">✕</button>
-  <div class="ml-marca" data-tour="gm-marca">
-    <div class="ml-moldura" id="mlMoldura" aria-hidden="true"></div>
-    <div class="ml-nome" id="mlNome">DG Claw</div>
-    <div class="ml-sub" id="mlSub"></div>
-    <button type="button" class="gm-tut" id="gmTutorial" title="Visita guiada: o que é cada parte e por que está aqui">Tutorial</button>
-    <div class="ml-troca" id="mlTroca" data-tour="agentes" hidden>
-      <button type="button" id="mlTrocaBtn" aria-haspopup="true" aria-expanded="false"><span>trocar de agente</span><span class="ml-seta" aria-hidden="true">▾</span></button>
-      <div class="ml-lista" id="mlLista" role="menu"></div>
-    </div>
-  </div>
-  <nav class="ml-tabs" id="mlTabs" aria-label="Páginas do agente">
-    <div data-tour="gm-conversa"><button type="button" class="ml-tab ativo" id="gmIrConversa" aria-current="page"><span class="ml-ico" aria-hidden="true">◔</span>Conversa</button></div>
-    <div data-tour="gm-mesa"><a class="ml-tab" href="/mesa"><span class="ml-ico" aria-hidden="true">▦</span>Mesa de tarefas</a></div>
-    <div id="mlPainel" data-tour="gm-painel" hidden></div>
-  </nav>
-  <section class="ml-config" id="mlConfig" data-tour="gm-config" aria-label="Configurações">
-    <h3>Configurações</h3>
-    <button type="button" class="ml-tab" id="mlInstalar"><span class="ml-ico" aria-hidden="true">⤓</span><span class="ml-tx">Instalar o app<small id="mlInstalarSub"></small></span></button>
-    <p class="ml-ajuda" id="mlInstalarAjuda" role="status" hidden></p>
-  </section>
-  <div class="pe">
-    <div class="conta">
-      <form method="post" action="/sair" id="formSair"><button type="submit" class="sair">Sair</button></form>
-    </div>
-  </div>
-</aside>
+<!-- O menu vem da marcação da casca (casca.js, MARCACAO_MENU): uma fonte só para todas as telas -->
+<div id="menuPonto"></div>
 
 <div id="chat" data-tour="thread"><div class="wrap" id="wrap"></div>
   <section id="loginCartao" class="lc" role="region" aria-label="Conectar a sua conta" tabindex="-1" hidden></section>
@@ -112,7 +95,7 @@ if (navigator.standalone === true ||
   <button class="x" aria-label="Fechar aviso">✕</button></div>
 <div class="faixa" id="faixaAudio" aria-live="polite"><span class="txt"></span></div>
 
-<div id="atividade" hidden data-tour="atividade"><i class="atv-ponto" aria-hidden="true"></i><span class="atv-txt"><span class="atv-nome"></span><span class="atv-sep"> · </span><span class="atv-acao"></span></span></div>
+<div id="atividade" hidden data-tour="atividade"><div class="pg-lista" id="pgLista" hidden></div><div class="pg-linha"><i class="atv-ponto" aria-hidden="true"></i><span class="atv-txt"><span class="atv-nome"></span><span class="atv-sep"> · </span><span class="atv-acao"></span></span><span class="pg-meta" id="pgMeta"></span><svg class="pg-seta" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="m6 15 6-6 6 6"/></svg></div></div>
 
 <div class="barra" data-tour="barra">
   <div id="anexoChip" hidden><div id="anexoLista" role="list" aria-label="Anexos desta mensagem"></div><div id="anexoInfo" aria-live="polite"></div></div>
@@ -132,30 +115,38 @@ if (navigator.standalone === true ||
 
 <div id="lightbox" aria-label="Arquivo em tamanho cheio">
   <div class="lbtopo">
+    <button id="lbFechar" aria-label="Fechar" title="Fechar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
     <span class="lbnome" id="lbNome"></span>
-    <a id="lbBaixar" href="#" download>baixar</a>
-    <button id="lbFechar" aria-label="Fechar">✕</button>
+    <a id="lbAbrir" href="#" target="_blank" rel="noopener" aria-label="Abrir em outra aba" title="Abrir em outra aba"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10"/></svg></a>
+    <a id="lbBaixar" href="#" download aria-label="Baixar" title="Baixar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/></svg></a>
   </div>
   <div class="lbcorpo" id="lbCorpo"></div>
 </div>
 
 <section id="acervoPainel" aria-label="Mídias, links e arquivos" hidden>
-  <header><b>Compartilhados</b><button id="acervoAjuda" title="Tutorial dos compartilhados" aria-label="Tutorial dos compartilhados">?</button><button id="acervoFechar" aria-label="Fechar compartilhados">✕</button></header>
+  <header><b>Compartilhados</b><button id="acervoAjuda" class="ac-ico" title="Como funciona" aria-label="Como funciona"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.1-2.4 3.6M12 17h.01"/></svg></button><button id="acervoFechar" class="ac-ico" aria-label="Fechar" title="Fechar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
   <nav role="tablist" aria-label="Tipo de item"><button data-aba="midias" role="tab" aria-selected="true">Mídias</button><button data-aba="links" role="tab" aria-selected="false">Links</button><button data-aba="docs" role="tab" aria-selected="false">Arquivos</button></nav>
   <p id="acervoEstado" role="status"></p><div id="acervoLista" data-tour="acervo"></div>
 </section>
 <script src="/midias-cache.js"></script>
 <script src="/login-cartao.js"></script>
+<script src="/vendor/highlight-11.9.0.min.js"></script>
 <script src="/trilha-tela.js"></script>
 <script src="/rolagem.js"></script>
 <script src="/tour.js"></script>
 <script src="/menu-lado.js"></script>
+<script src="/casca.js"></script>
+<script>window.DGCasca.injetaMenu("menuPonto");</script>
 <script src="/onboarding.js"></script>
 <script src="/campo-cofre.js"></script>
 <script src="/barra.js"></script>
 <script src="/sigilo.js"></script>
 <script src="/lembretes-faixa.js"></script>
 <script src="/foco-tela.js"></script>
+<script src="/dgui.js"></script>
+<script src="/historico.js"></script>
+<script src="/sessao-paralela.js"></script>
+<script src="/cota.js"></script>
 <script src="/conversa.js"></script>
 <script src="/icones-topo.js"></script>
 <script>
@@ -204,6 +195,16 @@ if (navigator.standalone === true ||
     if (perto && chat) chat.scrollTop = chat.scrollHeight;
   }
   function agenda(){ if (!agendado) { agendado = true; requestAnimationFrame(ajusta); } }
+  /* O iPhone às vezes deixa a tela deslizada para cima depois do teclado, sem
+     avisar a volta. Aí as janelas por cima (Compartilhados, visor, menu) abriam
+     com o topo atrás do relógio, o X sem pegar o toque e um vão embaixo
+     (19/10/2026). Qualquer toque sem campo em foco devolve a tela ao zero. */
+  document.addEventListener('click', function(){
+    var ativo = document.activeElement;
+    var digitando = !!ativo && (ativo.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(ativo.tagName));
+    if (!digitando && (window.scrollY || vv.offsetTop)) { try { window.scrollTo(0, 0); } catch(e){} agenda(); }
+  }, true);
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) agenda(); });
   vv.addEventListener('resize', agenda);
   vv.addEventListener('scroll', agenda);
   window.addEventListener('orientationchange', function(){ setTimeout(ajusta, 300); });

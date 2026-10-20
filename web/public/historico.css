@@ -1,0 +1,126 @@
+/* historico.css: a gaveta "Histórico" da conversa (historico.js). Só cores da paleta (tema.css). */
+.hist{position:fixed;inset:0;z-index:95;display:flex;justify-content:flex-end}
+.hist[hidden]{display:none}
+.hist-fundo{position:absolute;inset:0;background:var(--dg-sobreposicao);animation:hist-fade .18s ease-out}
+.hist-caixa{position:relative;width:min(100%,480px);height:100%;display:flex;flex-direction:column;background:var(--dg-fundo);color:var(--dg-texto);
+  border-left:1px solid var(--dg-borda);box-shadow:var(--dg-sombra);animation:hist-entra .22s cubic-bezier(.2,.8,.2,1);
+  font:15px/1.46 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif}
+@keyframes hist-entra{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
+@keyframes hist-fade{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.hist-caixa,.hist-fundo{animation:none}}
+html.hist-aberto,html.hist-aberto body{overflow:hidden}
+
+.hist-cab{display:flex;align-items:flex-start;gap:12px;padding:16px 16px 10px}
+.hist-cab > div{flex:1;min-width:0}
+.hist-cab h2{margin:0;font-size:18px;font-weight:650;letter-spacing:-.01em}
+.hist-sub{margin:2px 0 0;font-size:13px;color:var(--dg-texto-2)}
+.hist-x,.hist-volta{flex:0 0 36px;width:36px;height:36px;border-radius:50%;border:0;background:transparent;color:var(--dg-texto-2);cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center}
+.hist-x:hover,.hist-volta:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
+
+.hist-abas{display:flex;gap:4px;padding:0 16px;border-bottom:1px solid var(--dg-borda)}
+.hist-abas[hidden]{display:none}
+.hist-abas button{font:inherit;font-size:14px;padding:10px 4px;margin-right:16px;border:0;background:none;color:var(--dg-texto-2);cursor:pointer;
+  border-bottom:2px solid transparent;margin-bottom:-1px}
+.hist-abas button[aria-selected="true"]{color:var(--dg-texto);border-bottom-color:var(--dg-texto);font-weight:600}
+
+.hist-corpo{flex:1;min-height:0;display:flex;flex-direction:column}
+.hist-corpo[hidden]{display:none}
+.hist-busca{display:flex;align-items:center;gap:8px;margin:12px 16px 8px;padding:0 12px;min-height:44px;border-radius:22px;
+  border:1px solid var(--dg-borda);background:var(--dg-superficie);color:var(--dg-texto-3)}
+.hist-busca:focus-within{border-color:var(--dg-texto-3)}
+.hist-busca input{flex:1;min-width:0;border:0;outline:0;background:transparent;color:var(--dg-texto);font:inherit;font-size:15px;padding:10px 0}
+.hist-busca input::-webkit-search-cancel-button{cursor:pointer}
+.hist-so{display:flex;gap:6px;padding:0 16px 8px;flex-wrap:wrap}
+.hist-so button{font:inherit;font-size:12.5px;min-height:30px;padding:0 12px;border-radius:15px;border:1px solid var(--dg-borda);background:transparent;
+  color:var(--dg-texto-2);cursor:pointer}
+.hist-so button[aria-checked="true"]{background:var(--dg-texto);border-color:var(--dg-texto);color:var(--dg-fundo);font-weight:600}
+
+.hist-lista{flex:1;min-height:0;overflow:auto;padding:4px 16px 32px;overscroll-behavior:contain}
+.hist-conta{margin:4px 0 0;font-size:12.5px;color:var(--dg-texto-3)}
+.hist-aviso{margin:6px 0;font-size:13px;color:var(--dg-texto-2)}
+.hist-dia{margin:16px 0 6px;font-size:12px;font-weight:600;color:var(--dg-texto-3);text-transform:uppercase;letter-spacing:.04em}
+.hist-itens{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.hist-item{display:flex;flex-direction:column;align-items:stretch;gap:4px;width:100%;text-align:left;font:inherit;color:inherit;cursor:pointer;
+  padding:10px 12px;border-radius:12px;border:1px solid var(--dg-borda);background:var(--dg-superficie);transition:border-color .12s,background .12s}
+.hist-item:hover{border-color:var(--dg-texto-3)}
+.hist-item:focus-visible{outline:2px solid var(--dg-azul);outline-offset:1px}
+.hist-item.indo{opacity:.6}
+.hist-quem{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--dg-texto-2);min-width:0}
+.hist-quem b{color:var(--dg-texto);font-weight:600}
+.hist-hora{margin-left:auto;color:var(--dg-texto-3);font-variant-numeric:tabular-nums}
+.hist-secao{color:var(--dg-texto-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-ico{display:inline-flex;color:var(--dg-texto-3)}
+.hist-ico svg{width:15px;height:15px}
+.hist-item.dono{background:var(--dg-balao-dono);border-color:transparent}
+.hist-item.dono:hover{border-color:var(--dg-azul-suave)}
+.hist-trecho{font-size:14px;line-height:1.45;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.hist-trecho mark{background:transparent;color:inherit;font-weight:650;text-decoration:underline;text-decoration-color:var(--dg-azul);
+  text-decoration-thickness:2px;text-underline-offset:2px}
+.hist-ir{display:inline-flex;align-items:center;gap:2px;font-size:12.5px;color:var(--dg-texto-3)}
+.hist-item:hover .hist-ir{color:var(--dg-azul-forte)}
+
+.hist-item.arq{flex-direction:row;align-items:center;gap:12px;color:var(--dg-texto-3)}
+.hist-item.arq .hist-ico{flex:0 0 34px;width:34px;height:34px;border-radius:9px;background:var(--dg-superficie-2);align-items:center;justify-content:center}
+.hist-item.arq .hist-ico svg{width:18px;height:18px}
+.hist-arq-txt{flex:1;min-width:0;display:flex;flex-direction:column}
+.hist-arq-txt b{color:var(--dg-texto);font-weight:600;font-size:14.5px}
+.hist-arq-txt small{font-size:12.5px;color:var(--dg-texto-3)}
+
+.hist-vazio{display:flex;flex-direction:column;align-items:center;text-align:center;padding:48px 24px 0;color:var(--dg-texto-2)}
+.hist-vazio > svg{width:28px;height:28px;color:var(--dg-texto-3);margin-bottom:8px}
+.hist-vazio p{margin:4px 0;max-width:320px;font-size:14px}
+.hist-dica{font-size:13px;color:var(--dg-texto-3)}
+.hist-dica.topo{margin:12px 0 0}
+.hist-carregando,.hist-erro{margin:16px 0;font-size:14px;color:var(--dg-texto-2)}
+.hist-erro{color:var(--dg-erro-texto)}
+
+/* leitor de uma memória */
+.hist-leitor-cab{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--dg-borda)}
+.hist-leitor-cab div{display:flex;flex-direction:column;min-width:0}
+.hist-leitor-cab b{font-size:15px}
+.hist-leitor-cab small{font-size:12.5px;color:var(--dg-texto-3)}
+.hist-texto{flex:1;min-height:0;overflow:auto;padding:8px 20px 40px;font-size:14.5px;line-height:1.55;overflow-wrap:anywhere;overscroll-behavior:contain}
+.hist-texto h3,.hist-texto h4,.hist-texto h5,.hist-texto h6{margin:18px 0 6px;font-size:15px;font-weight:650}
+.hist-texto h3{font-size:16.5px}
+.hist-texto p{margin:6px 0}
+.hist-texto ul{margin:6px 0;padding-left:20px}
+.hist-texto li{margin:3px 0}
+.hist-texto blockquote{margin:8px 0;padding:2px 12px;border-left:3px solid var(--dg-borda);color:var(--dg-texto-2)}
+.hist-texto code{font:12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--dg-superficie-2);padding:1px 5px;border-radius:5px}
+.hist-texto pre{font:12.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--dg-superficie);border:1px solid var(--dg-borda);border-radius:10px;padding:10px 12px;overflow:auto;white-space:pre}
+.hist-achado{background:var(--dg-pedido-fundo);box-shadow:0 0 0 4px var(--dg-pedido-fundo);border-radius:4px}
+
+/* o chip no topo da conversa e a mensagem achada */
+.filtro.filtro-hist{margin-left:auto;display:inline-flex;align-items:center;gap:6px}
+.filtro.filtro-hist svg{flex:0 0 auto}
+.msg-achada{animation:msg-achada 2.4s ease-out}
+@keyframes msg-achada{0%,35%{background:var(--dg-pedido-fundo)}100%{background:transparent}}
+
+@media (max-width:600px){
+  .hist-caixa{width:100%;border-left:0}
+}
+
+/* conversas arquivadas (o /clear tira da tela e guarda aqui) */
+.hist-arq-cab{display:flex;align-items:center;gap:8px;margin:12px 0 6px}
+.hist-arq-cab .hist-dia{margin:0;flex:1}
+.hist-nova{font:inherit;font-size:12.5px;font-weight:600;min-height:30px;padding:0 12px;border-radius:15px;border:1px solid var(--dg-borda);
+  background:var(--dg-superficie);color:var(--dg-texto);cursor:pointer;white-space:nowrap}
+.hist-nova:hover{border-color:var(--dg-texto-3)}
+.hist-nova[data-confirma="1"]{border-color:var(--dg-azul);color:var(--dg-azul-forte)}
+.hist-item.arquivada{gap:3px}
+.hist-arq-titulo{font-weight:600;font-size:14.5px;line-height:1.35;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.hist-previa{font-size:13px;color:var(--dg-texto-2);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.hist-conversa{display:flex;flex-direction:column;gap:10px;padding-top:12px}
+.hist-conv-dia{align-self:center;margin:8px 0 2px;font-size:12px;color:var(--dg-texto-3)}
+.hist-conv-msg{display:flex;flex-direction:column;max-width:100%}
+.hist-conv-msg.dono{align-items:flex-end}
+.hist-conv-balao{max-width:88%;font-size:14px;line-height:1.5}
+.hist-conv-msg.dono .hist-conv-balao{background:var(--dg-balao-dono);padding:8px 12px;border-radius:16px}
+.hist-conv-balao > :first-child{margin-top:0}
+.hist-conv-balao > :last-child{margin-bottom:0}
+.hist-conv-hora{font-size:11.5px;color:var(--dg-texto-3);margin-top:3px}
+.hist-conv-anexo{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--dg-texto-2);margin-bottom:4px}
+.hist-conv-anexo svg{width:15px;height:15px}
+/* o aviso no topo da conversa depois de um /clear */
+.topo.topo-arq button{font:inherit;color:var(--dg-azul-forte);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px}

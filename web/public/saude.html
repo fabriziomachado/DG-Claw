@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Saúde do servidor - S2 Bot</title>
+<link rel="manifest" href="/manifest.webmanifest">
+<meta name="theme-color" content="#2f9e5e">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="S2 Bot">
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/tema.css">
+<script src="/tema.js"></script>
+<link rel="stylesheet" href="/saude.css">
+<link rel="stylesheet" href="/casca.css">
+<link rel="stylesheet" href="/menu-lado.css">
+<link rel="stylesheet" href="/sem-zoom.css">
+<script src="/sem-zoom.js"></script>
+</head>
+<body class="ss-pag">
+<main class="ss-main"><div id="ssRaiz" aria-live="polite"><p class="ss-fraco">Conferindo o servidor…</p></div></main>
+<script src="/tour.js"></script>
+<script src="/menu-lado.js"></script>
+<script src="/casca.js"></script>
+<script src="/saude.js"></script>
+<script>
+DGCasca.monta({ pagina: 'saude-servidor', titulo: 'Saúde do servidor', aoTutorial: function () { if (window.DGSaudeTutorial) window.DGSaudeTutorial(); } });
+</script>
+</body>
+</html>

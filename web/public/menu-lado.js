@@ -32,7 +32,7 @@
     { id: 'trabalho', nome: 'Trabalho', chaves: ['caixa', 'conversa', 'mesa', 'sessoes', 'lembretes', 'avisos'] },
     { id: 'agente', nome: 'O agente', chaves: ['identity', 'personality', 'skills', 'rotinas', 'memory', 'arquivos'] },
     { id: 'conexoes', nome: 'Conexões', chaves: ['integracoes', 'apps', 'cofre'] },
-    { id: 'saude', nome: 'Saúde', chaves: ['status', 'operations', 'costs', 'socorro'] },
+    { id: 'saude', nome: 'Saúde', chaves: ['saude-servidor', 'status', 'operations', 'costs', 'socorro'] },
   ];
   const NO_RODAPE = ['como'];
   function grupoDe(chave) {
@@ -49,6 +49,8 @@
   const LINK_AVISOS = { nome: 'Avisos', ico: '🔔', href: '/avisos' };
   /* Caixa de entrada (19/10/2026): tudo que espera o dono, de todos os agentes; o número em vermelho é o do ícone do app. */
   const LINK_CAIXA = { nome: 'Caixa de entrada', ico: '📥', href: '/caixa' };
+  /* Saúde do servidor (20/10/2026): só no menu do Admin, que não tem painel e ficava sem o grupo Saúde. */
+  const LINK_SAUDE_SERVIDOR = { nome: 'Saúde do servidor', ico: '◉', href: '/saude' };
 
   /* Sessões é item fixo para todo agente com painel (a tela fica no painel dele). Devolve o link do menu e os
      endereços que o menu consulta (config: a aba está ligada? pedidos: quantas sessões esperam o dono), ou null. */
@@ -78,6 +80,7 @@
     if (caminho === '/integracoes') return 'integracoes';
     if (caminho === '/avisos') return 'avisos';
     if (caminho === '/caixa') return 'caixa';
+    if (caminho === '/saude') return 'saude-servidor';
     if (/^\/a\/[^/]+$/.test(caminho)) return 'conversa';
     return '';
   }
@@ -190,7 +193,7 @@
     return '';
   }
 
-  if (!raiz.document) return { GRUPOS, grupoDe, LINK_CAIXA, ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, linkSessoes, itemAgente, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar, recorteQuadrado, problemaArquivo, ZOOM_MAX, escalaCobre, limitaAjuste, ajusteInicial, moveAjuste, zoomNoPonto, recorteDoAjuste };
+  if (!raiz.document) return { GRUPOS, grupoDe, LINK_CAIXA, LINK_SAUDE_SERVIDOR, ABAS_PAINEL, LINK_LEMBRETES, LINK_AVISOS, linkSessoes, itemAgente, linksPainel, linksExtras, comAgente, chaveDoHref, passosMenu, instrucaoInstalar, recorteQuadrado, problemaArquivo, ZOOM_MAX, escalaCobre, limitaAjuste, ajusteInicial, moveAjuste, zoomNoPonto, recorteDoAjuste };
 
   /* ── Parte com DOM ─────────────────────────────────────────────────────── */
   const $ = id => document.getElementById(id);
@@ -398,6 +401,10 @@
     ligaCaixa();
     $('mlTabs').insertAdjacentHTML('beforeend', `<div data-tour="gm-avisos"><a class="ml-tab" href="${comAgente(LINK_AVISOS.href, ag.id)}">` +
       `<span class="ml-ico" aria-hidden="true">${LINK_AVISOS.ico}</span>${LINK_AVISOS.nome}</a></div>`);
+    if (ag.tipo === 'admin') {
+      $('mlTabs').insertAdjacentHTML('beforeend', `<div data-tour="gm-saude-servidor"><a class="ml-tab" href="${LINK_SAUDE_SERVIDOR.href}">` +
+        `<span class="ml-ico" aria-hidden="true">${LINK_SAUDE_SERVIDOR.ico}</span>${LINK_SAUDE_SERVIDOR.nome}</a></div>`);
+    }
     // a Mesa já está no HTML com href="/mesa": passa a levar o agente junto
     const mesa = document.querySelector('#mlTabs a[href="/mesa"]');
     if (mesa) mesa.setAttribute('href', comAgente('/mesa', ag.id));

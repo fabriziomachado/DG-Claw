@@ -28,6 +28,7 @@ const { criarFeedback } = require('./lib/feedback');
 const { criarAlertas } = require('./lib/alertas');
 const { criarVigiaAlertas } = require('./lib/vigia-alertas');
 const { criarCaixaEntrada } = require('./lib/caixa-entrada');
+const { criarSaudeServidor } = require('./lib/saude-servidor');
 const { criarFoco } = require('./lib/foco');
 const { criarVoz } = require('./lib/voz');
 const { criarSigilo } = require('./lib/sigilo');
@@ -116,6 +117,7 @@ function criarServidor(opcoes) {
   const integracoes = criarIntegracoes({ registro, log });
   const arquivoConversa = criarArquivoConversa({ dataDir: config.dataDir, log });
   const caixaEntrada = criarCaixaEntrada({ registro, alertas, corteDe: (slug) => arquivoConversa.ultimoCorte(slug), log });
+  const saudeServidor = criarSaudeServidor({ registro, conversa, log });
   // A conversa como a tela vê: depois do último /clear (o antes fica em Histórico > Arquivadas).
   const mencoes = criarMencoes({ config, registro, conversa, log });
   mencoes.retoma();
@@ -324,6 +326,7 @@ function criarServidor(opcoes) {
 
     if ((p === '/api/v1/lembretes' || p.startsWith('/api/v1/lembretes/')) && await lembretes.rotas(req, res, url, sessao)) return undefined;
     if (p === '/api/v1/caixa' && await caixaEntrada.rotas(req, res, url, sessao)) return undefined;
+    if (p === '/api/v1/saude-servidor' && await saudeServidor.rotas(req, res, url, sessao)) return undefined;
 
     if (p === '/api/v1/onboarding') {
       if (falhaDoRegistro(req, res, true)) return;
@@ -845,6 +848,15 @@ function criarServidor(opcoes) {
       if (!servirArquivo(req, res, path.join(config.publicDir, 'integracoes.html'), 'no-store')) {
         log('erro', `A tela de integrações não está instalada: falta ${path.join(config.publicDir, 'integracoes.html')}.`);
         H.paginaErro(res, 500, 'Tela não instalada', 'O arquivo da tela de integrações não foi encontrado no servidor. Reinstale o DG Claw Web.');
+      }
+      return undefined;
+    }
+
+    if (p === '/saude' && (m === 'GET' || m === 'HEAD')) {
+      if (!sessao) return semSessaoPagina(req, res, url);
+      if (!servirArquivo(req, res, path.join(config.publicDir, 'saude.html'), 'no-store')) {
+        log('erro', `A tela da saúde do servidor não está instalada: falta ${path.join(config.publicDir, 'saude.html')}.`);
+        H.paginaErro(res, 500, 'Tela não instalada', 'O arquivo da saúde do servidor não foi encontrado. Reinstale o DG Claw Web.');
       }
       return undefined;
     }

@@ -1090,3 +1090,16 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
   color:var(--dg-texto);border:1px solid var(--dg-borda);font-size:12.5px}
 #cotaCartao .ct-item span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #cotaCartao .ct-item button{width:22px;height:22px;border:0;border-radius:50%;background:transparent;color:var(--dg-texto-3);cursor:pointer;font-size:15px;line-height:1}
+/* memória e tokens de cada resposta (20/10/2026, proposta B) */
+.acoes .ac-mem{width:auto;padding:0 8px;gap:4px;display:inline-flex;align-items:center;font-size:12px;font-weight:600;color:var(--dg-texto-2);
+  border:1px solid var(--dg-borda);border-radius:999px;height:26px;margin-left:6px}
+.acoes .ac-info{margin-left:auto}
+.acoes .ac.on{background:var(--dg-superficie-2);color:var(--dg-texto)}
+.resp-mem,.resp-info{margin:6px 0 2px;border:1px solid var(--dg-borda);border-radius:12px;background:var(--dg-superficie);padding:8px 12px;font-size:13.5px;
+  display:flex;flex-direction:column;gap:6px;max-width:520px}
+.resp-mem div{display:flex;gap:8px;align-items:baseline}
+.resp-mem .rm-tag{flex:0 0 auto;font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px;background:var(--dg-superficie-2);color:var(--dg-texto-2);white-space:nowrap}
+.resp-info{max-width:300px;gap:3px;margin-left:auto}
+.resp-info .ri-t{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dg-texto-3);margin-bottom:2px}
+.resp-info div{display:flex;justify-content:space-between;gap:16px;color:var(--dg-texto-2)}
+.resp-info b{color:var(--dg-texto);font-weight:600;font-variant-numeric:tabular-nums}

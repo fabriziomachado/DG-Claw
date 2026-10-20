@@ -1,0 +1,29 @@
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { criarLeitor } = require('../lib/thread');
+
+test('cada resposta do agente leva os tokens do turno e o que ele guardou na memória', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memtok-'));
+  const f = path.join(dir, 's.jsonl');
+  const ts = (s) => new Date(Date.UTC(2026, 9, 20, 0, 0, s)).toISOString();
+  const linhas = [
+    { type: 'user', timestamp: ts(0), message: { role: 'user', content: '<dgchat from="pessoa" chat="c_data" msg="m1" ts="x">só a base clinica</dgchat>' } },
+    { type: 'assistant', timestamp: ts(5), message: { id: 'a1', usage: { input_tokens: 2, cache_read_input_tokens: 1000, cache_creation_input_tokens: 50, output_tokens: 30 },
+      content: [{ type: 'tool_use', id: 't1', name: 'Bash', input: { command: "python3 - <<'EOF'\np='MEMORY.md'; s=open(p).read()\ns=s.replace(\"## Regras aprendidas\\n\\n\",\"## Regras aprendidas\\n\\n- (20/10) Só a base clinica nas análises.\\n\")\nopen(p,'w').write(s)\nEOF" } }] } },
+    // a mesma mensagem repetida no transcript não soma de novo
+    { type: 'assistant', timestamp: ts(5), message: { id: 'a1', usage: { input_tokens: 2, cache_read_input_tokens: 1000, cache_creation_input_tokens: 50, output_tokens: 30 }, content: [] } },
+    { type: 'assistant', timestamp: ts(9), message: { id: 'a2', usage: { input_tokens: 3, cache_read_input_tokens: 2000, cache_creation_input_tokens: 0, output_tokens: 70 },
+      content: [{ type: 'tool_use', id: 't2', name: 'mcp__dgchat__reply', input: { chat: 'c_data', text: 'Combinado.' } }] } },
+  ];
+  fs.writeFileSync(f, linhas.map((l) => JSON.stringify(l)).join('\n') + '\n');
+  const leitor = criarLeitor({ log: () => {}, tz: 'America/Sao_Paulo', canalTelegram: false, midia: { registrar: () => null } });
+  const { eventos } = leitor.ler(f, { slug: 'data', nome: 'Data', chat_id: 'c_data', agente_id: 'data' });
+  const fala = eventos.find((e) => e.quem === 'agente' && e.text === 'Combinado.');
+  assert.ok(fala, 'a fala do agente existe');
+  assert.deepEqual(fala.uso, { entrada: 3055, cache: 3000, saida: 100, ms: 9000 });
+  assert.deepEqual(fala.memorias, [{ tipo: 'Regra', texto: '(20/10) Só a base clinica nas análises.' }]);
+});

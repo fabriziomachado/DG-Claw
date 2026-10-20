@@ -1718,7 +1718,47 @@ function htmlAcoes(m, hora) {
          `<button type="button" class="ac${respondendo && respondendo.id === m.id ? ' acao-resp-on' : ''}" data-ac="responder" title="Responder citando" aria-label="Responder citando esta mensagem">${ICONE_ACAO.responder}</button>` +
          (m.origin === 'agente' ? `<button type="button" class="ac ac-voto${votos[m.id] === 'bom' ? ' on' : ''}" data-ac="bom" title="Boa resposta" aria-label="Boa resposta" aria-pressed="${votos[m.id] === 'bom'}">${ICONE_ACAO.bom}</button>` +
            `<button type="button" class="ac ac-voto${votos[m.id] === 'ruim' ? ' on' : ''}" data-ac="ruim" title="Resposta ruim" aria-label="Resposta ruim" aria-pressed="${votos[m.id] === 'ruim'}">${ICONE_ACAO.ruim}</button>` : '') +
-         hora + '</div>';
+         hora + extrasDaResposta(m) + '</div>' + detalhesDaResposta(m);
+}
+/* Memória e tokens de cada resposta (20/10/2026, proposta B do dono). O servidor manda em m.memorias
+   ([{tipo, texto}]: o que o agente guardou na memória durante esta resposta) e m.uso ({entrada, cache,
+   saida, ms}). Na linha das ações: um cérebro com o número de memórias e, à direita, um ⓘ. Cada um abre um
+   bloco logo abaixo; a escolha de aberto sobrevive ao redesenho. */
+const memAbertas = new Set(), infoAbertas = new Set();
+const ICO_MEMORIA = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4.5a3 3 0 0 0-3 3 3 3 0 0 0-1.5 5.3A3 3 0 0 0 8 18a2.5 2.5 0 0 0 4 1.5V5.5A2.5 2.5 0 0 0 9 4.5zM15 4.5a3 3 0 0 1 3 3 3 3 0 0 1 1.5 5.3A3 3 0 0 1 16 18a2.5 2.5 0 0 1-4 1.5"/></svg>';
+const ICO_INFO = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>';
+function numCurto(n) {
+  if (!Number.isFinite(n)) return '–';
+  if (n >= 1e6) return (n / 1e6).toFixed(n >= 1e7 ? 0 : 2).replace('.', ',').replace(/,?0+$/, '') + ' mi';
+  if (n >= 1e3) return (n / 1e3).toFixed(n >= 1e5 ? 0 : 1).replace('.', ',').replace(/,0$/, '') + ' mil';
+  return String(n);
+}
+function duracao(ms) {
+  if (!Number.isFinite(ms)) return '';
+  const s = Math.round(ms / 1000);
+  return s < 60 ? s + ' s' : Math.floor(s / 60) + ' min' + (s % 60 ? ' ' + (s % 60) + ' s' : '');
+}
+function extrasDaResposta(m) {
+  if (!m || m.origin !== 'agente') return '';
+  const n = Array.isArray(m.memorias) ? m.memorias.length : 0;
+  return (n ? `<button type="button" class="ac ac-mem${memAbertas.has(m.id) ? ' on' : ''}" data-ac="mem" title="O que ${esc(AGENTE.nome)} guardou na memória" aria-label="${n} ${n === 1 ? 'memória guardada' : 'memórias guardadas'}" aria-expanded="${memAbertas.has(m.id)}">${ICO_MEMORIA}<span>${n}</span></button>` : '') +
+    (m.uso ? `<button type="button" class="ac ac-info${infoAbertas.has(m.id) ? ' on' : ''}" data-ac="info" title="Tokens e tempo desta resposta" aria-label="Tokens e tempo desta resposta" aria-expanded="${infoAbertas.has(m.id)}">${ICO_INFO}</button>` : '');
+}
+function detalhesDaResposta(m) {
+  if (!m || m.origin !== 'agente') return '';
+  let html = '';
+  if (memAbertas.has(m.id) && Array.isArray(m.memorias) && m.memorias.length) {
+    html += `<div class="resp-mem" data-det="mem">${m.memorias.map(x => `<div><span class="rm-tag">${esc(x.tipo || 'Fato')}</span><span>${esc(x.texto)}</span></div>`).join('')}</div>`;
+  }
+  if (infoAbertas.has(m.id) && m.uso) {
+    const u = m.uso;
+    html += `<div class="resp-info" data-det="info"><span class="ri-t">Esta resposta</span>` +
+      `<div><span>Entrada</span><b>${numCurto(u.entrada)} tokens</b></div>` +
+      (u.cache ? `<div><span>· do cache (mais barato)</span><b>${numCurto(u.cache)}</b></div>` : '') +
+      `<div><span>Saída</span><b>${numCurto(u.saida)} tokens</b></div>` +
+      (Number.isFinite(u.ms) && u.ms > 0 ? `<div><span>Tempo</span><b>${duracao(u.ms)}</b></div>` : '') + '</div>';
+  }
+  return html;
 }
 wrap.addEventListener('click', async ev => {
   const b = ev.target.closest ? ev.target.closest('.acoes .ac') : null;
@@ -1727,6 +1767,18 @@ wrap.addEventListener('click', async ev => {
   const m = msgs.find(x => x.id === id);
   const texto = m ? legendaUtil(m) : '';
   if (!texto) return;
+  if (b.dataset.ac === 'mem' || b.dataset.ac === 'info') {
+    const conj = b.dataset.ac === 'mem' ? memAbertas : infoAbertas;
+    if (conj.has(m.id)) conj.delete(m.id); else conj.add(m.id);
+    const linha = b.closest('.acoes');
+    linha.parentElement.querySelectorAll(':scope > [data-det]').forEach(x => x.remove());
+    linha.insertAdjacentHTML('afterend', detalhesDaResposta(m));
+    linha.querySelectorAll('.ac-mem, .ac-info').forEach(x => {
+      const on = (x.dataset.ac === 'mem' ? memAbertas : infoAbertas).has(m.id);
+      x.classList.toggle('on', on); x.setAttribute('aria-expanded', String(on));
+    });
+    return;
+  }
   if (b.dataset.ac === 'responder') { comecaResposta(m); acendeResp(m.id); return; }
   if (b.dataset.ac === 'bom' || b.dataset.ac === 'ruim') { vota(m, b.dataset.ac); return; }
   if (b.dataset.ac === 'copiar') {

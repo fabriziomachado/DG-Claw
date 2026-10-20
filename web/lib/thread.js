@@ -19,6 +19,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { marcar } = require('./alertas');
 const { descreveUso, descreveResultado } = require('./trilha');
+const { mascarar } = require('./mascara');
 
 const DGCHAT_ABRE = /<dgchat\b[^>]*>/;
 const DGCHAT_ATTR = /\b(from|chat|msg|ts)="([^"]*)"/g;
@@ -193,6 +194,8 @@ function criarMontagem({ tz, midia }) {
 
   /** A fala do dono, com os marcadores [anexo: ...] virando mídia. `dg` vem de parseDgchat. */
   function empurraDono(estado, agente, dg, ep) {
+    // um pedido novo do dono começa a conta de tokens e de memória da próxima resposta
+    estado.usoTurno = null; estado.memTurno = []; estado.inicioTurnoEp = ep;
     const caminhos = [];
     const corpo = dg.interno.replace(ANEXO_LINHA, (_, cam) => {
       const visto = cam.trim();
@@ -357,7 +360,8 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
   const estados = new Map(); // chave -> estado incremental
 
   function novoEstado() {
-    return { offset: 0, ino: null, trigger: 'owner', chatCorrente: '', eventos: [], versao: 0, ultimoEp: 0, msgsVistas: new Set(), waPendentes: new Map(), restoParcial: Buffer.alloc(0), trilhaPend: new Map(), compactandoEp: null, fimCompactEp: 0, ecoCompact: false };
+    return { offset: 0, ino: null, trigger: 'owner', chatCorrente: '', eventos: [], versao: 0, ultimoEp: 0, msgsVistas: new Set(), waPendentes: new Map(), restoParcial: Buffer.alloc(0), trilhaPend: new Map(), compactandoEp: null, fimCompactEp: 0, ecoCompact: false,
+      usoTurno: null, memTurno: [], ultimoMsgUso: '', inicioTurnoEp: 0 };
   }
 
   const { epDe, empurra, empurraDono, empurraAgente, empurraDonoWhatsapp, empurraAgenteWhatsapp, empurraTrilha, empurraComando, empurraAviso } = criarMontagem({ tz, midia });
@@ -476,6 +480,95 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
     estado.compactandoEp = null;
     estado.fimCompactEp = ep;
     empurraAviso(estado, agente, { ep, text: AVISO_COMPACTADA, sistema: 'compactacao' });
+  }
+
+  /* Memória e tokens de cada resposta (20/10/2026, pedido do dono, proposta B). Enquanto o agente trabalha,
+     somam-se os tokens de cada chamada (o transcript repete o mesmo `message.id` em várias linhas: conta uma
+     vez) e o que ele escreveu nos arquivos de memória. Quando ele responde (dgchat reply), isso vai junto da
+     fala, em `uso` ({entrada, cache, saida, ms}) e `memorias` ([{tipo, texto}]), e recomeça do zero. */
+  const RX_MEMORIA = /(?:^|\/)(MEMORY\.md|working-memory\.md|CREATOR\.md|memory\/[^/]+\.md)$/i;
+  function tipoDaMemoria(arquivo, secao) {
+    const s = String(secao || '').toLowerCase();
+    if (/regra/.test(s)) return 'Regra';
+    if (/prefer/.test(s)) return 'Preferência';
+    if (/sobre|dono|creator/.test(s) || /CREATOR\.md$/i.test(arquivo)) return 'Sobre você';
+    if (/working-memory/i.test(arquivo)) return 'Contexto';
+    return 'Fato';
+  }
+  function linhasNovas(nome, inp) {
+    const novo = nome === 'Write' ? String(inp.content || '')
+      : nome === 'MultiEdit' && Array.isArray(inp.edits) ? inp.edits.map((e) => String((e && e.new_string) || '')).join('\n')
+      : String(inp.new_string || '');
+    const velho = new Set(String(nome === 'MultiEdit' && Array.isArray(inp.edits) ? inp.edits.map((e) => (e && e.old_string) || '').join('\n') : inp.old_string || '').split('\n').map((l) => l.trim()));
+    let secao = '';
+    const out = [];
+    for (const l0 of novo.split('\n')) {
+      const l = l0.trim();
+      if (/^#{1,4}\s/.test(l)) { secao = l; continue; }
+      if (!/^[-*]\s+\S/.test(l) || velho.has(l)) continue;
+      out.push({ secao, texto: l.replace(/^[-*]\s+/, '').replace(/\*\*(.+?)\*\*/g, '$1').slice(0, 220) });
+    }
+    return nome === 'Write' ? out.slice(-5) : out.slice(0, 5);
+  }
+  function anotaUso(estado, o) {
+    const m = o.message || {};
+    const u = m.usage;
+    if (!u || typeof u !== 'object') return;
+    if (m.id && m.id === estado.ultimoMsgUso) return;
+    estado.ultimoMsgUso = m.id || '';
+    const t = estado.usoTurno || (estado.usoTurno = { entrada: 0, cache: 0, saida: 0 });
+    const n = (v) => (Number.isFinite(v) ? v : 0);
+    t.cache += n(u.cache_read_input_tokens);
+    t.entrada += n(u.input_tokens) + n(u.cache_read_input_tokens) + n(u.cache_creation_input_tokens);
+    t.saida += n(u.output_tokens);
+  }
+  /* O agente também grava a memória por um script no terminal (python com s.replace(velho, novo), sed,
+     echo >>). Aqui as linhas de tópico ("- ...") que aparecem no comando e não estão no texto "velho" do
+     replace são as novas. É heurística: só mostra o que achou, e nunca afirma o que não viu. */
+  function memoriaDoComando(comando) {
+    const cmd = String(comando || '');
+    const arq = (/(MEMORY\.md|working-memory\.md|CREATOR\.md)/i.exec(cmd) || [])[1];
+    if (!arq || !/(open\([^)]*['"]w|write_text|>>|sed\s+-i|tee\s+-a)/.test(cmd)) return [];
+    const txt = cmd.replace(/\\n/g, '\n');
+    const velhos = new Set();
+    for (const m of txt.matchAll(/replace\(\s*(['"])([\s\S]*?)\1\s*,/g)) for (const l of m[2].split('\n')) velhos.add(l.trim());
+    let secao = '';
+    const out = [];
+    for (const l0 of txt.split('\n')) {
+      const l = l0.trim().replace(/^['"]|['"],?\)?$/g, '');
+      const h = /^(#{1,4}\s.+)/.exec(l.replace(/^.*?(#{1,4}\s)/, '$1'));
+      if (h && /^#{1,4}\s/.test(h[1])) secao = h[1];
+      const b = /^-\s+(\S.{6,})/.exec(l);
+      if (!b || velhos.has(l)) continue;
+      out.push({ arq, secao, texto: b[1].replace(/\*\*(.+?)\*\*/g, '$1').replace(/["'),;\\]+$/, '').slice(0, 220) });
+    }
+    return out.slice(0, 5);
+  }
+  function anotaMemoria(estado, nome, inp) {
+    if (nome === 'Bash') {
+      for (const l of memoriaDoComando(inp.command)) {
+        if (estado.memTurno.length >= 8) break;
+        estado.memTurno.push({ tipo: tipoDaMemoria(l.arq, l.secao), texto: mascarar(l.texto) });
+      }
+      return;
+    }
+    if (!['Edit', 'Write', 'MultiEdit'].includes(nome)) return;
+    const arq = String(inp.file_path || '');
+    if (!RX_MEMORIA.test(arq)) return;
+    for (const l of linhasNovas(nome, inp)) {
+      if (estado.memTurno.length >= 8) break;
+      estado.memTurno.push({ tipo: tipoDaMemoria(arq, l.secao), texto: mascarar(l.texto) });
+    }
+  }
+  function penduraNaFala(estado, ep) {
+    const ev = estado.eventos[estado.eventos.length - 1];
+    if (!ev || ev.quem !== 'agente') return;
+    const t = estado.usoTurno;
+    if (t && (t.entrada || t.saida)) {
+      ev.uso = { entrada: t.entrada, cache: t.cache, saida: t.saida, ms: estado.inicioTurnoEp ? Math.max(0, Math.round((ep - estado.inicioTurnoEp) * 1000)) : null };
+    }
+    if (estado.memTurno.length) ev.memorias = estado.memTurno.slice();
+    estado.usoTurno = null; estado.memTurno = []; estado.inicioTurnoEp = ep;
   }
 
   function processaLinha(estado, agente, linha) {
@@ -602,11 +695,13 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
 
     if (o.type === 'assistant' && Array.isArray(cont)) {
       if (cont.length) interrompeCompactacao(estado, agente, epDe(o.timestamp, estado));
+      anotaUso(estado, o);
       for (const b of cont) {
         if (!b || b.type !== 'tool_use') continue;
         const nome = String(b.name || '');
         const inp = b.input || {};
         const origin = estado.trigger === 'cron' ? 'rotina' : 'agente';
+        anotaMemoria(estado, nome, inp);
         const uso = descreveUso(nome, inp);
         if (uso) {
           if (typeof b.id === 'string' && b.id) estado.trilhaPend.set(b.id, { ep: epDe(o.timestamp, estado), uso });
@@ -615,7 +710,7 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
         if (nome.endsWith(TOOL_TEXTO) || nome.endsWith(TOOL_ARQUIVO)) {
           const chat = inp.chat || estado.chatCorrente || agente.chat_id;
           if (chat !== agente.chat_id) continue;
-          empurraAgente(estado, agente, { ep: epDe(o.timestamp, estado), origin, arquivo: nome.endsWith(TOOL_ARQUIVO), inp });
+          if (empurraAgente(estado, agente, { ep: epDe(o.timestamp, estado), origin, arquivo: nome.endsWith(TOOL_ARQUIVO), inp })) penduraNaFala(estado, epDe(o.timestamp, estado));
           continue;
         }
         if (nome.endsWith(TOOL_WA_TEXTO) || nome.endsWith(TOOL_WA_ARQUIVO)) {

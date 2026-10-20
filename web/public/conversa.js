@@ -427,6 +427,7 @@ new MutationObserver(() => { if (typeof pintaParar === 'function') pintaParar();
 if (window.DGSessaoParalela) window.DGSessaoParalela.inicia({ agente: AGENTE, atividade: atividadeEl, entrada });
 // aviso de cota acabada, com a hora da volta, e a fila das mensagens para a volta (cota.js)
 if (window.DGCota) window.DGCota.inicia({ agente: AGENTE, enviar: t => enviarTexto(t) });
+if (window.DGEconomia) window.DGEconomia.inicia({ agente: AGENTE });
 const atvNomeEl = atividadeEl && atividadeEl.querySelector('.atv-nome');
 const atvSepEl = atividadeEl && atividadeEl.querySelector('.atv-sep');
 const atvAcaoEl = atividadeEl && atividadeEl.querySelector('.atv-acao');
@@ -1940,6 +1941,7 @@ function render(opt) {
       continue;
     }
     if (m.origin === 'comando') { itens.push([m.id, htmlResultadoComando(m)]); continue; }
+    if (m.origin === 'linha') { itens.push([m.id, `<div class="linha-sis${m.economia ? ' eco' : ''}" data-msg="${esc(m.id)}"><span>${esc(m.text)}</span></div>`]); anterior = null; continue; }
     if (m.origin === 'mencao' && m.mencao) { itens.push([m.id, htmlMencao(m)]); anterior = 'her'; continue; }
     if (m.cartaoNasc) { itens.push([m.id, window.DGOnboarding.htmlCartao(m.cartaoNasc)]); anterior = null; continue; }
     const lado = ehDono(m) ? 'me' : 'her';

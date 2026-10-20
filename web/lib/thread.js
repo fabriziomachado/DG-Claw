@@ -661,9 +661,22 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
             return;
           }
           estado.ecoCompact = false;
+          estado.ecoModelo = false;
           if (n) {
             const a = TAG_ARGS_COMANDO.exec(txt);
             const args = a ? a[1].trim() : '';
+            // /model sonnet (modo economia, lib/limites.js) e /model default viram uma linha discreta no meio da
+            // conversa, e não um balão do dono com o resultado do terminal (20/10/2026)
+            if (/^\/?model$/.test(n) && /^(sonnet|default)$/i.test(args)) {
+              estado.ecoModelo = true;
+              const ep = epDe(o.timestamp, estado);
+              const { hhmm, dia } = fmtHoraDia(ep, tz);
+              const eco = /^sonnet$/i.test(args);
+              estado.eventos.push({ id: crypto.createHash('sha1').update(`linha|${ep}|${args}`).digest('hex').slice(0, 16), ep, hhmm, dia, origin: 'linha',
+                text: eco ? `${hhmm} · modo economia ligado, ${agente.nome} usa o Sonnet até a semana renovar` : `${hhmm} · modo economia desligado, ${agente.nome} voltou ao modelo de sempre`,
+                kind: 'text', media: null, fmt: 'text', editada: false, reacoes: [], cita: null, via: 'plataforma', quem: 'agente', economia: eco });
+              return;
+            }
             estado.trigger = 'owner';
             empurra(estado, agente, { ep: epDe(o.timestamp, estado), origin: 'dono', text: `${n.startsWith('/') ? n : `/${n}`}${args ? ` ${args}` : ''}`, caminhos: [], via: 'plataforma', quem: 'pessoa' });
           }
@@ -673,6 +686,7 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
         if (saida && !fila) {
           const ep = epDe(o.timestamp, estado);
           // Resultado de /compact: pelo eco anterior, ou pelo texto "Compacted" (versões sem eco).
+          if (estado.ecoModelo) { estado.ecoModelo = false; return; }   // "Set model to Sonnet": a linha já disse
           if (estado.ecoCompact || /^Compacted\b/.test(saida[2].replace(ANSI, '').trim())) saidaDeCompactacao(estado, agente, ep, saida[1], saida[2]);
           else empurraComando(estado, { ep, texto: saida[2], saida: saida[1] });
         }

@@ -51,3 +51,19 @@ test('memória gravada depois da última fala, em prosa ou por heredoc, vai para
     { tipo: 'Fato', texto: 'Imagens — send_file só mostra o que está na casa' },
   ]);
 });
+
+test('/model sonnet vira a linha do modo economia, sem balão do dono nem resultado do comando', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memtok-'));
+  const f = path.join(dir, 's.jsonl');
+  const ts = (s) => new Date(Date.UTC(2026, 9, 20, 18, 10, s)).toISOString();
+  const linhas = [
+    { type: 'user', timestamp: ts(0), message: { role: 'user', content: '<command-name>/model</command-name>\n<command-message>model</command-message>\n<command-args>sonnet</command-args>' } },
+    { type: 'user', timestamp: ts(1), message: { role: 'user', content: '<local-command-stdout>Set model to Sonnet</local-command-stdout>' } },
+  ];
+  fs.writeFileSync(f, linhas.map((l) => JSON.stringify(l)).join('\n') + '\n');
+  const leitor = criarLeitor({ log: () => {}, tz: 'America/Sao_Paulo', canalTelegram: false, midia: { registrar: () => null } });
+  const { eventos } = leitor.ler(f, { slug: 'data', nome: 'Data', chat_id: 'c_data', agente_id: 'data' });
+  assert.equal(eventos.length, 1);
+  assert.equal(eventos[0].origin, 'linha');
+  assert.equal(eventos[0].text, '15:10 · modo economia ligado, Data usa o Sonnet até a semana renovar');
+});

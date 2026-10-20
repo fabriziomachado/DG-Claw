@@ -22,6 +22,7 @@ const { abrirStream } = require('./lib/sse');
 const { criarProxy } = require('./lib/proxy');
 const { criarCofreAgente } = require('./lib/cofre-agente');
 const { criarCotaVigia } = require('./lib/cota-vigia');
+const { criarLimites } = require('./lib/limites');
 const { criarCofreRotas } = require('./lib/cofre-rotas');
 const { criarPaineisVivos } = require('./lib/paineis-vivos');
 const { criarMencoes } = require('./lib/mencoes');
@@ -120,6 +121,7 @@ function criarServidor(opcoes) {
   const caixaEntrada = criarCaixaEntrada({ registro, alertas, corteDe: (slug) => arquivoConversa.ultimoCorte(slug), log });
   const saudeServidor = criarSaudeServidor({ registro, conversa, log });
   const cotaVigia = opcoes.cotaVigia || criarCotaVigia({ log });
+  const limites = criarLimites({ registro, conversa, push, log, dataDir: config.dataDir, tz: config.tz, agora: opcoes.agora, buscarUso: opcoes.buscarUso });
   // A conversa como a tela vê: depois do último /clear (o antes fica em Histórico > Arquivadas).
   const mencoes = criarMencoes({ config, registro, conversa, log });
   mencoes.retoma();
@@ -329,6 +331,7 @@ function criarServidor(opcoes) {
     if ((p === '/api/v1/lembretes' || p.startsWith('/api/v1/lembretes/')) && await lembretes.rotas(req, res, url, sessao)) return undefined;
     if (p === '/api/v1/caixa' && await caixaEntrada.rotas(req, res, url, sessao)) return undefined;
     if (p === '/api/v1/saude-servidor' && await saudeServidor.rotas(req, res, url, sessao)) return undefined;
+    if (p.startsWith('/api/v1/limites') && await limites.rotas(req, res, url, sessao)) return undefined;
 
     if (p === '/api/v1/onboarding') {
       if (falhaDoRegistro(req, res, true)) return;
@@ -961,7 +964,7 @@ function criarServidor(opcoes) {
   });
 
   return {
-    servidor, config, registro, auth, midia, conversa, log, caixa, push, lembretes, avisos, cofreAgente,
+    servidor, config, registro, auth, midia, conversa, log, caixa, push, limites, lembretes, avisos, cofreAgente,
     ouvir(porta, host) {
       return new Promise((resolve, reject) => {
         servidor.once('error', reject);
@@ -974,7 +977,7 @@ function criarServidor(opcoes) {
         });
       });
     },
-    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); vigiaAlertas.parar(); avisos.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
+    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); vigiaAlertas.parar(); limites.parar(); avisos.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
   };
 }
 
@@ -982,6 +985,7 @@ module.exports = { criarServidor, proximoSeguro };
 
 if (require.main === module) {
   const s = criarServidor();
+  s.limites.iniciar();   // o vigia dos limites lê a conta de verdade: só no servidor de verdade, nunca nos testes
   s.ouvir().then((a) => {
     s.log('info', `DG Claw Web escutando em http://${a.address}:${a.port} (agentes: ${s.config.agentesPath}, dados: ${s.config.dataDir}).`);
   }).catch((e) => {

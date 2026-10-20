@@ -14,8 +14,65 @@
     servidor: ico('<rect x="3.5" y="4" width="17" height="7" rx="1.5"/><rect x="3.5" y="13" width="17" height="7" rx="1.5"/><path d="M7 7.5h.01M7 16.5h.01"/>'),
     agentes: ico('<circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.5a3 3 0 0 1 0 5.5M18.5 19a5.5 5.5 0 0 0-3-4.9"/>'),
     raio: ico('<path d="M13 3 5 13h6l-1 8 8-10h-6z"/>'),
+    relogio: ico('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+    sino: ico('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>'),
+    folha: ico('<path d="M5 19c0-8 5-13 14-14-1 9-6 14-14 14z"/><path d="M5 19l7-7"/>'),
   };
-  let dados = null, periodo = 'dia', agentesInfo = {}, carregando = false, verTudo = false;
+  let dados = null, periodo = 'dia', agentesInfo = {}, carregando = false, verTudo = false, lim = null, janela = 'semana';
+  const CORES = ['var(--dg-serie-0)', 'var(--dg-serie-1)', 'var(--dg-serie-2)', 'var(--dg-serie-3)', 'var(--dg-serie-4)', 'var(--dg-serie-5)'];
+  // cor fixa por agente (a mesma nas duas janelas): Admin primeiro, depois os outros em ordem de nome
+  const corDe = slug => {
+    const q = lim && lim.quem ? [...(lim.quem.semana || []), ...(lim.quem.sessao || [])].map(p => p.slug) : [];
+    const ids = ['admin', ...new Set([...Object.keys(agentesInfo), ...q].filter(k => k !== 'admin').sort())];
+    return CORES[Math.max(0, ids.indexOf(slug)) % CORES.length];
+  };
+  const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  const hm = iso => { const d = new Date(iso); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+  const renova = iso => { if (!iso) return ''; const d = new Date(iso); return d - Date.now() < 20 * 3600e3 ? `renova às ${hm(iso)}` : `renova ${DIAS[d.getDay()]}, ${hm(iso)}`; };
+  const dinheiro = (v, moeda) => (moeda === 'USD' ? 'US$ ' : moeda + ' ') + (v / 100).toLocaleString('pt-BR', { minimumFractionDigits: v % 100 ? 2 : 0, maximumFractionDigits: 2 });
+
+  // limite da conta (lib/limites.js): sessão, semana, créditos extras e quem usou
+  function limites() {
+    if (!lim) return '';
+    if (!lim.semana) return `<div class="ss-sec">${I.relogio}Limite da conta</div><p class="ss-fraco">${esc(lim.erro || 'Ainda não consegui ler o uso da conta.')}</p>`;
+    const barra = (rot, j, aviso) => `<div class="ss-lim"><b>${rot}</b><div class="ss-barra2${j.pct >= aviso ? ' medio' : ''}${j.pct >= 95 ? ' alto' : ''}"><i style="width:${Math.min(100, j.pct)}%"></i>` +
+      `<span class="ss-marca" style="left:${aviso}%" title="aviso em ${aviso}%"></span></div><span class="ss-p">${j.pct}%</span><small>${renova(j.renova)}</small></div>`;
+    const x = lim.extras;
+    const extras = x && x.ligado ? `<div class="ss-lim"><b>Créditos extras</b><div class="ss-barra2"><i style="width:${x.limite ? Math.min(100, Math.round(x.usado / x.limite * 100)) : 0}%"></i></div>` +
+      `<span class="ss-p">${dinheiro(x.usado, x.moeda)}</span><small>de ${dinheiro(x.limite, x.moeda)} no mês</small></div>` : '';
+    const q = (lim.quem && lim.quem[janela]) || [];
+    const nomeDe = p => (agentesInfo[p.slug] || {}).nome || p.nome;
+    return `<div class="ss-sec">${I.relogio}Limite da conta</div><div class="ss-grupo ss-pad">` +
+      `<div class="ss-conta">${lim.plano ? 'Plano ' + esc(lim.plano.charAt(0).toUpperCase() + lim.plano.slice(1)) + ' · ' : ''}todos os agentes usam esta mesma conta</div>` +
+      barra('Sessão atual', lim.sessao, lim.avisos.sessao) + barra('Esta semana', lim.semana, lim.config.economia.ligado ? lim.config.economia.nivel : lim.avisos.semana) + extras +
+      `<div class="ss-div"></div><div class="ss-sec ss-sec0">Quem usou<span class="q ss-chips"><button type="button" class="ss-chip${janela === 'sessao' ? ' on' : ''}" data-janela="sessao">5 h</button>` +
+      `<button type="button" class="ss-chip${janela === 'semana' ? ' on' : ''}" data-janela="semana">7 dias</button></span></div>` +
+      (q.length ? `<div class="ss-pilha">${q.map(p => `<i style="flex:${p.pct};background:${corDe(p.slug)}" title="${esc(nomeDe(p))} ${p.pct}%"></i>`).join('')}</div>` +
+        `<div class="ss-leg">${q.map(p => `<span><i style="background:${corDe(p.slug)}"></i>${esc(nomeDe(p))} <em>${p.pct}%</em></span>`).join('')}</div>`
+        : '<p class="ss-fraco" style="margin:0">Ninguém usou nessa janela.</p>') +
+      '<p class="ss-fraco" style="margin:0">A barra é a da Anthropic. A divisão por agente é uma estimativa pelos tokens de cada um.</p></div>';
+  }
+  function plano() {
+    if (!lim || !lim.config) return '';
+    const c = lim.config, e = lim.economia || {};
+    const sw = (id, on, rot) => `<button type="button" class="ss-sw${on ? ' on' : ''}" role="switch" aria-checked="${on}" data-sw="${id}" aria-label="${rot}" title="${rot}"></button>`;
+    return `<div class="ss-sec">${I.folha}Planejar o uso</div><div class="ss-grupo ss-pad">` +
+      `<div class="ss-op"><span class="ss-ic">${I.sino}</span><span class="ss-optx"><b>Avisar no celular</b><small>quando a sessão passar de ${lim.avisos.sessao}% ou a semana passar de ${lim.avisos.semana}%</small></span>${sw('avisar', c.avisar, 'Avisar no celular')}</div>` +
+      '<div class="ss-div"></div>' +
+      `<div class="ss-op"><span class="ss-ic">${I.folha}</span><span class="ss-optx"><b>Modo economia automático</b><small>os agentes passam para o Sonnet e o Admin pergunta antes de trabalho grande, até a semana renovar</small>` +
+      `<span class="ss-niveis">${(lim.niveis || []).map((n, i) => `<button type="button" class="ss-chip${c.economia.nivel === n ? ' on' : ''}" data-nivel="${n}">${i === 0 ? 'liga em ' : ''}${n}%</button>`).join('')}</span>` +
+      (e.ativa ? `<span class="ss-eco on">ligado desde ${hm(e.desde)} · semana em ${lim.semana ? lim.semana.pct : '?'}%</span>` : c.economia.ligado && lim.semana ? `<span class="ss-eco">desligado · semana em ${lim.semana.pct}%</span>` : '') +
+      `</span>${sw('economia', c.economia.ligado, 'Modo economia automático')}</div></div>`;
+  }
+  async function salva(corpo) {
+    try {
+      const r = await fetch('/api/v1/limites/config', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
+      const d = await r.json().catch(() => null);
+      if (!r.ok || !d || !d.ok) throw new Error((d && d.erro) || 'o servidor respondeu ' + r.status);
+      lim.config = d.config; pinta();
+      setTimeout(() => carrega(false), 4000);   // o servidor liga ou desliga o modo economia em seguida
+    } catch (e) { alert('Não consegui guardar: ' + e.message); }
+  }
 
   const gb = b => (b / 1073741824).toFixed(b >= 1e11 ? 0 : 1).replace('.', ',') + ' GB';
   function bytes(b) {
@@ -78,7 +135,7 @@
       `<div class="ss-grupo"><div class="ss-tok"><span class="h">Agente</span><span class="h">Entrada</span><span class="h">Saída</span>` +
       linhas.map(a => `<span class="ss-n">${foto(a.slug)}${esc((agentesInfo[a.slug] || {}).nome || a.nome)}</span><b>${num(a[periodo].entrada)}</b><b>${num(a[periodo].saida)}</b>`).join('') + '</div></div>' +
       (totE ? `<p class="ss-fraco">${Math.round((totC / totE) * 100)}% da entrada veio do cache, que custa bem menos. Na assinatura, o que conta é o limite de uso da conta, e não o valor.</p>` : '');
-    raiz.innerHTML = resumo + `<div class="ss-colunas"><div>${servidor}</div><div>${agentes}${consumo}</div></div>`;
+    raiz.innerHTML = resumo + `<div class="ss-colunas"><div>${servidor}${agentes}</div><div>${limites()}${plano()}${consumo}</div></div>`;
   }
 
   // as conferências: o que pede atenção aparece sempre; as que estão ok ficam atrás do "ver todas", para a tela não virar uma lista comprida
@@ -96,10 +153,12 @@
     const bt = document.getElementById('ssAtualiza');
     if (bt) bt.classList.add('girando');
     try {
-      const [r, ag] = await Promise.all([
+      const [r, ag, l] = await Promise.all([
         fetch('/api/v1/saude-servidor' + (forca ? '?forca=1' : ''), { credentials: 'same-origin', cache: 'no-store' }),
         fetch('/api/v1/agents', { credentials: 'same-origin', cache: 'no-store' }).then(x => x.json()).catch(() => null),
+        fetch('/api/v1/limites' + (forca ? '?forca=1' : ''), { credentials: 'same-origin', cache: 'no-store' }).then(x => x.json()).catch(() => null),
       ]);
+      lim = l && l.config ? l : null;
       if (r.status === 401) { location.href = '/login?next=/saude'; return; }
       const d = await r.json().catch(() => null);
       if (!r.ok || !d || d.ok === false) throw new Error((d && d.erro) || 'o servidor respondeu ' + r.status);
@@ -113,6 +172,12 @@
   raiz.addEventListener('click', ev => {
     if (ev.target.closest('#ssAtualiza')) { carrega(true); return; }
     if (ev.target.closest('#ssVerTudo')) { verTudo = !verTudo; pinta(); return; }
+    const j = ev.target.closest('[data-janela]');
+    if (j && lim) { janela = j.dataset.janela; pinta(); return; }
+    const w = ev.target.closest('[data-sw]');
+    if (w && lim) { const on = !w.classList.contains('on'); salva(w.dataset.sw === 'avisar' ? { avisar: on } : { economia: { ligado: on } }); return; }
+    const nv = ev.target.closest('[data-nivel]');
+    if (nv && lim) { salva({ economia: { nivel: +nv.dataset.nivel, ligado: true } }); return; }
     const p = ev.target.closest('[data-periodo]');
     if (p && dados) { periodo = p.dataset.periodo; pinta(); }
   });

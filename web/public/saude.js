@@ -199,10 +199,15 @@
     const linhas = [...d.consumo].sort((x, y) => y[periodo].entrada - x[periodo].entrada);
     const totE = linhas.reduce((t, a) => t + a[periodo].entrada, 0), totC = linhas.reduce((t, a) => t + a[periodo].cache, 0);
     const consumo = `<div class="ss-sec">${I.raio}Consumo de tokens<span class="q ss-chips"><button type="button" class="ss-chip${periodo === 'dia' ? ' on' : ''}" data-periodo="dia">24 h</button><button type="button" class="ss-chip${periodo === 'semana' ? ' on' : ''}" data-periodo="semana">7 dias</button></span></div>` +
-      `<div class="ss-grupo"><div class="ss-tok"><span class="h">Agente</span><span class="h">Entrada</span><span class="h">Saída</span>` +
-      linhas.map(a => `<span class="ss-n">${foto(a.slug)}${esc((agentesInfo[a.slug] || {}).nome || a.nome)}</span><b>${num(a[periodo].entrada)}</b><b>${num(a[periodo].saida)}</b>`).join('') + '</div></div>' +
+      // uma barra por agente, do tamanho da entrada dele perto do maior (20/10/2026, pedido do dono)
+      `<div class="ss-grupo ss-pad ss-tok">${(() => {
+        const max = Math.max(1, ...linhas.map(a => a[periodo].entrada));
+        return linhas.map(a => `<div class="ss-tk"><div class="ss-tk-l1">${foto(a.slug)}<b>${esc((agentesInfo[a.slug] || {}).nome || a.nome)}</b>` +
+          `<span class="ss-tk-n"><span title="Entrada: o que ${esc((agentesInfo[a.slug] || {}).nome || a.nome)} leu">↓ ${num(a[periodo].entrada)}</span><span title="Saída: o que escreveu">↑ ${num(a[periodo].saida)}</span></span></div>` +
+          `<div class="ss-tk-barra"><i style="width:${Math.max(a[periodo].entrada ? 2 : 0, Math.round(a[periodo].entrada / max * 100))}%;background:${corDe(a.slug)}"></i></div></div>`).join('');
+      })()}</div>` +
       (totE ? `<p class="ss-fraco">${Math.round((totC / totE) * 100)}% da entrada veio do cache, que custa bem menos. Na assinatura, o que conta é o limite de uso da conta, e não o valor.</p>` : '');
-    raiz.innerHTML = resumo + `<div class="ss-colunas"><div>${servidor}${agentes}${memoria()}</div><div>${limites()}${plano()}${consumo}</div></div>`;
+    raiz.innerHTML = resumo + `<div class="ss-colunas"><div>${servidor}${agentes}${memoria()}</div><div>${limites()}${consumo}${plano()}</div></div>`;
   }
 
   // as conferências: o que pede atenção aparece sempre; as que estão ok ficam atrás do "ver todas", para a tela não virar uma lista comprida

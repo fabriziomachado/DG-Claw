@@ -1115,3 +1115,4 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 .acoes .ac-tok{width:auto;margin-left:auto;padding:0 6px;gap:4px;display:inline-flex;align-items:center;font-size:12px;color:var(--dg-texto-3);font-variant-numeric:tabular-nums;white-space:nowrap}
 .acoes .ac-tok:hover{color:var(--dg-texto-2)}
 @media(prefers-reduced-motion:reduce){.rmc-seta{transition:none}}
+#cotaCartao .ct-agora{border:0;background:none;padding:0;font:inherit;color:inherit;text-decoration:underline;text-underline-offset:2px;cursor:pointer;font-weight:600}

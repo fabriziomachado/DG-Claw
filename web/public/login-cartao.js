@@ -28,41 +28,61 @@
    * O que o cartão mostra. `d` é a resposta de GET .../login (estado, link, codigoDispositivo,
    * mensagem, provedor, conferido, precisa_login). `ctx.iniciado` diz se o login foi começado
    * por este cartão (ou visto em andamento): um "concluido" ou "falhou" que sobrou de antes não deve aparecer como novidade.
+   * `ctx.abriuLink`: a pessoa já tocou em "Abrir a página de login" (o passo vai para o código).
+   * `ctx.vencido`: o login existia e venceu (o texto do começo muda).
    *
-   * fase: inicio | ja_conectado | preparando | codigo | navegador | concluido | falhou
+   * Passo a passo (20/10/2026, pedido do dono): `etapas` são os três passos e `passo` o atual
+   * (0 abrir, 1 entrar, 2 colar o código; 3 = tudo pronto).
+   *
+   * fase: inicio | ja_conectado | preparando | abrir | codigo | navegador | concluido | falhou
    */
   function visao(d, ctx) {
     d = d || {};
     const iniciado = !!(ctx && ctx.iniciado);
+    const abriu = !!(ctx && ctx.abriuLink);
     const nome = nomeProvedor(d.provedor);
     const agente = (ctx && ctx.agente) || 'O agente';
+    const codex = nome === 'Codex';
     let estado = d.estado || 'nenhum';
     if ((estado === 'concluido' || estado === 'falhou') && !iniciado) estado = 'nenhum';
     const base = {
-      fase: 'inicio', provedor: nome, titulo: 'Conectar o seu ' + nome, texto: '', passos: [],
-      botao: null, link: null, campoCodigo: false, codigoDispositivo: null,
+      fase: 'inicio', provedor: nome, titulo: 'Conectar ' + (agente === 'O agente' ? 'o seu ' + nome : agente + ' ao seu ' + nome),
+      sub: '', texto: '', passos: [], etapas: ['Abrir', 'Entrar', codex ? 'Digitar o código' : 'Colar o código'], passo: 0,
+      botao: null, link: null, campoCodigo: false, codigoDispositivo: null, reabrir: false,
       cancelar: false, fechar: false, entrarDeNovo: false, aviso: '',
     };
     switch (estado) {
       case 'aguardando_link':
-        return Object.assign(base, { fase: 'preparando', texto: 'Preparando o link…', cancelar: true, aviso: 'Preparando o link de login' });
+        return Object.assign(base, { fase: 'preparando', sub: 'Preparando a página de login…', texto: 'Preparando o link…', cancelar: true, aviso: 'Preparando o link de login' });
       case 'aguardando_codigo':
+        if (!abriu) {
+          return Object.assign(base, {
+            fase: 'abrir', sub: 'A página de login está pronta.', link: linkSeguro(d.link), cancelar: true,
+            texto: 'Abra a página numa aba nova e entre com a mesma conta de sempre.',
+            passos: ['Abra a página de login e entre com a sua conta.', 'No fim, a página mostra um código. Cole ele aqui embaixo.'],
+            aviso: 'A página de login está pronta',
+          });
+        }
         return Object.assign(base, {
-          fase: 'codigo', link: linkSeguro(d.link), campoCodigo: true, cancelar: true,
+          fase: 'codigo', sub: 'Falta só o código.', passo: 2, link: linkSeguro(d.link), campoCodigo: true, cancelar: true, reabrir: true,
+          texto: 'No fim do login, a página mostra um código. Copie e cole aqui.',
           passos: ['Abra a página de login e entre com a sua conta.', 'No fim, a página mostra um código. Cole ele aqui embaixo.'],
           aviso: 'Falta colar o código que a página mostrou',
         });
       case 'aguardando_navegador':
         return Object.assign(base, {
-          fase: 'navegador', link: linkSeguro(d.link), codigoDispositivo: d.codigoDispositivo || null, cancelar: true,
+          fase: 'navegador', sub: abriu ? 'Falta digitar o código na página.' : 'A página de login está pronta.', passo: abriu ? 2 : 0,
+          link: linkSeguro(d.link), codigoDispositivo: d.codigoDispositivo || null, cancelar: true, reabrir: abriu,
+          texto: abriu ? 'Quando a página pedir, digite este código. Aqui conecta sozinho.' : 'Abra a página numa aba nova e entre com a sua conta.',
           passos: ['Abra a página de login e entre com a sua conta.', 'Quando a página pedir, digite o código abaixo.'],
           aviso: 'Esperando você terminar o login na página',
         });
       case 'concluido':
-        return Object.assign(base, { fase: 'concluido', titulo: 'Conectado!', texto: 'Tudo certo. ' + agente + ' já pode responder.', aviso: 'Conectado' });
+        return Object.assign(base, { fase: 'concluido', titulo: 'Conectado.', passo: 3, sub: agente + ' já pode responder.', texto: 'Tudo certo. ' + agente + ' já pode responder.', aviso: 'Conectado' });
       case 'falhou':
         return Object.assign(base, {
           fase: 'falhou', titulo: 'O login não deu certo',
+          sub: 'Pode tentar de novo, leva um minuto.',
           texto: d.mensagem ? String(d.mensagem) : 'O login terminou sem conectar a conta.',
           botao: 'Tentar de novo', fechar: true, aviso: 'O login falhou',
         });
@@ -70,12 +90,14 @@
         const jaOk = !!(d.conferido && d.conferido.ok === true) && !d.precisa_login;
         if (jaOk) {
           return Object.assign(base, {
-            fase: 'ja_conectado', titulo: 'Esta conta já está conectada',
+            fase: 'ja_conectado', titulo: 'Esta conta já está conectada', passo: 3,
+            sub: agente + ' já usa a sua conta do ' + nome + '.',
             texto: agente + ' já usa a sua conta do ' + nome + '. Só entre de novo se quiser trocar de conta.',
             fechar: true, entrarDeNovo: true,
           });
         }
         return Object.assign(base, {
+          sub: ctx && ctx.vencido ? 'O login venceu. Leva um minuto, sem terminal.' : 'Precisa da sua conta para responder. Leva um minuto, sem terminal.',
           texto: agente + ' precisa da sua conta do ' + nome + ' para responder. Conecte aqui, sem terminal.',
           botao: 'Conectar', fechar: true,
         });

@@ -672,13 +672,13 @@ if (atividadeEl) {
    O código colado e o link nunca vão para console nem para log. */
 const LC = window.DGLoginCartao;
 const lcEl = $('loginCartao');
-const lc = { aberto: false, manual: false, iniciado: false, demo: false, dispensado: false,
+const lc = { aberto: false, manual: false, iniciado: false, demo: false, dispensado: false, abriuLink: false, vencido: false,
              carregando: false, ocupado: false, dados: null, erro: '', codigo: '', copiado: false,
              timer: null, conferindo: false, chave: '', fechaTimer: null };
 const LOGIN_API = API + '/login';
 
 function lcVisao() {
-  return LC.visao(lc.dados, { iniciado: lc.iniciado, agente: AGENTE.nome });
+  return LC.visao(lc.dados, { iniciado: lc.iniciado, agente: AGENTE.nome, abriuLink: lc.abriuLink, vencido: lc.vencido });
 }
 function lcBotao(texto, classe, aoClicar) {
   const b = document.createElement('button');
@@ -711,52 +711,90 @@ function lcDesenha() {
   const selIni = codigoFocado ? antes.selectionStart : 0, selFim = codigoFocado ? antes.selectionEnd : 0;
   const abrindo = lcEl.hidden;
 
+  /* Passo a passo (20/10/2026, pedido do dono): ícone, título e uma linha; os três passos com o atual
+     marcado; o texto do passo e uma ação só. Ações secundárias são o × e links discretos. */
+  const svg = d => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const ICO_LC = { chave: '<circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/>', x: '<path d="M6 6l12 12M18 6 6 18"/>',
+    ok: '<path d="m5 12 4.5 4.5L19 7"/>', ext: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>', seta: '<path d="M12 19V5M6 11l6-6 6 6"/>' };
+  const pronto = v.fase === 'concluido';
   const topo = lcEl_('div', 'lc-topo');
+  const ic = lcEl_('span', 'lc-ic' + (pronto ? ' ok' : ''));
+  ic.innerHTML = svg(pronto ? ICO_LC.ok : ICO_LC.chave);
+  const tt = lcEl_('span', 'lc-tt');
   const tit = lcEl_('b', 'lc-titulo', v.titulo);
   tit.id = 'lcTitulo';
-  topo.append(tit);
+  tt.append(tit);
+  if (v.sub) tt.append(lcEl_('small', 'lc-sub', v.sub));
+  topo.append(ic, tt);
+  if (v.fechar || v.cancelar) {
+    const x = lcEl_('button', 'lc-x');
+    x.type = 'button'; x.innerHTML = svg(ICO_LC.x);
+    x.title = v.cancelar ? 'Cancelar o login' : 'Fechar'; x.setAttribute('aria-label', x.title);
+    x.disabled = lc.ocupado;
+    x.addEventListener('click', v.cancelar ? lcCancela : () => lcFecha(true));
+    topo.append(x);
+  }
   lcEl.setAttribute('aria-label', v.titulo);
   const corpo = [topo];
-  if (v.texto) corpo.push(lcEl_('p', 'lc-texto', v.texto));
-  if (v.passos && v.passos.length) {
-    const ol = lcEl_('ol', 'lc-passos');
-    for (const p of v.passos) ol.append(lcEl_('li', '', p));
-    corpo.push(ol);
+  if (v.fase !== 'ja_conectado' && v.fase !== 'falhou' && v.etapas) {
+    const pass = lcEl_('ol', 'lc-etapas');
+    v.etapas.forEach((t, i) => {
+      const li = lcEl_('li', i < v.passo ? 'ok' : i === v.passo ? 'on' : '');
+      const bola = lcEl_('i', '');
+      if (i < v.passo) bola.innerHTML = svg(ICO_LC.ok); else bola.textContent = String(i + 1);
+      li.append(bola, document.createTextNode(t));
+      if (i === v.passo) li.setAttribute('aria-current', 'step');
+      pass.append(li);
+    });
+    corpo.push(pass);
   }
-  if (v.link) {
-    const a = lcEl_('a', 'lc-btn lc-link', 'Abrir a página de login');
+  // no começo a linha de baixo do título já diz tudo; o texto entra a partir do passo do link
+  if (v.texto && !pronto && !['ja_conectado', 'inicio', 'falhou'].includes(v.fase)) corpo.push(lcEl_('p', 'lc-texto', v.texto));
+  if (v.link && !v.reabrir) {
+    const a = lcEl_('a', 'lc-btn lc-link');
+    a.innerHTML = svg(ICO_LC.ext) + '<span>Abrir a página de login</span>';
     a.href = v.link; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    // a página abriu: o passo vai para o código (a conferência de 2 em 2 s continua)
+    a.addEventListener('click', () => { lc.abriuLink = true; setTimeout(lcDesenha, 300); });
     corpo.push(a);
   }
-  if (v.codigoDispositivo) {
+  if (v.codigoDispositivo && (v.reabrir || !v.link)) {
     const linha = lcEl_('div', 'lc-disp');
     linha.append(lcEl_('code', 'lc-disp-cod', v.codigoDispositivo));
     linha.append(lcBotao(lc.copiado ? 'Copiado' : 'Copiar', 'lc-leve', () => lcCopia(v.codigoDispositivo)));
     corpo.push(linha);
   }
   if (v.campoCodigo) {
-    const rot = lcEl_('label', 'lc-rotulo', 'Cole aqui o código que aparece no fim');
-    rot.htmlFor = 'lcCodigo';
     const campo = document.createElement('input');
     campo.type = 'text'; campo.id = 'lcCodigo'; campo.className = 'lc-campo';
     campo.autocomplete = 'off'; campo.spellcheck = false; campo.value = lc.codigo;
+    campo.placeholder = 'Cole o código aqui';
+    campo.setAttribute('aria-label', 'Cole aqui o código que aparece no fim');
     campo.setAttribute('autocapitalize', 'off');
     campo.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); lcEnviaCodigo(); } });
     campo.addEventListener('focus', () => lcTrazCampo(campo));
+    const vai = lcBotao('', 'lc-go', lcEnviaCodigo);
+    vai.innerHTML = svg(ICO_LC.seta); vai.title = 'Enviar código'; vai.setAttribute('aria-label', 'Enviar código');
     const linha = lcEl_('div', 'lc-linha');
-    linha.append(campo, lcBotao('Enviar código', 'lc-principal', lcEnviaCodigo));
-    corpo.push(rot, linha);
+    linha.append(campo, vai);
+    corpo.push(linha);
+  }
+  if (v.reabrir && v.link) {
+    const p = lcEl_('p', 'lc-dica');
+    const a = lcEl_('a', '', 'Abrir a página de novo');
+    a.href = v.link; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    p.append(document.createTextNode('Não abriu? '), a);
+    corpo.push(p);
   }
   if (lc.erro) {
     const e = lcEl_('p', 'lc-erro', lc.erro);
     e.setAttribute('role', 'alert');
     corpo.push(e);
   }
+  if (v.fase === 'falhou' || v.fase === 'ja_conectado') corpo.push(lcEl_('p', 'lc-texto', v.texto));
   const pe = lcEl_('div', 'lc-pe');
   if (v.botao) pe.append(lcBotao(lc.ocupado && v.fase === 'inicio' ? 'Conectando…' : v.botao, 'lc-principal', lcComeca));
   if (v.entrarDeNovo) pe.append(lcBotao('Entrar de novo', 'lc-leve', lcComeca));
-  if (v.cancelar) pe.append(lcBotao('Cancelar', 'lc-leve', lcCancela));
-  if (v.fechar) pe.append(lcBotao('Fechar', 'lc-leve', () => lcFecha(true)));
   if (pe.childElementCount) corpo.push(pe);
   const vivo = lcEl_('p', 'lc-vivo', v.aviso || '');
   vivo.setAttribute('aria-live', 'polite');
@@ -812,7 +850,7 @@ function lcFecha(dispensar) {
   clearTimeout(lc.fechaTimer);
   if (dispensar) lc.dispensado = true;
   Object.assign(lc, { aberto: false, manual: false, iniciado: false, demo: false, carregando: false,
-                      ocupado: false, erro: '', codigo: '', copiado: false });
+                      ocupado: false, erro: '', codigo: '', copiado: false, abriuLink: false });
   const era = !lcEl.hidden;
   lcDesenha();
   if (era) estadoOcioso();
@@ -855,7 +893,7 @@ function lcConcluiu() {
   // O oi é pedido já: o servidor espera o agente subir (até 60 s) e entrega uma vez só.
   api(LOGIN_API + '/oi', { method: 'POST', body: {}, timeoutMs: 75000 })
     .catch(e => mostraAviso('A conta foi conectada, mas não consegui pedir o oi do agente: ' + e.message + '. Escreva um oi na conversa.'));
-  lc.fechaTimer = setTimeout(() => { lc.fechaTimer = null; lcFecha(false); }, 1500);
+  lc.fechaTimer = setTimeout(() => { lc.fechaTimer = null; lcFecha(false); }, 4000);
 }
 
 async function lcComeca() {
@@ -863,7 +901,7 @@ async function lcComeca() {
   lc.ocupado = true; lc.erro = ''; lcDesenha();
   try {
     const d = await api(LOGIN_API, { method: 'POST', body: {}, timeoutMs: 20000 });
-    lc.dados = d; lc.iniciado = true; lc.carregando = false;
+    lc.dados = d; lc.iniciado = true; lc.carregando = false; lc.abriuLink = false;
     lcAgenda();
   } catch (e) {
     lc.erro = 'Não consegui começar o login: ' + e.message;
@@ -925,7 +963,7 @@ function lcSincroniza() {
   const est = window.atividadeFoto && window.atividadeFoto.agentes ? window.atividadeFoto.agentes[AGENTE.id] : null;
   const semLogin = !!est && est.alerta === 'sem_login';
   if (!semLogin) lc.dispensado = false;
-  if (semLogin && !lc.aberto && !lc.dispensado) lcAbre(false);
+  if (semLogin && !lc.aberto && !lc.dispensado) { lc.vencido = /venceu/.test(est.motivo || ''); lcAbre(false); }
   else if (!semLogin && lc.aberto && !lc.manual && !lc.iniciado) lcFecha(false);
 }
 

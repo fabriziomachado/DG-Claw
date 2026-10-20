@@ -243,11 +243,12 @@ function criarConversa({ config, runner, leitor, leitorRollout, midia, log, agor
     return { msgs, versao, avisos, arquivo };
   }
 
-  /** true quando a última fala do registro é um erro da API (isApiErrorMessage), sem pedido novo depois. */
+  /** 'login' (login vencido), 'erro' (outro erro da API, como limite) ou null: a última fala do registro, sem
+   *  pedido novo depois, é um erro da API (isApiErrorMessage)? */
   async function turnoAcabouComErro(agente) {
     try {
       const t = await thread(agente);
-      if (!t.arquivo || ehRollout(t.arquivo)) return false;
+      if (!t.arquivo || ehRollout(t.arquivo)) return null;
       const fd = fs.openSync(t.arquivo, 'r');
       let txt = '';
       try {
@@ -260,10 +261,11 @@ function criarConversa({ config, runner, leitor, leitorRollout, midia, log, agor
         if (!linhas[i].includes('"type":"user"') && !linhas[i].includes('"type":"assistant"')) continue;
         let o; try { o = JSON.parse(linhas[i]); } catch (_) { continue; }
         if (o.type !== 'user' && o.type !== 'assistant') continue;
-        return o.type === 'assistant' && o.isApiErrorMessage === true;
+        if (o.type !== 'assistant' || o.isApiErrorMessage !== true) return null;
+        return o.error === 'authentication_failed' ? 'login' : 'erro';
       }
     } catch (_) { /* sem registro legível: vale o que o runner diz */ }
-    return false;
+    return null;
   }
 
   /** O comando/arquivo que o agente quer rodar e ainda não rodou (sem tool_result), ou null. */
@@ -291,7 +293,12 @@ function criarConversa({ config, runner, leitor, leitorRollout, midia, log, agor
     } else {
       const e = r.estado;
       const ultimo = typeof e.updatedAt === 'number' ? iso(e.updatedAt) : null;
-      if (e.status === 'working' && await turnoAcabouComErro(agente)) {
+      const erroFinal = e.status === 'working' ? await turnoAcabouComErro(agente) : null;
+      if (erroFinal === 'login') {
+        // O login venceu no meio da sessão ("Login expired · Please run /login"): o runner continua em
+        // "working", mas o agente não responde mais. A conversa abre sozinha o cartão de conectar (20/10/2026).
+        est = { estado: 'sem_sinal', acao: null, detalhe: null, ultimo_sinal: ultimo, alerta: 'sem_login', motivo: `O login de ${agente.nome} no Claude venceu.` };
+      } else if (erroFinal) {
         // O turno terminou num erro da API (limite de uso, 429): o Claude não chama o gancho de fim e o runner
         // fica em "working" para sempre. A tela mostrava "trabalhando" e o parar não tinha o que parar (20/10/2026).
         est = { estado: 'ocioso', acao: null, detalhe: null, ultimo_sinal: ultimo, alerta: null, motivo: null };

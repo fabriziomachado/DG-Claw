@@ -65,16 +65,18 @@ function montaFileira(lista, atualId) {
   nav.id = 'fileira';
   nav.setAttribute('aria-label', 'Trocar de agente');
   const admin = lista.find(a => a.tipo === 'admin');
-  nav.innerHTML = (admin ? `<a class="fil novo" href="/a/${encodeURIComponent(admin.id)}#criar" aria-label="Criar um agente novo">` +
-      `<span class="fil-foto"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>` +
-      `<span class="fil-nome">Novo</span></a>` : '') +
+  // "Novo" fica no fim da fileira, depois dos agentes (19/10/2026, pedido do dono)
+  nav.innerHTML =
     lista.map(a => {
       const atual = a.id === atualId;
       return `<a class="fil${atual ? ' atual' : ''}" href="/a/${encodeURIComponent(a.id)}" data-avt="${escF(a.id)}" style="--arco:${escF(a.cor || '#2f9e5e')}"` +
         `${atual ? ' aria-current="page"' : ''} aria-label="${escF((atual ? 'Conversa aberta: ' : 'Conversar com ') + a.nome)}">` +
         `<span class="fil-foto" style="background:${escF(a.cor || '#2f9e5e')}">${fotoFileira(a)}</span>` +
         `<span class="fil-nome">${escF(a.nome)}</span></a>`;
-    }).join('');
+    }).join('') +
+    (admin ? `<a class="fil novo" href="/a/${encodeURIComponent(admin.id)}#criar" aria-label="Criar um agente novo">` +
+      `<span class="fil-foto"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>` +
+      `<span class="fil-nome">Novo</span></a>` : '');
   return nav;
 }
 /** Põe a fileira no cabeçalho, no lugar do avatar e do nome soltos (troca a que já estiver lá). */
@@ -420,8 +422,11 @@ function setEstado(txt, ehErro) {
    cabeçalho segue contando o que o app faz (gravando, enviando, erro). A foto
    fica em window.atividadeFoto. */
 const atividadeEl = $('atividade');
+new MutationObserver(() => { if (typeof pintaParar === 'function') pintaParar(); }).observe(atividadeEl, { attributes: true, attributeFilter: ['hidden', 'class'] });
 // dica e folha de "sessão em paralelo" enquanto o agente trabalha (sessao-paralela.js)
 if (window.DGSessaoParalela) window.DGSessaoParalela.inicia({ agente: AGENTE, atividade: atividadeEl, entrada });
+// aviso de cota acabada, com a hora da volta, e a fila das mensagens para a volta (cota.js)
+if (window.DGCota) window.DGCota.inicia({ agente: AGENTE, enviar: t => enviarTexto(t) });
 const atvNomeEl = atividadeEl && atividadeEl.querySelector('.atv-nome');
 const atvSepEl = atividadeEl && atividadeEl.querySelector('.atv-sep');
 const atvAcaoEl = atividadeEl && atividadeEl.querySelector('.atv-acao');
@@ -3264,6 +3269,30 @@ function pintaEnviar() {
   const vazio = !entrada.value.trim() && !(typeof anexos !== 'undefined' && anexos.length) &&
                 !(typeof gravando !== 'undefined' && gravando);
   btnEnviar.classList.toggle('apagado', vazio);
+  pintaParar();
+}
+/* Parar o trabalho (19/10/2026, pedido do dono, como no ChatGPT): enquanto o agente trabalha e o
+   campo está vazio, a setinha vira um quadrado. Um toque manda Esc ao terminal dele
+   (POST /interromper): para o turno de agora, sem apagar a conversa nem o que já foi feito. */
+const ICO_ENVIAR = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg>';
+const ICO_PARAR = '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="6" y="6" width="12" height="12" rx="2.5" fill="currentColor"/></svg>';
+function pintaParar() {
+  if (typeof btnEnviar === 'undefined' || !btnEnviar || typeof atividadeEl === 'undefined' || !atividadeEl) return;
+  const trabalhando = !atividadeEl.hidden && atividadeEl.classList.contains('trab');
+  const parar = trabalhando && btnEnviar.classList.contains('apagado') && !(typeof gravando !== 'undefined' && gravando);
+  if (btnEnviar.classList.contains('parar') === parar) return;
+  btnEnviar.classList.toggle('parar', parar);
+  btnEnviar.innerHTML = parar ? ICO_PARAR : ICO_ENVIAR;
+  btnEnviar.setAttribute('aria-label', parar ? 'Parar o que ' + AGENTE.nome + ' está fazendo' : 'Enviar');
+  btnEnviar.title = parar ? 'Parar o que ' + AGENTE.nome + ' está fazendo' : '';
+}
+async function interrompe() {
+  btnEnviar.disabled = true;
+  try {
+    await api(API + '/interromper', { method: 'POST', body: {} });
+    mostraAviso('Parei o que ' + AGENTE.nome + ' estava fazendo. A conversa e o que ele já fez continuam.');
+  } catch (e) { mostraErro('Não consegui parar: ' + e.message); }
+  finally { btnEnviar.disabled = false; }
 }
 function ajustaCampo() {
   const antes = entrada.offsetHeight;
@@ -4609,7 +4638,10 @@ function enviarDoCampo() {
   menLista.hidden = true;
   if (!EH_ADMIN && alvosEquipe(t)) { fimResposta(); enviaEquipe(t); return; }
   if (!EH_ADMIN && /^@\S+\s/.test(t) && mencionaveis().some(a => t.toLowerCase().startsWith('@' + a.nome.toLowerCase() + ' '))) { fimResposta(); enviaMencao(t); return; }
-  enviarTexto(comResposta(comTarefa(t)));
+  const final = comResposta(comTarefa(t));
+  // cota acabada: fica guardada e vai sozinha na volta (cota.js)
+  if (window.DGCota && window.DGCota.guarda(final)) return;
+  enviarTexto(final);
 }
 // pergunta sugerida embaixo de um painel (dgui.js): vai ao agente como se a pessoa tivesse digitado
 document.addEventListener('dgui-pergunta', ev => {
@@ -4625,13 +4657,17 @@ const RX_CITA_LOCAL = /^↩ (?:\[([a-f0-9]{8,40})\] )?([^\n]{1,200})\n([\s\S]+)$
 const semCita = t => { const r = RX_CITA_LOCAL.exec(String(t || '')); return r ? r[3] : t; };
 btnEnviar.onclick = () => {
   destravarAudio();
+  // com texto no campo é sempre enviar, mesmo que o botão ainda mostre o quadrado
+  if (btnEnviar.classList.contains('parar') && !entrada.value.trim() && !anexos.length) { interrompe(); return; }
   if (gravando) { paraEEnvia(true); return; }
   enviarDoCampo();
 };
-// Enter manda (é a tecla "enviar" do teclado do iPhone); Shift+Enter, no
-// computador, quebra a linha. Durante a composição de acento não manda.
+// Computador: Enter manda e Shift+Enter quebra a linha. Celular e tablet (toque): Enter quebra a
+// linha e quem manda é a setinha, como no WhatsApp (19/10/2026, pedido do dono). Durante a
+// composição de acento não manda.
+entrada.enterKeyHint = ehToque ? 'enter' : 'send';
 entrada.addEventListener('keydown', ev => {
-  if (ev.key !== 'Enter' || ev.shiftKey || ev.isComposing) return;
+  if (ev.key !== 'Enter' || ev.shiftKey || ev.isComposing || ehToque) return;
   ev.preventDefault(); destravarAudio(); enviarDoCampo();
 });
 

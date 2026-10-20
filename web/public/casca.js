@@ -132,16 +132,18 @@
     const nav = document.createElement('nav');
     nav.id = 'fileira';
     nav.setAttribute('aria-label', 'Trocar de agente');
-    nav.innerHTML = (admin ? `<a class="fil novo" href="/a/${encodeURIComponent(admin.id)}#criar" aria-label="Criar um agente novo">` +
-        '<span class="fil-foto"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>' +
-        '<span class="fil-nome">Novo</span></a>' : '') +
+    // "Novo" fica no fim da fileira, depois dos agentes (19/10/2026, pedido do dono)
+    nav.innerHTML =
       ordem.map(a => {
         const eh = a.id === atual.id;
         return `<a class="fil${eh ? ' atual' : ''}" href="/a/${encodeURIComponent(a.id)}" data-avt="${esc(a.id)}" style="--arco:${esc(a.cor || '#2f9e5e')}"` +
           ` aria-label="${esc('Conversar com ' + a.nome)}">` +
           `<span class="fil-foto" style="background:${esc(a.cor || '#2f9e5e')}">${fotoFileira(a)}</span>` +
           `<span class="fil-nome">${esc(a.nome)}</span></a>`;
-      }).join('');
+      }).join('') +
+      (admin ? `<a class="fil novo" href="/a/${encodeURIComponent(admin.id)}#criar" aria-label="Criar um agente novo">` +
+        '<span class="fil-foto"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>' +
+        '<span class="fil-nome">Novo</span></a>' : '');
     return nav;
   }
   function pregaFileira(lista, atual) {

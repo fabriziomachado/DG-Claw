@@ -1074,3 +1074,19 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 /* celular: os atalhos do topo (Painel, Sessões, Tutorial) já estão no menu; a fileira de agentes fica
    com a largura toda (19/10/2026, pedido do dono). Ler e Contínua (voz) continuam. */
 @media(max-width:700px){header #btnPainel,header #btnSessoes,header #btnTutorial{display:none!important}}
+/* setinha vira "parar" enquanto o agente trabalha (19/10/2026) */
+#btnEnviar.parar,#btnEnviar.parar.apagado{background:var(--dg-texto);color:var(--dg-fundo)}
+#btnEnviar.parar:hover{opacity:.85}
+/* cota da assinatura acabada (cota.js, 19/10/2026): aviso com a hora da volta e a fila para a volta */
+#cotaCartao{margin:0 auto 8px;padding:10px 14px;border:1px solid var(--dg-pedido-borda);border-radius:16px;background:var(--dg-pedido-fundo);
+  color:var(--dg-pedido-texto);font-size:13.5px;display:flex;flex-direction:column;gap:6px;box-sizing:border-box}
+#cotaCartao[hidden]{display:none}
+#cotaCartao .ct-l1{display:flex;gap:8px;align-items:flex-start}
+#cotaCartao .ct-l1 svg{flex:0 0 16px;margin-top:2px}
+#cotaCartao b{font-weight:600}
+#cotaCartao .ct-sub{font-size:12.5px;opacity:.85}
+#cotaCartao .ct-fila{display:flex;flex-wrap:wrap;gap:6px}
+#cotaCartao .ct-item{display:inline-flex;align-items:center;gap:4px;max-width:100%;padding:3px 4px 3px 10px;border-radius:999px;background:var(--dg-superficie);
+  color:var(--dg-texto);border:1px solid var(--dg-borda);font-size:12.5px}
+#cotaCartao .ct-item span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#cotaCartao .ct-item button{width:22px;height:22px;border:0;border-radius:50%;background:transparent;color:var(--dg-texto-3);cursor:pointer;font-size:15px;line-height:1}

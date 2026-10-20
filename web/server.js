@@ -511,6 +511,16 @@ function criarServidor(opcoes) {
       if (acao === 'stream' && m === 'GET') return stream(req, res, url, agente);
       if (acao === 'wait' && m === 'GET') return esperar(req, res, url, agente);
       if (acao === 'send' && m === 'POST') return enviar(req, res, agente);
+      // Cancelar o que o agente está fazendo (19/10/2026, pedido do dono): manda a tecla Esc crua ao
+      // terminal dele, o mesmo que apertar Esc no Claude Code. Para o turno de agora; a conversa e o que
+      // ele já fez continuam. Só o dono, pela sessão do login (um agente não cancela o outro pela caixa).
+      if (acao === 'interromper' && m === 'POST') {
+        if (sessao && sessao.via === 'caixa') return H.erroJson(res, 403, 'Só o dono interrompe um agente, pelo painel.');
+        const r = await runner.input(agente, { text: '\u001b', submit: false });
+        if (!r || r.ok === false) return H.erroJson(res, 502, `Não consegui interromper ${agente.nome}: ${(r && r.erro) || 'o runner não respondeu'}.`);
+        log('info', `${agente.slug}: o dono interrompeu o trabalho em andamento (Esc).`);
+        return H.enviaJson(res, 200, { ok: true });
+      }
       // 👍 / 👎 numa resposta (lib/feedback.js); GET devolve os votos desta conversa
       if (acao === 'feedback') {
         if (sessao.via === 'caixa') return H.erroJson(res, 403, 'O 👍 👎 é do dono, no navegador.');
@@ -547,7 +557,7 @@ function criarServidor(opcoes) {
       if (acao === 'upload' && m === 'POST') return upload(req, res, agente);
       if (acao === 'comandos' && m === 'GET') return H.enviaJson(res, 200, Object.assign({ ok: true, agente: agente.slug }, await comandos.catalogo(agente)));
       if (acao === 'comando' && m === 'POST') return comandoPost(req, res, agente);
-      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'mencao', 'aviso', 'pedido', 'upload', 'permissao', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
+      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'interromper', 'mencao', 'aviso', 'pedido', 'upload', 'permissao', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
     }
 
     mm = /^\/api\/v1\/media\/([0-9a-f]{16})\/visual$/.exec(p);

@@ -469,7 +469,8 @@ gerar_runner_json() {
                              DGCLAW_RUNNER_URL: "http://127.0.0.1:4300",
                              RUNNER_TOKEN_FILE: "/run/dgclaw/segredos/runner.token"},
                   promptHooks: ["node /opt/dgclaw/app/scripts/foco-hook.mjs",
-                                "node /opt/dgclaw/app/scripts/novidades-hook.mjs"],
+                                "node /opt/dgclaw/app/scripts/novidades-hook.mjs",
+                                "bash /opt/dgclaw/app/hooks/memory-recall.sh"],
                   tags: ["dgclaw", $slug], cofre: []}}'
 }
 
@@ -1238,6 +1239,8 @@ agente_reparar() {
     garantir_gancho_foco "$DG_CASAS/$slug/runner/runner.json" "$slug"
     passo "Garantindo o gancho do aviso de novidades no runner.json"
     garantir_gancho_novidades "$DG_CASAS/$slug/runner/runner.json" "$slug"
+    passo "Garantindo o gancho do lembrete da memoria no runner.json"
+    garantir_gancho_memoria "$DG_CASAS/$slug/runner/runner.json" "$slug"
     passo "Regravando o config.sh do agente $slug"
     regravar_config_sh "$slug" "$obj"
     passo "Regravando a identidade do agente $slug"

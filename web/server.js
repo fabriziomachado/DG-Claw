@@ -23,6 +23,7 @@ const { criarProxy } = require('./lib/proxy');
 const { criarCofreAgente } = require('./lib/cofre-agente');
 const { criarCotaVigia } = require('./lib/cota-vigia');
 const { criarLimites } = require('./lib/limites');
+const { criarMemoriaSemantica } = require('./lib/memoria-semantica');
 const { criarCofreRotas } = require('./lib/cofre-rotas');
 const { criarPaineisVivos } = require('./lib/paineis-vivos');
 const { criarMencoes } = require('./lib/mencoes');
@@ -121,6 +122,7 @@ function criarServidor(opcoes) {
   const caixaEntrada = criarCaixaEntrada({ registro, alertas, corteDe: (slug) => arquivoConversa.ultimoCorte(slug), log });
   const saudeServidor = criarSaudeServidor({ registro, conversa, log });
   const cotaVigia = opcoes.cotaVigia || criarCotaVigia({ log });
+  const memoriaSemantica = criarMemoriaSemantica({ registro, log, agora: opcoes.agora });
   const limites = criarLimites({ registro, conversa, push, log, dataDir: config.dataDir, tz: config.tz, agora: opcoes.agora, buscarUso: opcoes.buscarUso });
   // A conversa como a tela vê: depois do último /clear (o antes fica em Histórico > Arquivadas).
   const mencoes = criarMencoes({ config, registro, conversa, log });
@@ -332,6 +334,7 @@ function criarServidor(opcoes) {
     if (p === '/api/v1/caixa' && await caixaEntrada.rotas(req, res, url, sessao)) return undefined;
     if (p === '/api/v1/saude-servidor' && await saudeServidor.rotas(req, res, url, sessao)) return undefined;
     if (p.startsWith('/api/v1/limites') && await limites.rotas(req, res, url, sessao)) return undefined;
+    if (p.startsWith('/api/v1/memoria') && await memoriaSemantica.rotas(req, res, url, sessao)) return undefined;
 
     if (p === '/api/v1/onboarding') {
       if (falhaDoRegistro(req, res, true)) return;

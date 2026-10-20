@@ -80,6 +80,12 @@ if [ "$N" -ge "$COMPACT_AT" ] && [ $(( N % 10 )) -eq 0 ]; then
     COMPACT_NOTE="A conversa ja esta longa ($N mensagens). Logo o sistema vai resumir o contexto automaticamente, e voce NAO vai perder o fio (ele e re-injetado). Pode avisar o dono, em tom leve, que voce esta organizando a memoria pra manter a conversa fluida."
 fi
 
+# --- chave do lembrete (S2 Bot, Saude do servidor > Memoria semantica, 20/10/2026) ---
+# O Web grava <config>/memoria-lembrete-desligado quando o dono desliga; a pasta e so leitura aqui.
+LEMBRETE=on
+[ -f "${DGCLAW_CONFIG_DIR:-/run/dgclaw/config}/memoria-lembrete-desligado" ] && LEMBRETE=off
+FONTE=""
+
 # --- recall: busca em conversas (padrao) ou palavra-chave nos arquivos (enquanto nao ha indice) ---
 extrai_recall='import json,sys
 raw=sys.stdin.read()
@@ -91,7 +97,10 @@ print(r.get("recall") or "")'
 
 T0=$(date +%s%3N)
 RC=""
-if [ -f "$FTS" ] && [ -f "$FTS_DB" ]; then
+RECALL_TEXT=""
+if [ "$LEMBRETE" = off ]; then
+    RC="desligado"
+elif [ -f "$FTS" ] && [ -f "$FTS_DB" ]; then
     # o codigo de saida do timeout precisa sair de dentro da substituicao de comando
     SAIDA=$(printf '%s' "$PROMPT_RAW" | python3 -c "import json,sys; print(json.dumps({'input': sys.stdin.read()}))" \
         | DGCLAW_WORKSPACE="$WORKSPACE" timeout 4 python3 "$FTS" --workspace "$WORKSPACE" recall 2>>"$LOGF"
@@ -100,16 +109,18 @@ if [ -f "$FTS" ] && [ -f "$FTS_DB" ]; then
     [ "$RC" = "124" ] && logerr "a busca em conversas passou de 4s e foi abandonada nesta mensagem (indice grande demais ou travado por outro processo?)"
     [ "$RC" != "0" ] && [ "$RC" != "124" ] && logerr "a busca em conversas saiu com codigo $RC (detalhe nas linhas acima deste log)"
     RECALL_TEXT=$(printf '%s' "${SAIDA%__rc=*}" | python3 -c "$extrai_recall" 2>>"$LOGF")
+    [ -n "$RECALL_TEXT" ] && FONTE=conversas
 else
     RECALL_TEXT=$(printf '%s' "$USER_TEXT" | python3 -c "import json,sys; print(json.dumps({'input': sys.stdin.read()}))" \
         | DGCLAW_WORKSPACE="$WORKSPACE" timeout 5 python3 "$RECALL_LOCAL" 2>>"$LOGF" \
         | python3 -c "$extrai_recall" 2>>"$LOGF")
+    [ -n "$RECALL_TEXT" ] && FONTE=palavra
 fi
 
 # --- complemento semantico: so quando a busca em conversas voltou vazia ---
 FAST="$SCRIPTS/memory_search_fast.py"
 IDX="${DGCLAW_MEMORY_INDEX_DIR:-$WORKSPACE/.dgclaw/memory_index}"
-if [ -z "$RECALL_TEXT" ] && [ "$RC" != "124" ] && [ "${DGCLAW_SEMANTIC_RECALL:-on}" != "off" ] \
+if [ -z "$RECALL_TEXT" ] && [ "$RC" != "124" ] && [ "$RC" != "desligado" ] && [ "${DGCLAW_SEMANTIC_RECALL:-on}" != "off" ] \
    && [ "${DGCLAW_MEMORY_HOOK:-0}" != "1" ] && [ -f "$FAST" ] \
    && [ -f "$IDX/chunks.db" ] && [ -f "$IDX/baseline-vocab.json" ]; then
     # o hook inteiro tem 8 s (hooks.json); a busca semantica fica com o que sobrar ate 6,5 s,
@@ -126,6 +137,7 @@ if [ -z "$RECALL_TEXT" ] && [ "$RC" != "124" ] && [ "${DGCLAW_SEMANTIC_RECALL:-o
         # orcamento de contexto: no maximo ~700 caracteres, igual ao teto da busca em conversas
         RECALL_TEXT=$(printf '%s' "${SEM%__rc=*}" | python3 -c "$extrai_recall" 2>>"$LOGF" \
             | python3 -c "import sys; t=sys.stdin.read().strip(); print(t if len(t)<=700 else t[:700].rstrip()+' (...)')" 2>>"$LOGF")
+        [ -n "$RECALL_TEXT" ] && FONTE=semantica
     fi
 fi
 
@@ -135,6 +147,13 @@ QUAR="$SCRIPTS/../_lib/quarentena.py"
 if [ -n "$RECALL_TEXT" ] && [ -f "$QUAR" ] && { [ -d "$WORKSPACE/.dgclaw/quarentena" ] || [ -f "$WORKSPACE/.dgclaw/modo-seguro.json" ]; }; then
     RECALL_TEXT=$(printf '%s' "$RECALL_TEXT" | timeout 3 python3 "$QUAR" filtrar-linhas --workspace "$WORKSPACE" 2>>"$LOGF") \
         || { logerr "o filtro da quarentena falhou nesta mensagem; por seguranca o recall nao entrou"; RECALL_TEXT=""; }
+fi
+
+# --- uso da memoria: uma linha por mensagem do dono, para as barras da Saude do servidor ---
+if [ "$LEMBRETE" = on ]; then
+    [ -n "$RECALL_TEXT" ] || FONTE=""
+    printf '{"ts":"%s","achou":%s,"fonte":"%s","ms":%s}\n' "$(date -u +%FT%TZ)" "$([ -n "$RECALL_TEXT" ] && echo true || echo false)" \
+        "${FONTE:-nenhuma}" "$(( $(date +%s%3N) - T0 ))" >> "$WORKSPACE/.dgclaw/logs/memoria-uso.jsonl" 2>>"$LOGF"
 fi
 
 CTX=""

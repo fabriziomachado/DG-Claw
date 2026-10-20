@@ -284,6 +284,18 @@ function criarServidor(opcoes) {
     return H.enviaJson(res, r.status, r.corpo, cab);
   }
 
+  /* Teste do avatar dormindo (20/10/2026): <dados>/sono-teste.json { "<slug>": "<até quando, ISO>" } faz o
+     avatar daquele agente dormir até a hora marcada, sem mexer no estado de verdade. O Admin grava para
+     o dono ver como fica; vencido, não vale mais. */
+  function sonoTeste() {
+    try {
+      const d = JSON.parse(fs.readFileSync(path.join(config.dataDir, 'sono-teste.json'), 'utf8'));
+      const out = {};
+      for (const [k, v] of Object.entries(d || {})) if (Date.parse(v) > Date.now()) out[k] = true;
+      return out;
+    } catch (_) { return {}; }
+  }
+
   // ── API ──────────────────────────────────────────────────────────────────
   function avatarDe(a) {
     const inicial = (a.nome[0] || '?').toUpperCase();
@@ -377,7 +389,11 @@ function criarServidor(opcoes) {
       const agentes = {};
       await Promise.all(registro.estado().agentes.map(async (a) => {
         // parado_desde: desde quando está sem trabalhar (o avatar dorme depois de uns minutos, sono.js)
-        try { const e = await conversa.atividade(a); agentes[a.slug] = { estado: e.estado, parado_desde: e.parado_desde || null }; }
+        try {
+          const e = await conversa.atividade(a);
+          agentes[a.slug] = { estado: e.estado, parado_desde: e.parado_desde || null };
+          if (sonoTeste()[a.slug]) agentes[a.slug].sono_teste = true;
+        }
         catch (_) { agentes[a.slug] = { estado: 'sem_sinal' }; }
       }));
       return H.enviaJson(res, 200, { ok: true, agentes });

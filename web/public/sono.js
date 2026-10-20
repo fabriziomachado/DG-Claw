@@ -79,7 +79,7 @@
     if (!d || !d.agentes) return;
     const agora = Date.now();
     for (const [id, a] of Object.entries(d.agentes)) {
-      const parado = a.estado === 'ocioso' && a.parado_desde && agora - Date.parse(a.parado_desde) >= SONO_MIN * 60000;
+      const parado = a.sono_teste || (a.estado === 'ocioso' && a.parado_desde && agora - Date.parse(a.parado_desde) >= SONO_MIN * 60000);
       if (parado) dorme(id); else acorda(id);
     }
   }

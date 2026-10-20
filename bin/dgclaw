@@ -396,6 +396,13 @@ gerar_identidade() {
     renderizar_template "$tpl/CLAUDE.md.tmpl" | escrever_se_novo "$h/CLAUDE.md" 644 "$ug"
     renderizar_template "$tpl/AGENTS.md.tmpl" | escrever_se_novo "$h/AGENTS.md" 644 "$ug"
     renderizar_template "$tpl/MEMORY.md.tmpl" | escrever_se_novo "$h/MEMORY.md" 644 "$ug"
+    # ajudantes leves no Haiku (pesquisador e leitor), 20/10/2026: a leitura pesada sai do limite caro
+    if [ -d "$tpl/ajudantes" ]; then
+        for f in "$tpl"/ajudantes/*.md; do
+            [ -f "$f" ] && escrever_se_novo "$h/.claude/agents/$(basename "$f")" 644 "$ug" < "$f"
+        done
+        [ "$ENSAIO" = 1 ] || { [ -d "$h/.claude/agents" ] && dono "$ug" "$h/.claude" "$h/.claude/agents"; }
+    fi
 
     regravar_identidade_md
 }

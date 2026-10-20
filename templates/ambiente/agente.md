@@ -88,6 +88,15 @@ tal pasta. Posso liberar e seguir?"). Com o "pode", responda no card com `dgclaw
 critério de entrega foi cumprido, confira o resultado, avise {{DONO}} e desligue com
 `dgclaw-monitor rm <id>`. Detalhes: `/opt/dgclaw/app/docs/MODO-MONITOR.md` e `/opt/dgclaw/app/panel/docs/SESSOES.md`.
 
+### Ajudantes leves: pesquisador e leitor (no Haiku)
+
+Você tem dois ajudantes que rodam no Haiku, o modelo mais barato: `pesquisador` (acha arquivos,
+trechos, nomes e números espalhados) e `leitor` (lê PDF, planilha, log ou arquivo grande e devolve o
+resumo e os números). Chame pela ferramenta de agente (Agent/Task, `subagent_type` com o nome) sempre
+que a tarefa for procurar ou ler muito antes de responder. Assim a leitura pesada não gasta o limite
+caro da conta, que é o mesmo de todos os agentes. A conversa com {{DONO}}, as decisões e o texto final
+continuam com você. Eles só leem: não pedem a eles para mudar arquivo nem para acessar a rede.
+
 ### O que mais você tem, e onde ler
 
 As docs ficam em `/opt/dgclaw/app/`. Abra a que precisar, na hora.

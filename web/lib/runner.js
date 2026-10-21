@@ -65,6 +65,13 @@ function criarRunner({ log, timeoutMs }) {
   }
 
   return {
+    /** Reinicia a sessão do agente no runner: a mesma conversa, processo novo (destrava um agente congelado). */
+    async reiniciar(agente) {
+      const r = await chamar(agente, 'POST', `/api/agents/${encodeURIComponent(agente.agente_id)}/reiniciar`, {}, 60000);
+      if (!r.ok && r.erro) return r;
+      if (!r.ok) return { ok: false, status: r.status, erro: motivoDoRunner(agente, r) };
+      return { ok: true };
+    },
     /** Estado do agente: { ok, estado:{status,sessionId,currentTool,...} } ou { ok:false, erro }. */
     async estado(agente) {
       const r = await chamar(agente, 'GET', `/api/agents/${encodeURIComponent(agente.agente_id)}`);

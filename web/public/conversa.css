@@ -1135,3 +1135,19 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 #entradaEspelho:empty{display:none}
 #entradaEspelho .esp-men{border-radius:6px;background:color-mix(in srgb,var(--c,var(--dg-azul)) 26%,transparent);
   box-shadow:0 0 0 2px color-mix(in srgb,var(--c,var(--dg-azul)) 26%,transparent)}
+/* cartão do parar (21/10/2026): discreto, em cima do campo, no design do app */
+#pararCartao{display:flex;align-items:center;gap:10px;max-width:880px;margin:0 auto 8px;padding:9px 10px 9px 12px;border:1px solid var(--dg-borda);
+  border-radius:14px;background:var(--dg-superficie);color:var(--dg-texto-2);font-size:13.5px;box-shadow:var(--dg-sombra);box-sizing:border-box}
+#pararCartao[hidden]{display:none}
+#pararCartao .pa-ic{display:flex;color:var(--dg-texto-3)}
+#pararCartao.pa-ok .pa-ic{color:var(--dg-entrega-texto)}
+#pararCartao.pa-travado,#pararCartao.pa-erro{border-color:var(--dg-pedido-borda);background:var(--dg-pedido-fundo);color:var(--dg-pedido-texto)}
+#pararCartao.pa-travado .pa-ic,#pararCartao.pa-erro .pa-ic{color:inherit}
+#pararCartao .pa-tx{flex:1;min-width:0}
+#pararCartao .pa-tx b{font-weight:600}
+#pararCartao .pa-bt{font:inherit;font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;border:0;background:var(--dg-azul);color:#fff;cursor:pointer;white-space:nowrap}
+#pararCartao .pa-x{width:28px;height:28px;flex:0 0 28px;border:0;border-radius:50%;background:transparent;color:inherit;opacity:.7;display:grid;place-items:center;cursor:pointer}
+#pararCartao .pa-x:hover{opacity:1}
+.pa-gira{display:block;width:14px;height:14px;border-radius:50%;border:2px solid var(--dg-borda);border-top-color:var(--dg-texto-2);animation:paGira .8s linear infinite}
+@keyframes paGira{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.pa-gira{animation:none}}

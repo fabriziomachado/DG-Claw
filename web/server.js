@@ -545,9 +545,33 @@ function criarServidor(opcoes) {
       // ele já fez continuam. Só o dono, pela sessão do login (um agente não cancela o outro pela caixa).
       if (acao === 'interromper' && m === 'POST') {
         if (sessao && sessao.via === 'caixa') return H.erroJson(res, 403, 'Só o dono interrompe um agente, pelo painel.');
+        // O registro da conversa antes do Esc: se nada mudar e o runner seguir "trabalhando" depois de uns
+        // segundos, o agente está congelado (21/10/2026: o Tech travou numa busca de ferramenta e não reagia a
+        // tecla nenhuma). A tela então oferece reiniciar a sessão (POST .../destravar).
+        const marca = async () => {
+          let tam = null;
+          try { const t = await conversa.thread(agente); if (t.arquivo) tam = fs.statSync(t.arquivo).size; } catch (_) { /* sem registro */ }
+          return tam;
+        };
+        const antes = await marca();
         const r = await runner.input(agente, { text: '\u001b', submit: false });
         if (!r || r.ok === false) return H.erroJson(res, 502, `Não consegui interromper ${agente.nome}: ${(r && r.erro) || 'o runner não respondeu'}.`);
         log('info', `${agente.slug}: o dono interrompeu o trabalho em andamento (Esc).`);
+        let parou = false;
+        for (let i = 0; i < 8 && !parou; i++) {
+          await new Promise((ok) => setTimeout(ok, 1000));
+          const e = await runner.estado(agente);
+          parou = !(e && e.ok && e.estado && e.estado.status === 'working') || (await marca()) !== antes;
+        }
+        if (!parou) log('aviso', `${agente.slug}: não reagiu ao Esc em 8 s (registro parado e runner em working); a tela oferece reiniciar.`);
+        return H.enviaJson(res, 200, { ok: true, parou, travado: !parou });
+      }
+      // Agente congelado: reinicia a sessão no runner (a mesma conversa; a fila de mensagens continua).
+      if (acao === 'destravar' && m === 'POST') {
+        if (sessao && sessao.via === 'caixa') return H.erroJson(res, 403, 'Só o dono reinicia um agente, pelo painel.');
+        const r = await runner.reiniciar(agente);
+        if (!r || r.ok === false) return H.erroJson(res, 502, `Não consegui reiniciar ${agente.nome}: ${(r && r.erro) || 'o runner não respondeu'}.`);
+        log('info', `${agente.slug}: o dono reiniciou a sessão (agente travado).`);
         return H.enviaJson(res, 200, { ok: true });
       }
       // A conta liberou antes da hora do aviso de limite? (lib/cota-vigia.js; a tarja da cota pergunta)
@@ -591,7 +615,7 @@ function criarServidor(opcoes) {
       if (acao === 'upload' && m === 'POST') return upload(req, res, agente);
       if (acao === 'comandos' && m === 'GET') return H.enviaJson(res, 200, Object.assign({ ok: true, agente: agente.slug }, await comandos.catalogo(agente)));
       if (acao === 'comando' && m === 'POST') return comandoPost(req, res, agente);
-      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'interromper', 'cota', 'mencao', 'aviso', 'pedido', 'upload', 'permissao', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
+      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'interromper', 'destravar', 'cota', 'mencao', 'aviso', 'pedido', 'upload', 'permissao', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
     }
 
     mm = /^\/api\/v1\/media\/([0-9a-f]{16})\/visual$/.exec(p);

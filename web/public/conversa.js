@@ -3397,12 +3397,48 @@ function pintaParar() {
   btnEnviar.setAttribute('aria-label', parar ? 'Parar o que ' + AGENTE.nome + ' está fazendo' : 'Enviar');
   btnEnviar.title = parar ? 'Parar o que ' + AGENTE.nome + ' está fazendo' : '';
 }
+/* Parar (21/10/2026, no design do app): um cartão discreto em cima do campo, no lugar da faixa amarela.
+   O servidor espera uns segundos para ver se o agente reagiu; congelado, o cartão oferece reiniciar a
+   sessão (a mesma conversa, e as mensagens na fila continuam). */
+const pararEl = document.createElement('div');
+pararEl.id = 'pararCartao'; pararEl.hidden = true; pararEl.setAttribute('role', 'status');
+{ const l1 = document.querySelector('.barra .linha1'); if (l1) l1.before(pararEl); }
+let pararTimer = null;
+const ICO_CARTAO_PARAR = {
+  gira: '<i class="pa-gira" aria-hidden="true"></i>',
+  ok: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"/></svg>',
+  alerta: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17h.01"/></svg>',
+  x: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+};
+function pintaCartaoParar(estado, texto, acao) {
+  clearTimeout(pararTimer);
+  if (!estado) { pararEl.hidden = true; pararEl.innerHTML = ''; return; }
+  pararEl.className = 'pa-' + estado;
+  pararEl.innerHTML = `<span class="pa-ic">${estado === 'andando' ? ICO_CARTAO_PARAR.gira : estado === 'ok' ? ICO_CARTAO_PARAR.ok : ICO_CARTAO_PARAR.alerta}</span>` +
+    `<span class="pa-tx">${texto}</span>` + (acao ? `<button type="button" class="pa-bt" data-pa="${acao.id}">${esc(acao.rotulo)}</button>` : '') +
+    (estado === 'travado' || estado === 'erro' ? `<button type="button" class="pa-x" data-pa="fechar" title="Fechar" aria-label="Fechar">${ICO_CARTAO_PARAR.x}</button>` : '');
+  pararEl.hidden = false;
+  if (estado === 'ok') pararTimer = setTimeout(() => pintaCartaoParar(null), 3500);
+}
+pararEl.addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-pa]'); if (!b) return;
+  if (b.dataset.pa === 'fechar') { pintaCartaoParar(null); return; }
+  if (b.dataset.pa === 'destravar') {
+    pintaCartaoParar('andando', `Reiniciando ${esc(AGENTE.nome)}…`);
+    try {
+      await api(API + '/destravar', { method: 'POST', body: {}, timeoutMs: 70000 });
+      pintaCartaoParar('ok', `${esc(AGENTE.nome)} foi reiniciado. A conversa continua e as mensagens que esperavam vão chegar a ele.`);
+    } catch (e) { pintaCartaoParar('erro', `Não consegui reiniciar: ${esc(e.message)}`); }
+  }
+});
 async function interrompe() {
   btnEnviar.disabled = true;
+  pintaCartaoParar('andando', `Parando ${esc(AGENTE.nome)}…`);
   try {
-    await api(API + '/interromper', { method: 'POST', body: {} });
-    mostraAviso('Parei o que ' + AGENTE.nome + ' estava fazendo. A conversa e o que ele já fez continuam.');
-  } catch (e) { mostraErro('Não consegui parar: ' + e.message); }
+    const r = await api(API + '/interromper', { method: 'POST', body: {}, timeoutMs: 20000 });
+    if (r && r.travado) pintaCartaoParar('travado', `<b>${esc(AGENTE.nome)} não reagiu.</b> Parece travado.`, { id: 'destravar', rotulo: 'Reiniciar' });
+    else pintaCartaoParar('ok', `Parado. A conversa e o que ${esc(AGENTE.nome)} já fez continuam.`);
+  } catch (e) { pintaCartaoParar('erro', 'Não consegui parar: ' + esc(e.message)); }
   finally { btnEnviar.disabled = false; }
 }
 function ajustaCampo() {

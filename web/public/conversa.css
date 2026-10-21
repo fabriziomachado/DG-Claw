@@ -382,13 +382,17 @@
   width:var(--pct,0%);background:#2f9e5e;border-radius:0 2px 2px 0;transition:width .3s}
 
 /* ── Conversa vazia: avatar do agente, pergunta curta e sugestões (padrão de estado vazio) ── */
-.vazio{max-width:30em;margin:0 auto;padding:clamp(20px,8vh,96px) 20px 24px;text-align:center;color:var(--dg-texto-2);
+/* conversa vazia no meio da altura (21/10/2026, pedido do dono): o wrap ocupa a altura do chat e centraliza */
+.wrap:has(> .vazio){min-height:100%;display:flex;flex-direction:column;justify-content:center;justify-content:safe center}
+.vazio{width:100%;box-sizing:border-box;max-width:30em;margin:0 auto;padding:12px 20px 24px;text-align:center;color:var(--dg-texto-2);
   display:flex;flex-direction:column;align-items:center;animation:vz-entra .3s ease-out}
 @keyframes vz-entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.vazio{animation:none}}
-.vazio .vz-av{width:176px;height:176px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;
-  font-size:72px;font-weight:600;color:#fff;margin-bottom:20px;box-shadow:0 0 0 4px var(--dg-fundo),0 0 0 5px var(--dg-borda)}
+.vazio .vz-av{width:clamp(128px,26vh,224px);height:clamp(128px,26vh,224px);border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;
+  font-size:88px;font-weight:600;color:#fff;margin-bottom:20px;box-shadow:0 0 0 4px var(--dg-fundo),0 0 0 5px var(--dg-borda)}
 .vazio .vz-av img{width:100%;height:100%;object-fit:cover}
+/* tela baixa (iPhone SE e afins): a foto diminui para a conversa vazia caber sem rolar */
+@media (max-height:760px){.vazio .vz-av{width:120px;height:120px;font-size:48px;margin-bottom:14px}}
 .vazio b{display:block;font-size:22px;font-weight:650;letter-spacing:-.01em;color:var(--dg-texto);margin-bottom:6px}
 .vazio small{display:block;font-size:14.5px;line-height:1.5;color:var(--dg-texto-2);max-width:24em}
 .vazio .vz-link{font:inherit;color:var(--dg-azul-forte);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px}

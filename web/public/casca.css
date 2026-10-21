@@ -11,6 +11,9 @@
 :root{--fonte:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif}
 
 html.casca{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+/* enquanto a casca não monta, o painel do agente fica escondido (sem piscar o layout antigo; casca.js) */
+html.casca-espera body{visibility:hidden}
+html.casca-espera{background:var(--dg-fundo)}
 
 /* cabeçalho: a mesma altura, fonte e cores da Conversa; fica colado no topo ao rolar a página */
 html.casca #cabecalho,html.casca #cabecalho *,aside#menu,aside#menu *,#overlayMenu{

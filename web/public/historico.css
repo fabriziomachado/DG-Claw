@@ -19,7 +19,7 @@ html.hist-aberto,html.hist-aberto body{overflow:hidden}
 .hist-x:hover,.hist-volta:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
 
 .hist-abas{display:flex;gap:4px;padding:0 16px;border-bottom:1px solid var(--dg-borda)}
-.hist-abas[hidden]{display:none}
+.hist-abas[hidden],.hist-busca[hidden],.hist-so[hidden]{display:none}
 .hist-abas button{font:inherit;font-size:14px;padding:10px 4px;margin-right:16px;border:0;background:none;color:var(--dg-texto-2);cursor:pointer;
   border-bottom:2px solid transparent;margin-bottom:-1px}
 .hist-abas button[aria-selected="true"]{color:var(--dg-texto);border-bottom-color:var(--dg-texto);font-weight:600}

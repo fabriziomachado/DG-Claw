@@ -90,12 +90,13 @@ function criarHistorico({ registro, log, conversa = null, arquivoConversa = null
   const erro = (res, status, motivo) => json(res, status, { ok: false, erro: motivo });
   const ultimoReindex = new Map();
 
-  function agenteDe(slug) {
+  // O Admin não tem caixa nem índice: dele só as conversas arquivadas (o resto responde vazio ou 404).
+  function agenteDe(slug, rota) {
     const est = registro.estado();
     if (!est.ok) return { erro: est.erro, status: 503 };
     const a = est.agentes.find((x) => x.slug === slug);
     if (!a) return { erro: `Não existe agente "${String(slug).slice(0, 40)}".`, status: 404 };
-    if (a.tipo === 'admin') return { erro: 'O Admin não guarda histórico pesquisável.', status: 404 };
+    if (a.tipo === 'admin' && rota !== 'arquivadas' && rota !== undefined) return { erro: 'O Admin não guarda histórico pesquisável.', status: 404 };
     return { a };
   }
   const naCaixa = (a, args) => roda('podman', ['exec', '-u', 'agente', '-w', CASA, a.container || `dgclaw-${a.slug}`, ...args]);
@@ -125,8 +126,9 @@ function criarHistorico({ registro, log, conversa = null, arquivoConversa = null
     if (!mm) { erro(res, 404, 'Rota do histórico desconhecida.'); return true; }
     if (mm[3] && mm[2] !== 'arquivadas') { erro(res, 404, 'Rota do histórico desconhecida.'); return true; }
     if (m !== 'GET') { erro(res, 405, 'O histórico é só de leitura: use GET.'); return true; }
-    const { a, erro: e, status } = agenteDe(decodeURIComponent(mm[1]));
+    const { a, erro: e, status } = agenteDe(decodeURIComponent(mm[1]), mm[2]);
     if (!a) { erro(res, status, e); return true; }
+    if (a.tipo === 'admin' && !mm[2]) { json(res, 200, { ok: true, ligada: false, so_arquivadas: true, conversa: 0, memoria: 0 }); return true; }
 
     try {
       if (!mm[2]) {

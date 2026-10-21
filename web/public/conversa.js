@@ -1875,7 +1875,7 @@ if (!EH_ADMIN) {
 function htmlVazio() {
   const img = AGENTE.avatar_img || (/^https:\/\//i.test(AGENTE.avatar || '') ? AGENTE.avatar : '');
   const foto = img ? `<img src="${esc(img)}" alt="">` : esc(AGENTE.avatar || (AGENTE.nome || '?').slice(0, 1));
-  const comHist = !EH_ADMIN && !!window.DGHistorico;
+  const comHist = !!window.DGHistorico;
   const sub = arquivadasTela && comHist
     ? 'Conversa nova. As anteriores estão no <button type="button" class="vz-link" data-abre-historico>Histórico</button>.'
     : `Mande a primeira mensagem para o ${esc(AGENTE.nome)}. A resposta aparece aqui.`;
@@ -1947,7 +1947,7 @@ function render(opt) {
     itens.push(['topo', maisAntigas
       ? `<div class="topo">${carregandoAntigas ? 'carregando mensagens antigas…'
                                               : 'role para ver as antigas'}</div>`
-      : arquivadasTela && !EH_ADMIN && window.DGHistorico
+      : arquivadasTela && window.DGHistorico
         ? '<div class="topo topo-arq">Conversa nova. As anteriores estão no <button type="button" data-abre-historico>Histórico</button></div>'
         : '<div class="topo">início da conversa</div>']);
   }
@@ -5207,14 +5207,14 @@ function desenhaAlertas() {
   pintaBadgeApp();
   alertasCaixa.hidden = true;   // a pilha lateral antiga não aparece mais
   const c = contagensFiltro();
-  // o Histórico fica sempre à mão nos agentes (o Admin não guarda histórico pesquisável)
-  const temHist = !EH_ADMIN && !!window.DGHistorico;
+  // o Histórico fica sempre à mão (no Admin, só com as conversas arquivadas)
+  const temHist = !!window.DGHistorico;
   filtrosEl.hidden = !(temHist || c.nv || c.temEntregas || filtro !== 'tudo');
   const chip = (k, rot, n, cls) => `<button type="button" class="filtro${filtro === k ? ' on' : ''}${cls ? ' ' + cls : ''}" data-filtro="${k}" aria-pressed="${filtro === k}">` +
     `${rot}${n ? ` <b>${n}</b>` : ''}</button>`;
   filtrosEl.innerHTML = chip('tudo', 'Tudo', 0) + chip('nao-vistas', 'Não vistas', c.nv) +
     chip('pedidos', 'Pedem ação', c.pedidos, c.pedidos ? 'tem-pedido' : '') + chip('entregas', 'Entregas', c.entregas) +
-    (temHist ? `<button type="button" class="filtro filtro-hist" data-historico title="Buscar nas conversas antigas e ver as memórias">${window.DGHistorico.ICONE}Histórico</button>` : '');
+    (temHist ? `<button type="button" class="filtro filtro-hist" data-historico title="${EH_ADMIN ? 'Ver as conversas arquivadas' : 'Buscar nas conversas antigas e ver as memórias'}">${window.DGHistorico.ICONE}Histórico</button>` : '');
   aplicaFiltro();
 }
 function idsDoFiltro() {
@@ -5248,10 +5248,10 @@ async function garanteMensagemDoAlerta(a) {
   maisAntigas = !!d.mais_antigas;
 }
 wrap.addEventListener('click', ev => {
-  if (ev.target.closest('[data-abre-historico]')) window.DGHistorico.abre({ id: AGENTE.id, nome: AGENTE.nome || 'o agente' }, 'arquivadas');
+  if (ev.target.closest('[data-abre-historico]')) window.DGHistorico.abre({ id: AGENTE.id, nome: AGENTE.nome || 'o agente', soArquivadas: EH_ADMIN }, 'arquivadas');
 });
 filtrosEl.addEventListener('click', async ev => {
-  if (ev.target.closest('[data-historico]')) { window.DGHistorico.abre({ id: AGENTE.id, nome: AGENTE.nome || 'o agente' }); return; }
+  if (ev.target.closest('[data-historico]')) { window.DGHistorico.abre({ id: AGENTE.id, nome: AGENTE.nome || 'o agente', soArquivadas: EH_ADMIN }); return; }
   const b = ev.target.closest('[data-filtro]'); if (!b) return;
   filtro = b.dataset.filtro;
   try {

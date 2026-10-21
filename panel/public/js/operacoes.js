@@ -188,7 +188,7 @@
           ${esc(conta)}${r.motivo ? ` · ${rl(r.motivo)}` : ''} · conferido às ${esc(horaCurta(dados.geradoEm))}
         </div>
       </div>
-      <button type="button" class="btn-leve op-atualizar" title="Lê o diário do sistema de novo agora, em vez de esperar o próximo minuto.">atualizar</button>`;
+      <button type="button" class="btn-icone op-atualizar" aria-label="Atualizar" title="Atualizar: lê o diário do sistema de novo agora, em vez de esperar o próximo minuto."><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg></button>`;
     el.querySelectorAll('.op-ir').forEach((a) => a.addEventListener('click', (ev) => {
       ev.preventDefault();
       const alvo = document.getElementById(a.dataset.alvo);

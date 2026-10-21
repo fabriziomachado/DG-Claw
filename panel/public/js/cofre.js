@@ -188,7 +188,7 @@
     const acao = revogada
       ? ''
       : `<button type="button" class="btn-leve cofre-revogar" data-env="${esc(c.envName)}"
-                 title="Tira esta chave do cofre. Ela some do agente no próximo reinício, e o registro de que ela existiu fica.">revogar</button>`;
+                 aria-label="Revogar ${esc(c.envName)}" title="Revogar: tira esta chave do cofre. Ela some do agente no próximo reinício, e o registro de que ela existiu fica."><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/></svg></button>`;
     // O `data-rot` é o rótulo da coluna, e ele existe para o CELULAR: em tela
     // estreita a tabela vira cartão, e cada valor aparece com o nome da coluna do
     // lado. Tabela de seis colunas em 390px ou rola para o lado ou espreme tudo,
@@ -357,7 +357,7 @@
       ? `<span class="cofre-selo revogada" title="Esta chave de API deixou de valer em ${esc(quando(c.revogadaEm))}.">revogada</span>`
       : '<span class="cofre-selo ativa" title="Quem tiver este token consegue guardar chaves neste agente.">ativa</span>';
     const acao = revogada ? '' : `<button type="button" class="btn-leve cofre-api-revogar" data-id="${esc(c.id)}" data-nome="${esc(c.nome)}"
-        title="Faz esta chave de API parar de valer agora. Quem a usava passa a receber recusa.">revogar</button>`;
+        aria-label="Revogar ${esc(c.nome)}" title="Revogar: faz esta chave de API parar de valer agora. Quem a usava passa a receber recusa."><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/></svg></button>`;
     return `<tr>
         <td data-rot="Nome" title="O nome que você deu à chave, para lembrar quem a usa.">${esc(c.nome)}</td>
         <td data-rot="Final do token" title="Os quatro últimos caracteres do token, para você reconhecer a chave."><span class="cofre-mascara">••••${esc(c.ultimos4 || '')}</span></td>

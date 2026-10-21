@@ -79,6 +79,13 @@ DGCLAW_CARD_INTERVALO=0.3 "$BIN" esperar card-abc123 --max 1 >"$T/o" 2>"$T/e"; c
 ok "esperar estourando o tempo sai com 7" $([ $c = 7 ] && echo 0 || echo 1)
 grep -q "segue trabalhando" "$T/e"; ok "esperar diz que a sessao segue trabalhando" $?
 
+# --- card que nunca comeca (o pedido sumiu na entrega) ---------------------------------------------
+subir engole
+"$BIN" abrir --provedor claude --titulo x --pedido oi >/dev/null 2>&1
+DGCLAW_CARD_SEM_COMECO=1 "$BIN" esperar card-abc123 --max 30 >"$T/o" 2>"$T/e"; c=$?
+ok "esperar desiste com 9 quando o card nunca comeca" $([ $c = 9 ] && echo 0 || echo 1)
+grep -q "o pedido nao chegou" "$T/e" && grep -q "dgclaw-card mandar card-abc123" "$T/e"; ok "esperar diz para reenviar com mandar" $?
+
 # --- limite (429) ---------------------------------------------------------------------------------
 subir limite
 "$BIN" abrir --provedor codex --titulo x --pedido oi >"$T/o" 2>"$T/e"; c=$?

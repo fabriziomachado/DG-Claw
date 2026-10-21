@@ -8,7 +8,7 @@ import {
 } from "./apoio-teste.js";
 
 const amb = prepararAmbiente("sessao-claude");
-const { Sessao, nonceConfere } = await import("./sessao.js");
+const { Sessao, nonceConfere, textoNaCaixa } = await import("./sessao.js");
 const { gravarProvedorJson } = await import("./provedores/escolha.js");
 
 const OAI = chaveFalsaOpenai();
@@ -41,6 +41,10 @@ async function nova(config: Record<string, unknown> = {}, opcoes: Record<string,
 /** As entradas do Claude falso que pertencem a ESTA sessão (o settings de cada uma tem o id no nome). */
 const entradasDe = (id: string) =>
   lerLinhasJson(amb.logDosClis).filter((l) => l.bin === "claude" && l.modo === "interativo" && l.argv.some((a: string) => a.endsWith(`/${id}.settings.json`)));
+
+/** Os prompts que o Claude falso desta sessão aceitou. */
+const entradasDoPrompt = (id: string) =>
+  lerLinhasJson(amb.logDosClis).filter((l) => l.bin === "claude" && l.modo === "prompt" && l.argv.some((a: string) => a.endsWith(`/${id}.settings.json`)));
 
 const abertas: Array<{ parar(m: string): void }> = [];
 const servidores: Array<{ fechar(): void }> = [];
@@ -118,6 +122,29 @@ test("digitar e enviar: o Enter vira turno pelo recibo do hook, e a sessão volt
   assert.equal(lerLinhasJson(amb.logDosClis).filter((l) => l.modo === "prompt").pop()!.texto, "olá, mundo");
   await esperarAte(() => s.estado.status === "working" || hooks.recebidos.some((h) => h.event === "UserPromptSubmit"), 5_000);
   await esperarAte(() => s.estado.status === "idle" && hooks.recebidos.some((h) => h.event === "Stop"), 12_000, "o Stop confirmar");
+});
+
+test("digitar e enviar: o terminal engoliu a colagem e os Enters; o runner confere a tela e digita de novo", async () => {
+  logarClaude(amb);
+  process.env.FAKE_ENGOLIR_MS = "3000";
+  const { s, id } = await nova();
+  await s.subir("nova");
+  delete process.env.FAKE_ENGOLIR_MS;
+  await esperarAte(() => s.estado.status === "idle", 8_000);
+  const texto = "x".repeat(300) + " pedido do card";
+  await s.digitarEEnviar(texto);
+  await esperarAte(() => entradasDoPrompt(id).length > 0, 4_000, "o prompt entrar na segunda digitação");
+  assert.equal(entradasDoPrompt(id).length, 1, "o texto entra uma vez só");
+  assert.equal(entradasDoPrompt(id)[0].texto, texto);
+  const log = lerTexto(amb.logDoRunner);
+  assert.match(log, /o texto sumiu da caixa sem abrir turno/);
+  assert.match(log, /a segunda digitação virou turno/);
+});
+
+test("textoNaCaixa: acha o começo do texto ou o resumo de colagem no fim da tela", () => {
+  assert.equal(textoNaCaixa("\u001b[2K> Perfil dos leads\r\n  que viram", "Perfil dos leads que viram matrícula"), true);
+  assert.equal(textoNaCaixa("> [Pasted text #1 +42 lines]", "qualquer coisa"), true);
+  assert.equal(textoNaCaixa("fake claude pronto\r\n> ", "Perfil dos leads"), false);
 });
 
 /** Sobe a sessão com o gatilho do Stop perdido num prazo curto; devolve o hook falso e um escritor de transcript. */

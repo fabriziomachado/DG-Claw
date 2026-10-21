@@ -112,7 +112,15 @@ setTimeout(() => disparar("SessionStart", { source: "startup" }), Number(process
 
 let linha = "";
 if (process.stdin.isTTY) process.stdin.setRawMode(true);
+// FAKE_ENGOLIR_MS: como o TUI que ainda está trocando de sessão, joga fora tudo o que chega nos
+// primeiros N ms depois do primeiro byte (texto e Enters), sem abrir turno.
+let primeiroByte = 0;
 process.stdin.on("data", (d) => {
+  if (!primeiroByte) primeiroByte = Date.now();
+  if (process.env.FAKE_ENGOLIR_MS && Date.now() - primeiroByte < Number(process.env.FAKE_ENGOLIR_MS)) {
+    registrar({ modo: "engolido", bytes: d.length });
+    return;
+  }
   for (const ch of d.toString()) {
     if (ch === "\r" || ch === "\n") {
       const texto = linha.trim();

@@ -61,6 +61,9 @@ const INTERVALO_MS = 25;
 /** Quantas vezes batemos no Enter se ele não virar turno. Quanto esperar pelo recibo
  *  depende do motor (Motor.reciboMs). Ver enviarComRecibo(). */
 const RECIBO_ENTER_TENTATIVAS = 3;
+/** Recuperação do envio (recuperarEnvio): até quanto esperar a tela sossegar e o recibo do Enter extra. */
+const RECUPERAR_ESPERA_MAX_MS = 8_000;
+const RECUPERAR_RECIBO_MS = 4_000;
 /** Um `--resume` que morre dentro desta janela morreu por causa da sessão, não
  *  do trabalho. Medido: `claude --resume <id>` de um id sem transcript no disco
  *  sai com código 1 em ~2s. */
@@ -87,6 +90,16 @@ const RE_ANSI = new RegExp(`${ESC}\\[[0-9;?]*[a-zA-Z]`, "g");
 
 function semAnsi(s: string): string {
   return s.replace(RE_ANSI, "");
+}
+
+/** O texto digitado ainda aparece no fim da tela? Olha os últimos 4 KB sem ANSI e sem espaços (o TUI
+ *  quebra linha e redesenha), atrás do começo do texto ou do resumo de colagem do Claude ("[Pasted text"). */
+export function textoNaCaixa(tela: string, texto: string): boolean {
+  const compacto = (t: string) => semAnsi(t).replace(/\s+/g, "");
+  const fim = compacto(tela.slice(-4096));
+  if (/\[Pastedtext/i.test(fim)) return true;
+  const comeco = compacto(texto).slice(0, 16);
+  return comeco.length > 0 && fim.includes(comeco);
 }
 
 /** O diálogo de aviso do modo Bypass Permissions do Claude Code (16/10/2026).
@@ -1126,10 +1139,18 @@ export class Sessao extends EventEmitter {
     this.marcarAtividade();
     if (this.motor.provedor === "codex") await this.vencerTelaDeConfianca();
     const pausa = this.motor.pausaAntesDoEnterMs;
+    await this.colar(texto, pausa);
+    if (await this.enviarComRecibo()) return;
+    await this.recuperarEnvio(texto, pausa);
+  }
+
+  /** Escreve o texto no PTY: de uma vez até 256 caracteres, em pedaços acima disso (a colagem
+   *  drena antes de voltar, para o Enter não chegar no meio dela). */
+  private async colar(texto: string, pausa: number): Promise<void> {
+    if (!this.proc) return;
     if (texto.length <= 256) {
       this.proc.write(texto);
       await new Promise((r) => setTimeout(r, pausa));
-      await this.enviarComRecibo();
       return;
     }
     await new Promise<void>((resolve) => {
@@ -1148,7 +1169,54 @@ export class Sessao extends EventEmitter {
       };
       passo();
     });
-    await this.enviarComRecibo();
+  }
+
+  /** Os três Enters não viraram turno (21/10/2026: um card recém-nascido engoliu o pedido de 2.903
+   *  caracteres enquanto o Claude ainda trocava de sessão por dentro; o texto se perdeu, o card ficou
+   *  20 min ocioso e o agente esperou 30 min por nada). Antes de desistir:
+   *  1. espera a tela sossegar e bate UM Enter a mais, com prazo maior (o texto pode estar na caixa);
+   *  2. se ainda não virou turno e o começo do texto não aparece no fim da tela, o TUI engoliu a
+   *     colagem: digita tudo de novo, uma vez, e manda com recibo.
+   *  Se o texto está visível na caixa e nada abre turno, não digita de novo (duplicaria): só o erro. */
+  private async recuperarEnvio(texto: string, pausa: number): Promise<void> {
+    const area = this.a("entrada");
+    await this.esperarTelaQuieta(QUIETO_ANTES_DE_DIGITAR_MS, RECUPERAR_ESPERA_MAX_MS);
+    if (!this.proc) return;
+    const antes = this.promptsAceitos;
+    this.proc.write("\r");
+    if (await this.esperarRecibo(antes, RECUPERAR_RECIBO_MS)) {
+      log.info(area, "o Enter extra, com a tela quieta, virou turno");
+      return;
+    }
+    if (textoNaCaixa(this.telaInteira(), texto)) {
+      log.erro(
+        area,
+        `digitei ${RECIBO_ENTER_TENTATIVAS + 1} Enters e nenhum abriu turno: o texto continua escrito na caixa de entrada do agente`,
+        "olhar a tela (GET /api/agents/:id/terminal) e dar um Enter à mão, ou reenviar por POST /api/agents/:id/input",
+      );
+      return;
+    }
+    log.aviso(area, `o texto sumiu da caixa sem abrir turno (o terminal engoliu a colagem); digitando os ${texto.length} caracteres de novo`);
+    await this.colar(texto, pausa);
+    if (await this.enviarComRecibo()) {
+      log.info(area, "a segunda digitação virou turno");
+      return;
+    }
+    log.erro(
+      area,
+      "digitei o texto duas vezes e nenhum Enter abriu turno: o pedido não chegou ao agente",
+      "olhar a tela (GET /api/agents/:id/terminal) e reenviar por POST /api/agents/:id/input",
+    );
+  }
+
+  /** Espera a saída do PTY ficar quieta por `quietoMs`, no máximo `maxMs`. */
+  private async esperarTelaQuieta(quietoMs: number, maxMs: number): Promise<void> {
+    const limite = Date.now() + maxMs;
+    while (this.proc && Date.now() < limite) {
+      const quieto = this.ultimaSaidaEm ? Date.now() - this.ultimaSaidaEm : Infinity;
+      if (quieto >= quietoMs) return;
+      await new Promise((r) => setTimeout(r, 100));
+    }
   }
 
   /**
@@ -1203,26 +1271,22 @@ export class Sessao extends EventEmitter {
    *  (Codex), que só aparecem quando o CLI ACEITOU o prompt. Sem recibo, batemos na
    *  tecla de novo. Um Enter a mais numa caixa já vazia é inofensivo (o TUI ignora
    *  linha vazia; testado no Codex real); um Enter a menos perde o poke.  */
-  private async enviarComRecibo(): Promise<void> {
+  private async enviarComRecibo(): Promise<boolean> {
     const espera = this.motor.reciboMs;
     for (let tentativa = 1; tentativa <= RECIBO_ENTER_TENTATIVAS; tentativa++) {
-      if (!this.proc) return;
+      if (!this.proc) return true;
       const antes = this.promptsAceitos;
       this.proc.write("\r");
       const recebeu = await this.esperarRecibo(antes, espera);
-      if (recebeu) return;
+      if (recebeu) return true;
       log.info(
         this.a("entrada"),
         `o Enter ${tentativa}/${RECIBO_ENTER_TENTATIVAS} não virou turno em ${espera}ms; batendo na tecla de novo`,
       );
     }
-    // Não dá para consertar daqui, mas dá para NÃO mentir: quem lê o log precisa
-    // saber que o texto está na caixa e que ninguém vai processá-lo.
-    log.erro(
-      this.a("entrada"),
-      `digitei ${RECIBO_ENTER_TENTATIVAS} Enters e nenhum abriu turno: o texto ficou escrito na caixa de entrada do agente`,
-      "olhar a tela (GET /api/agents/:id/terminal) e dar um Enter à mão, ou reenviar por POST /api/agents/:id/input",
-    );
+    // Quem chamou tenta recuperar (recuperarEnvio) e, se não der, diz no log que o texto não chegou.
+    log.info(this.a("entrada"), `os ${RECIBO_ENTER_TENTATIVAS} Enters não abriram turno; vou conferir a tela antes de desistir`);
+    return false;
   }
 
   /** Espera o contador de prompts aceitos passar de `antes`. No Claude, sem hook vivo

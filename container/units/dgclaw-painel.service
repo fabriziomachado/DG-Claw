@@ -7,6 +7,9 @@ ConditionPathExists=/run/dgclaw/config/painel.env
 [Service]
 Type=simple
 User=agente
+# A aba Operações lê no diário as linhas "terminou" e "falhou" que o systemd escreve sobre as rotinas.
+# Só o painel ganha o grupo do diário: o agente (a sessão do Claude) continua sem ler o diário da caixa.
+SupplementaryGroups=systemd-journal
 EnvironmentFile=/run/dgclaw/config/painel.env
 WorkingDirectory=/opt/dgclaw/app/panel
 ExecStart=/usr/bin/node server.js

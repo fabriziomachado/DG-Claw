@@ -283,12 +283,35 @@ function executarPadrao(cmd, args, opts) {
   });
 }
 
+/** Root, ou no grupo systemd-journal (ou adm): pode ler as linhas que o systemd escreve sobre as rotinas. */
+function podeLerDiario() {
+  if (typeof process.getuid !== 'function' || process.getuid() === 0) return true;
+  let grupos;
+  try { grupos = new Set(process.getgroups()); } catch { return true; }
+  try {
+    for (const l of require('node:fs').readFileSync('/etc/group', 'utf8').split('\n')) {
+      const [nome, , gid] = l.split(':');
+      if ((nome === 'systemd-journal' || nome === 'adm') && grupos.has(Number(gid))) return true;
+    }
+  } catch { return true; }   // sem /etc/group legível: deixa o journalctl dizer
+  return false;
+}
+
 /**
  * Lê do diário os eventos de começo, fim, falha e parada das unidades pedidas.
  * Nunca rejeita: devolve { eventos, motivo }, e `motivo` preenchido quer dizer que
  * a leitura NÃO aconteceu (e não que não houve evento).
  */
 async function lerDiario(executar, padroes, desdeMs) {
+  // Sem o grupo do diário, o journalctl de quem não é root devolve vazio e em silêncio (o --quiet esconde a
+  // queixa): sem esta conferência a aba mostrava tudo "sem dado" (20/10/2026).
+  if (!podeLerDiario()) {
+    return {
+      eventos: [],
+      motivo: 'o painel não tem permissão para ler o diário do sistema (journal). '
+        + 'Quem cuida da máquina resolve dando ao serviço do painel o grupo "systemd-journal".',
+    };
+  }
   const args = ['-o', 'json', '--no-pager', '--quiet', `--since=@${Math.floor(desdeMs / 1000)}`];
   for (const p of padroes) args.push('-u', p);
   for (const id of Object.values(ID)) args.push(`MESSAGE_ID=${id}`);

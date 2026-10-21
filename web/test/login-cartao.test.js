@@ -22,13 +22,16 @@ test('linkSeguro só aceita https', () => {
 
 test('visao: início usa o texto e o nome do provedor', () => {
   const v = LC.visao({ estado: 'nenhum', provedor: 'claude', precisa_login: true }, { agente: 'Ana' });
-  assert.equal(v.fase, 'inicio'); assert.equal(v.titulo, 'Conectar o seu Claude'); assert.equal(v.botao, 'Conectar');
+  assert.equal(v.fase, 'inicio'); assert.equal(v.titulo, 'Conectar Ana ao seu Claude'); assert.equal(v.botao, 'Conectar'); assert.equal(v.passo, 0);
   assert.equal(v.texto, 'Ana precisa da sua conta do Claude para responder. Conecte aqui, sem terminal.');
   assert.equal(LC.visao({ estado: 'nenhum', provedor: 'codex' }, {}).titulo, 'Conectar o seu Codex');
 });
 
-test('visao: Claude aguardando código mostra link, 2 passos, campo e cancelar', () => {
-  const v = LC.visao({ estado: 'aguardando_codigo', provedor: 'claude', link: 'https://claude.ai/o' }, {});
+test('visao: Claude com o link pronto mostra só o botão de abrir; depois de abrir, o campo do código (passo 3)', () => {
+  const a = LC.visao({ estado: 'aguardando_codigo', provedor: 'claude', link: 'https://claude.ai/o' }, {});
+  assert.equal(a.fase, 'abrir'); assert.equal(a.campoCodigo, false); assert.equal(a.link, 'https://claude.ai/o'); assert.equal(a.passo, 0);
+  const v = LC.visao({ estado: 'aguardando_codigo', provedor: 'claude', link: 'https://claude.ai/o' }, { abriuLink: true });
+  assert.equal(v.passo, 2); assert.equal(v.reabrir, true);
   assert.equal(v.fase, 'codigo'); assert.equal(v.link, 'https://claude.ai/o'); assert.equal(v.campoCodigo, true);
   assert.equal(v.passos.length, 2); assert.equal(v.cancelar, true); assert.equal(v.codigoDispositivo, null);
 });
@@ -40,13 +43,16 @@ test('visao: Codex aguardando navegador mostra link e código de dispositivo, se
 
 test('visao: link que não é https nunca vira botão', () => {
   assert.equal(LC.visao({ estado: 'aguardando_codigo', link: 'javascript:x' }, {}).link, null);
+  assert.equal(LC.visao({ estado: 'aguardando_codigo', link: 'javascript:x' }, { abriuLink: true }).link, null);
 });
 
 test('visao: aguardando_link, falhou e concluido', () => {
   assert.equal(LC.visao({ estado: 'aguardando_link' }, {}).texto, 'Preparando o link…');
   const f = LC.visao({ estado: 'falhou', mensagem: 'prazo estourado' }, { iniciado: true });
   assert.equal(f.fase, 'falhou'); assert.equal(f.texto, 'prazo estourado'); assert.equal(f.botao, 'Tentar de novo');
-  assert.equal(LC.visao({ estado: 'concluido' }, { iniciado: true }).titulo, 'Conectado!');
+  assert.equal(LC.visao({ estado: 'concluido' }, { iniciado: true }).titulo, 'Conectado.');
+  assert.equal(LC.visao({ estado: 'concluido' }, { iniciado: true }).passo, 3);
+  assert.match(LC.visao({ estado: 'nenhum', precisa_login: true }, { vencido: true }).sub, /venceu/);
 });
 
 test('visao: concluido ou falhou antigos, de antes de abrir o cartão, não aparecem', () => {

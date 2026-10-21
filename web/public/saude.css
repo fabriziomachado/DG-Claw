@@ -52,3 +52,68 @@ a.ss-li:hover{background:var(--dg-superficie-2)}
 @media(prefers-reduced-motion:reduce){.ss-bt.girando svg{animation:none}}
 .ss-mais{display:block;margin:8px auto 0;border:0;background:transparent;font:inherit;font-size:13px;color:var(--dg-texto-3);cursor:pointer;padding:6px 10px;border-radius:999px}
 .ss-mais:hover{background:var(--dg-superficie-2);color:var(--dg-texto-2)}
+/* limite da conta e plano de uso (20/10/2026) */
+.ss-pad{padding:12px 14px;display:flex;flex-direction:column;gap:12px}
+.ss-conta{font-size:12.5px;color:var(--dg-texto-3)}
+.ss-lim{display:grid;grid-template-columns:110px 1fr 64px;gap:4px 12px;align-items:center}
+.ss-lim b{font-weight:600;font-size:13.5px}
+.ss-lim small{grid-column:1/-1;font-size:12px;color:var(--dg-texto-3);margin-top:-4px}
+.ss-p{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;font-size:13.5px}
+.ss-barra2{position:relative;height:6px;border-radius:3px;background:var(--dg-superficie-2)}
+.ss-barra2 i{display:block;height:100%;border-radius:3px;background:var(--dg-azul)}
+.ss-barra2.medio i{background:var(--dg-serie-2)}
+.ss-barra2.alto i{background:var(--dg-erro-texto)}
+.ss-marca{position:absolute;top:-3px;bottom:-3px;width:2px;border-radius:1px;background:var(--dg-texto-3)}
+.ss-div{height:1px;background:var(--dg-borda)}
+.ss-sec0{margin:0 0 -4px}
+.ss-pilha{display:flex;height:10px;border-radius:5px;overflow:hidden;gap:2px}
+.ss-pilha i{display:block;min-width:3px}
+.ss-leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px}
+.ss-leg span{display:inline-flex;align-items:center;gap:6px}
+.ss-leg i{width:8px;height:8px;border-radius:50%}
+.ss-leg em{font-style:normal;color:var(--dg-texto-3)}
+.ss-op{display:flex;align-items:flex-start;gap:10px}
+.ss-ic{color:var(--dg-texto-2);margin-top:2px;display:flex}
+.ss-optx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.ss-optx b{font-weight:600;font-size:13.5px}
+.ss-optx small{font-size:12.5px;color:var(--dg-texto-3)}
+.ss-niveis{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.ss-eco{align-self:flex-start;margin-top:8px;font-size:11.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--dg-superficie-2);color:var(--dg-texto-2)}
+.ss-eco.on{background:color-mix(in srgb,var(--dg-serie-2) 18%,transparent);color:var(--dg-serie-2)}
+.ss-sw{width:36px;height:20px;flex:0 0 36px;border-radius:999px;border:0;padding:0;margin-top:2px;background:var(--dg-superficie-2);position:relative;cursor:pointer}
+.ss-sw::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:var(--dg-texto-3);transition:left .15s}
+.ss-sw.on{background:var(--dg-azul)}
+.ss-sw.on::after{left:18px;background:var(--dg-fundo)}
+/* memória semântica (20/10/2026): uma linha por agente com as barras de uso das últimas 48 h */
+.ss-mem{display:flex;flex-direction:column;gap:8px}
+.ss-mem-l1{display:flex;align-items:center;gap:10px}
+.ss-bt-p{width:30px;height:30px;flex:0 0 30px;color:var(--dg-texto-3)}
+.ss-uso{display:flex;gap:3px;height:22px;margin-left:36px}
+.ss-uso i{flex:1;border-radius:3px;background:var(--dg-superficie-2)}
+.ss-uso i.nada{background:color-mix(in srgb,var(--dg-texto-3) 45%,transparent)}
+.ss-uso i.ok{background:var(--dg-entrega-texto)}
+.ss-mem-uso{margin-left:36px;font-size:12px;color:var(--dg-texto-3)}
+.ss-leg-mem{font-size:12px;color:var(--dg-texto-3)}
+.ss-leg-mem i{width:10px;height:10px;border-radius:3px;background:var(--dg-superficie-2)}
+.ss-leg-mem i.ok{background:var(--dg-entrega-texto)}
+.ss-leg-mem i.nada{background:color-mix(in srgb,var(--dg-texto-3) 45%,transparent)}
+.ss-busca{display:flex;align-items:center;gap:6px;border:1px solid var(--dg-borda);border-radius:999px;padding:4px 4px 4px 6px;background:var(--dg-fundo)}
+.ss-busca select{font:inherit;font-size:12.5px;font-weight:600;border:0;border-radius:999px;padding:4px 8px;background:var(--dg-superficie-2);color:var(--dg-texto)}
+.ss-busca input{flex:1;min-width:0;font:inherit;font-size:14px;border:0;background:transparent;color:var(--dg-texto);outline:none}
+.ss-go{width:30px;height:30px;flex:0 0 30px;border:0;border-radius:50%;background:var(--dg-azul);color:var(--dg-fundo);display:grid;place-items:center;cursor:pointer}
+.ss-res{display:flex;flex-direction:column;gap:8px}
+.ss-r{border-left:2px solid var(--dg-azul);padding:2px 0 2px 10px;font-size:13px;white-space:pre-line}
+.ss-r small{display:block;font-size:11.5px;color:var(--dg-texto-3);margin-bottom:2px}
+/* consumo de tokens com barra por agente (20/10/2026) */
+.ss-tk{display:flex;flex-direction:column;gap:6px}
+.ss-tk-l1{display:flex;align-items:center;gap:8px;font-size:13.5px}
+.ss-tk-l1 b{font-weight:600}
+.ss-tk-n{margin-left:auto;display:flex;gap:12px;font-variant-numeric:tabular-nums;font-size:13px;color:var(--dg-texto-2)}
+.ss-tk-n span:first-child{color:var(--dg-texto);font-weight:600}
+.ss-tk-barra{height:8px;border-radius:4px;background:var(--dg-superficie-2);margin-left:34px;overflow:hidden}
+.ss-tk-barra i{display:block;height:100%;border-radius:4px}
+.ss-pad.ss-tok{display:flex;flex-direction:column;align-items:stretch;gap:12px;padding:12px 14px;grid-template-columns:none}
+.ss-tk-lin{display:grid;grid-template-columns:52px 1fr 64px;gap:8px;align-items:center;margin-left:34px;font-size:12px;color:var(--dg-texto-3)}
+.ss-tk-lin .ss-tk-barra{margin-left:0}
+.ss-tk-lin b{text-align:right;font-size:13px;font-weight:600;color:var(--dg-texto);font-variant-numeric:tabular-nums}
+.ss-tk-barra i.s{opacity:.55}

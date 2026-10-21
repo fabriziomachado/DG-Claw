@@ -76,7 +76,7 @@ test('onboarding.css: z-index do modal, celular e movimento reduzido', () => {
 test('conversa.js usa o marcador só fora do dono, e o service worker subiu de versão', () => {
   const cj = lê('conversa.js');
   assert.match(cj, /!ehDono\(m\) && window\.DGOnboarding && window\.DGOnboarding\.marcadorParaBotao/);
-  assert.match(lê('sw.js'), /dgclaw-estaticos-v(1[5-9]|[2-9][0-9])\b/);
+  assert.match(lê('sw.js'), /dgclaw-estaticos-v(1[5-9]|[2-9][0-9]|[1-9][0-9]{2,})\b/);
 });
 
 test('a chegada do agente reabre o modal mesmo se a pessoa o minimizou (criação pela conversa)', () => {

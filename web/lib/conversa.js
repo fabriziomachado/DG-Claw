@@ -243,6 +243,31 @@ function criarConversa({ config, runner, leitor, leitorRollout, midia, log, agor
     return { msgs, versao, avisos, arquivo };
   }
 
+  /** 'login' (login vencido), 'erro' (outro erro da API, como limite) ou null: a última fala do registro, sem
+   *  pedido novo depois, é um erro da API (isApiErrorMessage)? */
+  async function turnoAcabouComErro(agente) {
+    try {
+      const t = await thread(agente);
+      if (!t.arquivo || ehRollout(t.arquivo)) return null;
+      const fd = fs.openSync(t.arquivo, 'r');
+      let txt = '';
+      try {
+        const tam = fs.fstatSync(fd).size, n = Math.min(tam, 65536), buf = Buffer.alloc(n);
+        fs.readSync(fd, buf, 0, n, tam - n);
+        txt = buf.toString('utf8');
+      } finally { fs.closeSync(fd); }
+      const linhas = txt.split('\n');
+      for (let i = linhas.length - 1; i >= 0; i--) {
+        if (!linhas[i].includes('"type":"user"') && !linhas[i].includes('"type":"assistant"')) continue;
+        let o; try { o = JSON.parse(linhas[i]); } catch (_) { continue; }
+        if (o.type !== 'user' && o.type !== 'assistant') continue;
+        if (o.type !== 'assistant' || o.isApiErrorMessage !== true) return null;
+        return o.error === 'authentication_failed' ? 'login' : 'erro';
+      }
+    } catch (_) { /* sem registro legível: vale o que o runner diz */ }
+    return null;
+  }
+
   /** O comando/arquivo que o agente quer rodar e ainda não rodou (sem tool_result), ou null. */
   async function pendenteDe(agente) {
     try {
@@ -268,7 +293,16 @@ function criarConversa({ config, runner, leitor, leitorRollout, midia, log, agor
     } else {
       const e = r.estado;
       const ultimo = typeof e.updatedAt === 'number' ? iso(e.updatedAt) : null;
-      if (e.status === 'working') {
+      const erroFinal = e.status === 'working' ? await turnoAcabouComErro(agente) : null;
+      if (erroFinal === 'login') {
+        // O login venceu no meio da sessão ("Login expired · Please run /login"): o runner continua em
+        // "working", mas o agente não responde mais. A conversa abre sozinha o cartão de conectar (20/10/2026).
+        est = { estado: 'sem_sinal', acao: null, detalhe: null, ultimo_sinal: ultimo, alerta: 'sem_login', motivo: `O login de ${agente.nome} no Claude venceu.` };
+      } else if (erroFinal) {
+        // O turno terminou num erro da API (limite de uso, 429): o Claude não chama o gancho de fim e o runner
+        // fica em "working" para sempre. A tela mostrava "trabalhando" e o parar não tinha o que parar (20/10/2026).
+        est = { estado: 'ocioso', acao: null, detalhe: null, ultimo_sinal: ultimo, alerta: null, motivo: null };
+      } else if (e.status === 'working') {
         est = { estado: 'trabalhando', acao: e.currentTool || 'pensando', detalhe: null, ultimo_sinal: ultimo, alerta: null, motivo: null };
         // o passo de agora, com o comando ou o arquivo de verdade (a linha "trabalhando" mostra ele no lugar do nome da ferramenta)
         if (e.currentTool) est.passo = await pendenteDe(agente);
@@ -291,6 +325,7 @@ function criarConversa({ config, runner, leitor, leitorRollout, midia, log, agor
     const desde = ant && ant.chave === chave ? ant.desde : iso(agoraMs);
     atividadeAnterior.set(agente.slug, { chave, desde });
     est.desde = est.estado === 'ocioso' ? null : desde;
+    est.parado_desde = est.estado === 'ocioso' ? desde : null;
     return est;
   }
 

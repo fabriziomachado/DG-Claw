@@ -427,6 +427,7 @@ new MutationObserver(() => { if (typeof pintaParar === 'function') pintaParar();
 if (window.DGSessaoParalela) window.DGSessaoParalela.inicia({ agente: AGENTE, atividade: atividadeEl, entrada });
 // aviso de cota acabada, com a hora da volta, e a fila das mensagens para a volta (cota.js)
 if (window.DGCota) window.DGCota.inicia({ agente: AGENTE, enviar: t => enviarTexto(t) });
+if (window.DGEconomia) window.DGEconomia.inicia({ agente: AGENTE });
 const atvNomeEl = atividadeEl && atividadeEl.querySelector('.atv-nome');
 const atvSepEl = atividadeEl && atividadeEl.querySelector('.atv-sep');
 const atvAcaoEl = atividadeEl && atividadeEl.querySelector('.atv-acao');
@@ -671,13 +672,13 @@ if (atividadeEl) {
    O código colado e o link nunca vão para console nem para log. */
 const LC = window.DGLoginCartao;
 const lcEl = $('loginCartao');
-const lc = { aberto: false, manual: false, iniciado: false, demo: false, dispensado: false,
+const lc = { aberto: false, manual: false, iniciado: false, demo: false, dispensado: false, abriuLink: false, vencido: false,
              carregando: false, ocupado: false, dados: null, erro: '', codigo: '', copiado: false,
              timer: null, conferindo: false, chave: '', fechaTimer: null };
 const LOGIN_API = API + '/login';
 
 function lcVisao() {
-  return LC.visao(lc.dados, { iniciado: lc.iniciado, agente: AGENTE.nome });
+  return LC.visao(lc.dados, { iniciado: lc.iniciado, agente: AGENTE.nome, abriuLink: lc.abriuLink, vencido: lc.vencido });
 }
 function lcBotao(texto, classe, aoClicar) {
   const b = document.createElement('button');
@@ -710,52 +711,90 @@ function lcDesenha() {
   const selIni = codigoFocado ? antes.selectionStart : 0, selFim = codigoFocado ? antes.selectionEnd : 0;
   const abrindo = lcEl.hidden;
 
+  /* Passo a passo (20/10/2026, pedido do dono): ícone, título e uma linha; os três passos com o atual
+     marcado; o texto do passo e uma ação só. Ações secundárias são o × e links discretos. */
+  const svg = d => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const ICO_LC = { chave: '<circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/>', x: '<path d="M6 6l12 12M18 6 6 18"/>',
+    ok: '<path d="m5 12 4.5 4.5L19 7"/>', ext: '<path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>', seta: '<path d="M12 19V5M6 11l6-6 6 6"/>' };
+  const pronto = v.fase === 'concluido';
   const topo = lcEl_('div', 'lc-topo');
+  const ic = lcEl_('span', 'lc-ic' + (pronto ? ' ok' : ''));
+  ic.innerHTML = svg(pronto ? ICO_LC.ok : ICO_LC.chave);
+  const tt = lcEl_('span', 'lc-tt');
   const tit = lcEl_('b', 'lc-titulo', v.titulo);
   tit.id = 'lcTitulo';
-  topo.append(tit);
+  tt.append(tit);
+  if (v.sub) tt.append(lcEl_('small', 'lc-sub', v.sub));
+  topo.append(ic, tt);
+  if (v.fechar || v.cancelar) {
+    const x = lcEl_('button', 'lc-x');
+    x.type = 'button'; x.innerHTML = svg(ICO_LC.x);
+    x.title = v.cancelar ? 'Cancelar o login' : 'Fechar'; x.setAttribute('aria-label', x.title);
+    x.disabled = lc.ocupado;
+    x.addEventListener('click', v.cancelar ? lcCancela : () => lcFecha(true));
+    topo.append(x);
+  }
   lcEl.setAttribute('aria-label', v.titulo);
   const corpo = [topo];
-  if (v.texto) corpo.push(lcEl_('p', 'lc-texto', v.texto));
-  if (v.passos && v.passos.length) {
-    const ol = lcEl_('ol', 'lc-passos');
-    for (const p of v.passos) ol.append(lcEl_('li', '', p));
-    corpo.push(ol);
+  if (v.fase !== 'ja_conectado' && v.fase !== 'falhou' && v.etapas) {
+    const pass = lcEl_('ol', 'lc-etapas');
+    v.etapas.forEach((t, i) => {
+      const li = lcEl_('li', i < v.passo ? 'ok' : i === v.passo ? 'on' : '');
+      const bola = lcEl_('i', '');
+      if (i < v.passo) bola.innerHTML = svg(ICO_LC.ok); else bola.textContent = String(i + 1);
+      li.append(bola, document.createTextNode(t));
+      if (i === v.passo) li.setAttribute('aria-current', 'step');
+      pass.append(li);
+    });
+    corpo.push(pass);
   }
-  if (v.link) {
-    const a = lcEl_('a', 'lc-btn lc-link', 'Abrir a página de login');
+  // no começo a linha de baixo do título já diz tudo; o texto entra a partir do passo do link
+  if (v.texto && !pronto && !['ja_conectado', 'inicio', 'falhou'].includes(v.fase)) corpo.push(lcEl_('p', 'lc-texto', v.texto));
+  if (v.link && !v.reabrir) {
+    const a = lcEl_('a', 'lc-btn lc-link');
+    a.innerHTML = svg(ICO_LC.ext) + '<span>Abrir a página de login</span>';
     a.href = v.link; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    // a página abriu: o passo vai para o código (a conferência de 2 em 2 s continua)
+    a.addEventListener('click', () => { lc.abriuLink = true; setTimeout(lcDesenha, 300); });
     corpo.push(a);
   }
-  if (v.codigoDispositivo) {
+  if (v.codigoDispositivo && (v.reabrir || !v.link)) {
     const linha = lcEl_('div', 'lc-disp');
     linha.append(lcEl_('code', 'lc-disp-cod', v.codigoDispositivo));
     linha.append(lcBotao(lc.copiado ? 'Copiado' : 'Copiar', 'lc-leve', () => lcCopia(v.codigoDispositivo)));
     corpo.push(linha);
   }
   if (v.campoCodigo) {
-    const rot = lcEl_('label', 'lc-rotulo', 'Cole aqui o código que aparece no fim');
-    rot.htmlFor = 'lcCodigo';
     const campo = document.createElement('input');
     campo.type = 'text'; campo.id = 'lcCodigo'; campo.className = 'lc-campo';
     campo.autocomplete = 'off'; campo.spellcheck = false; campo.value = lc.codigo;
+    campo.placeholder = 'Cole o código aqui';
+    campo.setAttribute('aria-label', 'Cole aqui o código que aparece no fim');
     campo.setAttribute('autocapitalize', 'off');
     campo.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); lcEnviaCodigo(); } });
     campo.addEventListener('focus', () => lcTrazCampo(campo));
+    const vai = lcBotao('', 'lc-go', lcEnviaCodigo);
+    vai.innerHTML = svg(ICO_LC.seta); vai.title = 'Enviar código'; vai.setAttribute('aria-label', 'Enviar código');
     const linha = lcEl_('div', 'lc-linha');
-    linha.append(campo, lcBotao('Enviar código', 'lc-principal', lcEnviaCodigo));
-    corpo.push(rot, linha);
+    linha.append(campo, vai);
+    corpo.push(linha);
+  }
+  if (v.reabrir && v.link) {
+    const p = lcEl_('p', 'lc-dica');
+    const a = lcEl_('a', '', 'Abrir a página de novo');
+    a.href = v.link; a.target = '_blank'; a.rel = 'noopener noreferrer';
+    p.append(document.createTextNode('Não abriu? '), a);
+    corpo.push(p);
   }
   if (lc.erro) {
     const e = lcEl_('p', 'lc-erro', lc.erro);
     e.setAttribute('role', 'alert');
     corpo.push(e);
   }
+  if (v.fase === 'falhou' || v.fase === 'ja_conectado') corpo.push(lcEl_('p', 'lc-texto', v.texto));
   const pe = lcEl_('div', 'lc-pe');
   if (v.botao) pe.append(lcBotao(lc.ocupado && v.fase === 'inicio' ? 'Conectando…' : v.botao, 'lc-principal', lcComeca));
   if (v.entrarDeNovo) pe.append(lcBotao('Entrar de novo', 'lc-leve', lcComeca));
-  if (v.cancelar) pe.append(lcBotao('Cancelar', 'lc-leve', lcCancela));
-  if (v.fechar) pe.append(lcBotao('Fechar', 'lc-leve', () => lcFecha(true)));
   if (pe.childElementCount) corpo.push(pe);
   const vivo = lcEl_('p', 'lc-vivo', v.aviso || '');
   vivo.setAttribute('aria-live', 'polite');
@@ -811,7 +850,7 @@ function lcFecha(dispensar) {
   clearTimeout(lc.fechaTimer);
   if (dispensar) lc.dispensado = true;
   Object.assign(lc, { aberto: false, manual: false, iniciado: false, demo: false, carregando: false,
-                      ocupado: false, erro: '', codigo: '', copiado: false });
+                      ocupado: false, erro: '', codigo: '', copiado: false, abriuLink: false });
   const era = !lcEl.hidden;
   lcDesenha();
   if (era) estadoOcioso();
@@ -854,7 +893,7 @@ function lcConcluiu() {
   // O oi é pedido já: o servidor espera o agente subir (até 60 s) e entrega uma vez só.
   api(LOGIN_API + '/oi', { method: 'POST', body: {}, timeoutMs: 75000 })
     .catch(e => mostraAviso('A conta foi conectada, mas não consegui pedir o oi do agente: ' + e.message + '. Escreva um oi na conversa.'));
-  lc.fechaTimer = setTimeout(() => { lc.fechaTimer = null; lcFecha(false); }, 1500);
+  lc.fechaTimer = setTimeout(() => { lc.fechaTimer = null; lcFecha(false); }, 4000);
 }
 
 async function lcComeca() {
@@ -862,7 +901,7 @@ async function lcComeca() {
   lc.ocupado = true; lc.erro = ''; lcDesenha();
   try {
     const d = await api(LOGIN_API, { method: 'POST', body: {}, timeoutMs: 20000 });
-    lc.dados = d; lc.iniciado = true; lc.carregando = false;
+    lc.dados = d; lc.iniciado = true; lc.carregando = false; lc.abriuLink = false;
     lcAgenda();
   } catch (e) {
     lc.erro = 'Não consegui começar o login: ' + e.message;
@@ -924,7 +963,7 @@ function lcSincroniza() {
   const est = window.atividadeFoto && window.atividadeFoto.agentes ? window.atividadeFoto.agentes[AGENTE.id] : null;
   const semLogin = !!est && est.alerta === 'sem_login';
   if (!semLogin) lc.dispensado = false;
-  if (semLogin && !lc.aberto && !lc.dispensado) lcAbre(false);
+  if (semLogin && !lc.aberto && !lc.dispensado) { lc.vencido = /venceu/.test(est.motivo || ''); lcAbre(false); }
   else if (!semLogin && lc.aberto && !lc.manual && !lc.iniciado) lcFecha(false);
 }
 
@@ -1940,6 +1979,7 @@ function render(opt) {
       continue;
     }
     if (m.origin === 'comando') { itens.push([m.id, htmlResultadoComando(m)]); continue; }
+    if (m.origin === 'linha') { itens.push([m.id, `<div class="linha-sis${m.economia ? ' eco' : ''}" data-msg="${esc(m.id)}"><span>${esc(m.text)}</span></div>`]); anterior = null; continue; }
     if (m.origin === 'mencao' && m.mencao) { itens.push([m.id, htmlMencao(m)]); anterior = 'her'; continue; }
     if (m.cartaoNasc) { itens.push([m.id, window.DGOnboarding.htmlCartao(m.cartaoNasc)]); anterior = null; continue; }
     const lado = ehDono(m) ? 'me' : 'her';
@@ -3357,15 +3397,52 @@ function pintaParar() {
   btnEnviar.setAttribute('aria-label', parar ? 'Parar o que ' + AGENTE.nome + ' está fazendo' : 'Enviar');
   btnEnviar.title = parar ? 'Parar o que ' + AGENTE.nome + ' está fazendo' : '';
 }
+/* Parar (21/10/2026, no design do app): um cartão discreto em cima do campo, no lugar da faixa amarela.
+   O servidor espera uns segundos para ver se o agente reagiu; congelado, o cartão oferece reiniciar a
+   sessão (a mesma conversa, e as mensagens na fila continuam). */
+const pararEl = document.createElement('div');
+pararEl.id = 'pararCartao'; pararEl.hidden = true; pararEl.setAttribute('role', 'status');
+{ const l1 = document.querySelector('.barra .linha1'); if (l1) l1.before(pararEl); }
+let pararTimer = null;
+const ICO_CARTAO_PARAR = {
+  gira: '<i class="pa-gira" aria-hidden="true"></i>',
+  ok: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"/></svg>',
+  alerta: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17h.01"/></svg>',
+  x: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+};
+function pintaCartaoParar(estado, texto, acao) {
+  clearTimeout(pararTimer);
+  if (!estado) { pararEl.hidden = true; pararEl.innerHTML = ''; return; }
+  pararEl.className = 'pa-' + estado;
+  pararEl.innerHTML = `<span class="pa-ic">${estado === 'andando' ? ICO_CARTAO_PARAR.gira : estado === 'ok' ? ICO_CARTAO_PARAR.ok : ICO_CARTAO_PARAR.alerta}</span>` +
+    `<span class="pa-tx">${texto}</span>` + (acao ? `<button type="button" class="pa-bt" data-pa="${acao.id}">${esc(acao.rotulo)}</button>` : '') +
+    (estado === 'travado' || estado === 'erro' ? `<button type="button" class="pa-x" data-pa="fechar" title="Fechar" aria-label="Fechar">${ICO_CARTAO_PARAR.x}</button>` : '');
+  pararEl.hidden = false;
+  if (estado === 'ok') pararTimer = setTimeout(() => pintaCartaoParar(null), 3500);
+}
+pararEl.addEventListener('click', async ev => {
+  const b = ev.target.closest('[data-pa]'); if (!b) return;
+  if (b.dataset.pa === 'fechar') { pintaCartaoParar(null); return; }
+  if (b.dataset.pa === 'destravar') {
+    pintaCartaoParar('andando', `Reiniciando ${esc(AGENTE.nome)}…`);
+    try {
+      await api(API + '/destravar', { method: 'POST', body: {}, timeoutMs: 70000 });
+      pintaCartaoParar('ok', `${esc(AGENTE.nome)} foi reiniciado. A conversa continua e as mensagens que esperavam vão chegar a ele.`);
+    } catch (e) { pintaCartaoParar('erro', `Não consegui reiniciar: ${esc(e.message)}`); }
+  }
+});
 async function interrompe() {
   btnEnviar.disabled = true;
+  pintaCartaoParar('andando', `Parando ${esc(AGENTE.nome)}…`);
   try {
-    await api(API + '/interromper', { method: 'POST', body: {} });
-    mostraAviso('Parei o que ' + AGENTE.nome + ' estava fazendo. A conversa e o que ele já fez continuam.');
-  } catch (e) { mostraErro('Não consegui parar: ' + e.message); }
+    const r = await api(API + '/interromper', { method: 'POST', body: {}, timeoutMs: 20000 });
+    if (r && r.travado) pintaCartaoParar('travado', `<b>${esc(AGENTE.nome)} não reagiu.</b> Parece travado.`, { id: 'destravar', rotulo: 'Reiniciar' });
+    else pintaCartaoParar('ok', `Parado. A conversa e o que ${esc(AGENTE.nome)} já fez continuam.`);
+  } catch (e) { pintaCartaoParar('erro', 'Não consegui parar: ' + esc(e.message)); }
   finally { btnEnviar.disabled = false; }
 }
 function ajustaCampo() {
+  try { pintaEspelho(); } catch (_) { /* a camada do @ ainda não existe (início da página) */ }
   const antes = entrada.offsetHeight;
   entrada.style.height = CAMPO_MIN + 'px';
   const cs = getComputedStyle(entrada);
@@ -4542,12 +4619,52 @@ function marcaDivisor() {
    dele volta aqui num cartão (lib/mencoes.js), e este agente recebe a resposta para continuar. */
 const mencionaveis = () => agentesMenu.filter(a => a.tipo !== 'admin' && a.id !== AGENTE.id);
 const fotoAg = a => { const img = a && (a.avatar_img || (/^https:\/\//i.test(a.avatar || '') ? a.avatar : '')); return img ? `<img src="${esc(img)}" alt="">` : esc((a && (a.avatar || a.nome) || '?').slice(0, 1)); };
+/* @Nome em destaque (21/10/2026, pedido do dono, opção A): uma pílula na cor do agente, no balão e no campo. */
+const corMencao = a => ` style="--c:${esc((a && a.cor) || '#3b82f6')}"`;
 function destacaMencao(html, m) {
-  if (m.mencaoPergunta.varios) return html.replace(/(^|>)((?:@[^\s<]+\s)+)/, (_, a, b) => a + b.trim().split(/\s+/).map(x => `<span class="mencao-nome">${x}</span>`).join(' ') + ' ');
+  if (m.mencaoPergunta.varios) return html.replace(/(^|>)((?:@[^\s<]+\s)+)/, (_, a, b) => a + b.trim().split(/\s+/).map(x => {
+    const ag = agentesMenu.find(y => '@' + y.nome.toLowerCase() === x.toLowerCase());
+    return `<span class="mencao-nome"${corMencao(ag)}>${x}</span>`;
+  }).join(' ') + ' ');
   const a = agentesMenu.find(x => x.id === m.mencaoPergunta.para);
   if (!a) return html;
   const marca = esc('@' + a.nome);
-  return html.replace(marca, `<span class="mencao-nome">${marca}</span>`);
+  return html.replace(marca, `<span class="mencao-nome"${corMencao(a)}>${marca}</span>`);
+}
+
+/* No campo de digitar o texto não tem cor por palavra: uma camada por cima do campo, com o mesmo texto
+   transparente, pinta só o fundo dos @Nome que batem com um agente. Fora da conversa do Admin, onde o @
+   não chama ninguém. */
+const espelho = document.createElement('div');
+espelho.id = 'entradaEspelho'; espelho.setAttribute('aria-hidden', 'true');
+if (!EH_ADMIN && entrada && entrada.parentElement) entrada.after(espelho);
+function pintaEspelho() {
+  if (EH_ADMIN || !espelho.isConnected) return;
+  const ags = mencionaveis();
+  const t = entrada.value;
+  if (!t.includes('@') || !ags.length) { if (espelho.innerHTML) espelho.innerHTML = ''; return; }
+  const nomes = ags.map(a => a.nome).sort((x, y) => y.length - x.length).map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const rx = new RegExp('(^|\\s)@(' + nomes.join('|') + ')(?=$|[\\s,.!?:;])', 'gi');
+  let html = '', ult = 0, m;
+  while ((m = rx.exec(t))) {
+    const ini = m.index + m[1].length, fim = ini + 1 + m[2].length;
+    const a = ags.find(x => x.nome.toLowerCase() === m[2].toLowerCase());
+    html += esc(t.slice(ult, ini)) + `<span class="esp-men"${corMencao(a)}>${esc(t.slice(ini, fim))}</span>`;
+    ult = fim;
+  }
+  if (!ult) { if (espelho.innerHTML) espelho.innerHTML = ''; return; }
+  espelho.innerHTML = html + esc(t.slice(ult)) + '\u200b';
+  // a mesma caixa do campo (o tema e o celular mudam padding e fonte): copia do estilo calculado
+  const cs = getComputedStyle(entrada);
+  for (const k of ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'borderTopWidth', 'borderRightWidth', 'borderBottomWidth',
+    'borderLeftWidth', 'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'wordSpacing', 'textIndent']) espelho.style[k] = cs[k];
+  Object.assign(espelho.style, { left: entrada.offsetLeft + 'px', top: entrada.offsetTop + 'px', width: entrada.offsetWidth + 'px', height: entrada.offsetHeight + 'px' });
+  espelho.scrollTop = entrada.scrollTop;
+}
+if (entrada) {
+  entrada.addEventListener('input', pintaEspelho);
+  entrada.addEventListener('scroll', () => { espelho.scrollTop = entrada.scrollTop; });
+  window.addEventListener('resize', pintaEspelho);
 }
 function htmlEquipe(m) {
   const me = m.mencao;

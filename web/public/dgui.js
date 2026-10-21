@@ -392,9 +392,13 @@
     doc.addEventListener('click', (ev) => {
       const b = ev.target.closest && ev.target.closest('[data-dg-car-ir]'); if (!b) return;
       const car = b.closest('.dg-car'), tr = car && car.querySelector('.dg-car-trilho'); if (!tr) return;
-      const i = Math.max(0, Math.min(tr.children.length - 1, atual(tr) + Number(b.dataset.dgCarIr)));
-      const alvo = tr.children[i];
-      tr.scrollTo({ left: alvo.offsetLeft - tr.offsetLeft, behavior: 'smooth' });
+      // pela posição de cada cartão, e não pelo "atual": no computador cabem dois cartões, e no fim o
+      // "atual" é o último, então voltar um caía no mesmo lugar e a seta de voltar não andava (21/10/2026)
+      const x = tr.scrollLeft, pos = [...tr.children].map((c) => c.offsetLeft - tr.offsetLeft);
+      const alvo = Number(b.dataset.dgCarIr) < 0
+        ? pos.filter((p) => p < x - 4).pop()
+        : pos.find((p) => p > x + 4);
+      tr.scrollTo({ left: alvo == null ? (Number(b.dataset.dgCarIr) < 0 ? 0 : tr.scrollWidth) : alvo, behavior: 'smooth' });
     });
     doc.addEventListener('keydown', (ev) => {
       const tr = ev.target && ev.target.classList && ev.target.classList.contains('dg-car-trilho') ? ev.target : null;

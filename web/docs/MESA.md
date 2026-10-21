@@ -63,6 +63,7 @@ Funciona sozinha em cada VPS, sem nenhum serviço de fora. A verdade fica no Web
 | `titulo` | até 120 caracteres. Obrigatório |
 | `origem` | o pedido em uma linha, **com a data** ("Dono, 05/10 15h42: ..."). Até 300. Obrigatório |
 | `tipo` | `conteudo`, `desenvolvimento`, `projeto` ou `outro` (padrão) |
+| `prazo` | dia em que a tarefa precisa estar pronta, `AAAA-MM-DD`, ou `null` (21/10/2026). O dono vê "até sex, 24/10" e "atrasada" no Board |
 | `estado` | `fazendo` (padrão), `travada`, `esperando_dono`, `concluida` ou `cancelada`. `esperando_danilo` é aceito como sinônimo de `esperando_dono` |
 | `motivo` | obrigatório em `travada` e `esperando_dono`: o que travou, ou o que o dono precisa decidir. Até 300. Some sozinho quando a tarefa sai desses estados |
 | `progresso` | 0 a 100, ou `null`. Opcional |

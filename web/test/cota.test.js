@@ -15,3 +15,10 @@ test('falta: minutos e horas em português', () => {
   assert.equal(falta(138 * 60000), '2 h 18 min');
   assert.equal(falta(-1), 'a qualquer momento');
 });
+test('horaDaVolta: o limite semanal vem com o dia (20/10/2026)', () => {
+  const agora = new Date('2026-10-20T19:30:00Z');
+  assert.equal(horaDaVolta("You've hit your weekly limit · resets Oct 25, 12am (America/Sao_Paulo)", agora).toISOString(), '2026-10-25T03:00:00.000Z');
+  assert.equal(horaDaVolta('resets Jan 2, 3:15pm (America/Sao_Paulo)', new Date('2026-12-30T12:00:00Z')).toISOString(), '2027-01-02T18:15:00.000Z');
+  assert.equal(horaDaVolta('resets Foo 2, 3pm (America/Sao_Paulo)', agora), null);
+  assert.equal(falta(4 * 86400000 + 5 * 3600000), '4 dias 5 h');
+});

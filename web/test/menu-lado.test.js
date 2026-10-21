@@ -17,7 +17,7 @@ test('conversa.html carrega o menu novo e não tem mais o link avulso do painel'
 
 test('sw.js guarda os arquivos novos e está na v14', () => {
   const s = pub('sw.js');
-  assert.match(s, /dgclaw-estaticos-v(1[5-9]|[2-9][0-9])\b/);
+  assert.match(s, /dgclaw-estaticos-v(1[5-9]|[2-9][0-9]|[1-9][0-9]{2,})\b/);
   assert.match(s, /'\/menu-lado\.js'/);
   assert.match(s, /'\/menu-lado\.css'/);
 });
@@ -129,7 +129,7 @@ test('enquadrar foto: a folha traz o controle com rótulo e a dica em português
   assert.match(js, /arraste para posicionar e use o controle para aproximar/);
   assert.match(js, /setPointerCapture/);
   assert.match(pub('menu-lado.css'), /\.ml-fs-corte\{[^}]*touch-action:none/);
-  assert.match(pub('sw.js'), /dgclaw-estaticos-v(2[7-9]|[3-9][0-9])\b/);
+  assert.match(pub('sw.js'), /dgclaw-estaticos-v(2[7-9]|[3-9][0-9]|[1-9][0-9]{2,})\b/);
   const textos = js.slice(js.indexOf('function folhaFoto')).match(/'[^'\n]*[a-zà-ú][^'\n]*'/g) || [];
   for (const t of textos) assert.doesNotMatch(t, /[—–]/, t);
 });

@@ -318,12 +318,31 @@ TEXTO_JEITO_NEUTRO="Educado, direto e objetivo. Fala em portugues do Brasil, em 
 # renderizar_template <arquivo.tmpl>: imprime o template com os campos preenchidos.
 # Todo {{CAMPO}} que sobrar sai do texto: campo cru na identidade do agente faria ele
 # repetir chaves para o dono.
+# regra_paralela: quando o agente abre uma sessão paralela (card), combinado pelo dono na Saúde do
+# servidor, "Planejar o uso" (Web, /var/lib/dgclaw/web/limites.json, config.paralela). Padrão: 5 minutos.
+regra_paralela() {
+    local arq="${DGCLAW_WEB_DADOS:-/var/lib/dgclaw/web}/limites.json" ligado="true" min="5"
+    if [ -f "$arq" ]; then
+        ligado="$(jq -r 'if .config.paralela.ligado == false then "false" else "true" end' "$arq" 2>/dev/null || echo true)"
+        min="$(jq -r '.config.paralela.minutos // 5' "$arq" 2>/dev/null || echo 5)"
+        case "$min" in ''|*[!0-9]*) min=5 ;; esac
+    fi
+    if [ "$ligado" = false ]; then
+        printf '%s' '**Quando abrir um card (regra combinada com {{DONO}}):** só quando {{DONO}} pedir ("faz em paralelo", "abre uma sessão para isso"). Fora isso, faça você mesmo.'
+    else
+        local bt='`'
+        printf '%s' "**Quando abrir um card (regra combinada com {{DONO}}): todo trabalho que deve passar de ${min} minutos vai para um card, sempre com ${bt}--monitor${bt}.** Exemplos: análise ou relatório, varrer muitos chamados ou arquivos, mexer em código, pesquisa longa. No mesmo turno, responda a {{DONO}} na hora: diga que abriu uma sessão paralela, o título dela e que avisa quando terminar, e fique livre para a conversa. Quando o card terminar, confira o resultado e mande com ${bt}[ENTREGA] ${bt}. O que leva menos que isso, faça você mesmo. Se {{DONO}} pedir para fazer ali mesmo, faça."
+    fi
+}
+
 renderizar_template() {
     local tmpl="$1"
     local nome dono slug papel jeito
     nome="$(sed_esc "$C_NOME")"; dono="$(sed_esc "$C_DONO_TEXTO")"; slug="$(sed_esc "$C_SLUG")"
     papel="$(sed_esc "$C_PAPEL")"; jeito="$(sed_esc "$C_JEITO")"
+    local paralela; paralela="$(sed_esc "$(regra_paralela)")"
     sed \
+        -e "s|{{REGRA_PARALELA}}|$paralela|g" \
         -e 's|^Voce conversa pelo Telegram e vive 24/7 numa VPS\.$|Voce conversa com {{DONO}} pelo painel (aba Conversa) e vive 24/7 num servidor.\n\n## Seu papel\n\n{{PAPEL}}|' \
         -e 's|^- So o {{DONO}} fala com voce (a lista de permissao do Telegram garante isso)\.|- So o {{DONO}} fala com voce, pelo painel.|' \
         -e 's|systemctl restart dgclaw-{{SLUG}}\.service|systemctl restart dgclaw-runner.service|' \
@@ -396,6 +415,13 @@ gerar_identidade() {
     renderizar_template "$tpl/CLAUDE.md.tmpl" | escrever_se_novo "$h/CLAUDE.md" 644 "$ug"
     renderizar_template "$tpl/AGENTS.md.tmpl" | escrever_se_novo "$h/AGENTS.md" 644 "$ug"
     renderizar_template "$tpl/MEMORY.md.tmpl" | escrever_se_novo "$h/MEMORY.md" 644 "$ug"
+    # ajudantes leves no Haiku (pesquisador e leitor), 20/10/2026: a leitura pesada sai do limite caro
+    if [ -d "$tpl/ajudantes" ]; then
+        for f in "$tpl"/ajudantes/*.md; do
+            [ -f "$f" ] && escrever_se_novo "$h/.claude/agents/$(basename "$f")" 644 "$ug" < "$f"
+        done
+        [ "$ENSAIO" = 1 ] || { [ -d "$h/.claude/agents" ] && dono "$ug" "$h/.claude" "$h/.claude/agents"; }
+    fi
 
     regravar_identidade_md
 }
@@ -443,7 +469,8 @@ gerar_runner_json() {
                              DGCLAW_RUNNER_URL: "http://127.0.0.1:4300",
                              RUNNER_TOKEN_FILE: "/run/dgclaw/segredos/runner.token"},
                   promptHooks: ["node /opt/dgclaw/app/scripts/foco-hook.mjs",
-                                "node /opt/dgclaw/app/scripts/novidades-hook.mjs"],
+                                "node /opt/dgclaw/app/scripts/novidades-hook.mjs",
+                                "bash /opt/dgclaw/app/hooks/memory-recall.sh"],
                   tags: ["dgclaw", $slug], cofre: []}}'
 }
 
@@ -1212,6 +1239,8 @@ agente_reparar() {
     garantir_gancho_foco "$DG_CASAS/$slug/runner/runner.json" "$slug"
     passo "Garantindo o gancho do aviso de novidades no runner.json"
     garantir_gancho_novidades "$DG_CASAS/$slug/runner/runner.json" "$slug"
+    passo "Garantindo o gancho do lembrete da memoria no runner.json"
+    garantir_gancho_memoria "$DG_CASAS/$slug/runner/runner.json" "$slug"
     passo "Regravando o config.sh do agente $slug"
     regravar_config_sh "$slug" "$obj"
     passo "Regravando a identidade do agente $slug"

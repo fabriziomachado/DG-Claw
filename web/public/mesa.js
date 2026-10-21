@@ -20,7 +20,35 @@
 
   /* ───────────── partes puras ───────────── */
 
+  const ico = (d, t) => `<svg viewBox="0 0 24 24" width="${t || 16}" height="${t || 16}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const ICO = {
+    espera: ico('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'),
+    fazendo: ico('<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/>'),
+    trava: ico('<path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17h.01"/>'),
+    pronto: ico('<circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/>'),
+    cancel: ico('<circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/>'),
+    seta: ico('<path d="m9 6 6 6-6 6"/>', 14),
+    sino: ico('<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>'),
+    tarefa: ico('<rect x="4" y="4" width="16" height="16" rx="3"/><path d="m8.5 12 2.5 2.5 4.5-5"/>'),
+    ajustes: ico('<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/>', 18),
+    enviar: ico('<path d="M12 19V5M6 11l6-6 6 6"/>', 18),
+    cal: ico('<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/>', 13),
+  };
+  const DIAS_CURTOS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+  /* "até sex, 24/10" e se já passou (só vale para tarefa aberta). hoje: Date. */
+  function textoPrazo(prazo, hoje) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(prazo || '')) return null;
+    const [a, m, d] = prazo.split('-').map(Number);
+    const dt = new Date(a, m - 1, d), h = hoje || new Date();
+    const h0 = new Date(h.getFullYear(), h.getMonth(), h.getDate());
+    const dias = Math.round((dt - h0) / 86400000);
+    const texto = dias === 0 ? 'até hoje' : dias === 1 ? 'até amanhã' : `até ${DIAS_CURTOS[dt.getDay()]}, ${pad2(d)}/${pad2(m)}`;
+    return { texto, vencido: dias < 0, perto: dias >= 0 && dias <= 1 };
+  }
+
   const ESTADO_DONO = 'esperando_dono';
+  // aberta: vem do servidor; sem o campo, decide pelo estado
+  const ehAberta = t => (typeof t.aberta === 'boolean' ? t.aberta : ['fazendo', 'travada', 'esperando_dono', 'esperando_danilo'].includes(t.estado));
   const normEstado = e => (e === 'esperando_danilo' ? ESTADO_DONO : e);
 
   /* { texto, classe } do selo. "parada?" só vale para fazendo. */
@@ -153,14 +181,17 @@
       campos = `<label>Título<input name="titulo" type="text" maxlength="120" value="${esc(v.titulo != null ? v.titulo : t.titulo)}"></label>` +
         `<label>Nota<input name="nota" type="text" maxlength="200" value="${esc(v.nota != null ? v.nota : (t.nota || ''))}"></label>` +
         `<label>Progresso (0 a 100, vazio = sem medida)<input name="progresso" type="number" min="0" max="100" step="1" inputmode="numeric" value="${esc(prog)}"></label>` +
-        `<label>Link<input name="link" type="text" maxlength="500" value="${esc(v.link != null ? v.link : (t.link || ''))}"></label>`;
+        `<label>Link<input name="link" type="text" maxlength="500" value="${esc(v.link != null ? v.link : (t.link || ''))}"></label>` +
+        `<label>Prazo<input name="prazo" type="date" value="${esc(v.prazo != null ? v.prazo : (t.prazo || ''))}"></label>`;
     }
     return `<form class="mz-form" ${atrib} data-form="${esc(form.tipo)}"><h4>${esc(titulo)}</h4>${campos}${htmlErros(form.erro)}` +
       `<div class="mz-linha"><button type="submit" class="mz-btn pri" ${atrib} data-acao="enviar-form">${esc(ok)}</button>` +
       `<button type="button" class="mz-btn" ${atrib} data-acao="fechar-form">Voltar</button></div></form>`;
   }
 
-  /* opcoes = { aberto, eventos, form, msg, demo }. Tudo o que vem da API passa por esc(). */
+  /* A tarefa como linha, no estilo da aba Hoje (21/10/2026, pedido do dono): foto do agente, título, o que
+     está acontecendo, a barra fina e o prazo; tocar abre os passos, as ações e o histórico embaixo.
+     opcoes = { aberto, eventos, form, msg, demo, foto (html da foto do agente) }. Tudo da API passa por esc(). */
   function htmlCartao(t, opcoes) {
     const o = opcoes || {};
     const sel = rotuloEstado(t);
@@ -173,30 +204,32 @@
     const origemProg = { informado: 'informado pelo agente', passos: 'passos feitos ÷ total', concluida: 'tarefa concluída' }[t.progresso_origem] || '';
     const passos = Array.isArray(t.passos) ? t.passos : [];
     const anexos = Array.isArray(t.anexos) ? t.anexos : [];
-    let h = `<article class="mz-cartao est-${sel.classe}${fechada ? ' fechada' : ''}${o.demo ? ' demo' : ''}" id="t${id}" ${atrib} data-estado="${esc(estado)}">`;
-    h += `<button type="button" class="mz-cab" ${atrib} data-acao="abrir" aria-expanded="${o.aberto ? 'true' : 'false'}">` +
-      `<span class="mz-tit">${esc(t.titulo)}${o.demo ? ' <em>(demonstração)</em>' : ''}</span>` +
-      `<span class="mz-selo ${sel.classe}">${esc(sel.texto)}</span></button>`;
-    if ((estado === ESTADO_DONO || estado === 'travada') && t.motivo) {
-      h += `<p class="mz-motivo"><b>${estado === 'travada' ? 'Travou porque' : 'Precisa de você'}:</b> ${esc(t.motivo)}</p>`;
-    }
-    h += pct == null
-      ? '<div class="mz-prog" data-tour-alvo="progresso"><span class="mz-semmedida">sem medida</span></div>'
-      : `<div class="mz-prog" data-tour-alvo="progresso"><div class="mz-barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${esc(Math.round(pct))}"` +
-        `${origemProg ? ` title="${esc(origemProg)}"` : ''}><i style="width:${pct}%"></i></div><span class="mz-pnum">${esc(prog)}</span></div>`;
-    if (passos.length) {
-      h += '<ul class="mz-passos">' + passos.map(p => `<li class="${p.feito ? 'feito' : ''}"><span aria-hidden="true">${p.feito ? '✓' : '○'}</span> ${esc(p.texto)}</li>`).join('') + '</ul>';
-    }
-    if (t.nota) h += `<p class="mz-nota">${esc(t.nota)}</p>`;
-    if (t.origem) h += `<p class="mz-origem">${esc(t.origem)}</p>`;
-    const ligacoes = [];
-    if (t.link) ligacoes.push(linkHtml(t.link, 'Ver o trabalho'));
-    for (const a of anexos) ligacoes.push(linkHtml(a.url, a.rotulo || a.url));
-    if (ligacoes.length) h += '<p class="mz-links">' + ligacoes.join('') + '</p>';
-    h += `<p class="mz-quando">${esc(haMin(t.atualizada_ha_min))}</p>`;
+    const passoAtual = passos.find(p => !p.feito);
+    const sub = (estado === ESTADO_DONO || estado === 'travada') && t.motivo
+      ? `<span class="mz-motivo"><b>${estado === 'travada' ? 'Travou porque' : 'Precisa de você'}:</b> ${esc(t.motivo)}</span>`
+      : esc([t.nota || (passoAtual && passoAtual.texto) || (fechada ? sel.texto : ''), haMin(t.atualizada_ha_min).replace('atualizada ', '')].filter(Boolean).join(' · '));
+    const pz = !fechada ? textoPrazo(t.prazo) : null;
+    let h = `<article class="mz-cartao tz-l est-${sel.classe}${fechada ? ' fechada' : ''}${o.aberto ? ' aberto' : ''}${o.demo ? ' demo' : ''}" id="t${id}" ${atrib} data-estado="${esc(estado)}">`;
+    h += `<button type="button" class="mz-cab tz-cab" ${atrib} data-acao="abrir" aria-expanded="${o.aberto ? 'true' : 'false'}">${o.foto || ''}` +
+      `<span class="tz-tx"><span class="mz-tit">${esc(t.titulo)}${o.demo ? ' <em>(demonstração)</em>' : ''}</span><small class="tz-sub">${sub}</small>` +
+      (pct == null || fechada ? '' : `<span class="mz-barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${esc(Math.round(pct))}"${origemProg ? ` title="${esc(origemProg)}"` : ''}><i style="width:${Math.max(2, pct)}%"></i></span>`) +
+      '</span>' +
+      (pz ? `<span class="tz-prazo${pz.vencido ? ' vencido' : pz.perto ? ' perto' : ''}">${ICO.cal}${esc(pz.vencido ? 'atrasada' : pz.texto)}</span>` : '') +
+      (estado === ESTADO_DONO ? '<span class="mz-selo esperando">sua vez</span>' : t.parada && estado === 'fazendo' ? '<span class="mz-selo parada">parada?</span>' : '') +
+      `<span class="mz-pnum">${pct == null ? '<span class="vh">sem medida</span>' : fechada ? '' : esc(prog)}</span>` +
+      `<span class="tz-ir">${ICO.seta}</span></button>`;
     if (o.msg) h += htmlErros(o.msg);
     if (o.aberto) {
       h += '<div class="mz-detalhes">';
+      if (passos.length) {
+        h += '<ul class="mz-passos">' + passos.map(p => `<li class="${p.feito ? 'feito' : ''}"><span aria-hidden="true">${p.feito ? '✓' : '○'}</span> ${esc(p.texto)}</li>`).join('') + '</ul>';
+      }
+      if (t.nota && (estado === ESTADO_DONO || estado === 'travada') && t.motivo) h += `<p class="mz-nota">${esc(t.nota)}</p>`;   // fora disso a nota já está na linha
+      if (t.origem) h += `<p class="mz-origem">${esc(t.origem)}</p>`;
+      const ligacoes = [];
+      if (t.link) ligacoes.push(linkHtml(t.link, 'Ver o trabalho'));
+      for (const a of anexos) ligacoes.push(linkHtml(a.url, a.rotulo || a.url));
+      if (ligacoes.length) h += '<p class="mz-links">' + ligacoes.join('') + '</p>';
       if (o.form) {
         h += htmlFormCartao(t, o.form);
       } else {
@@ -216,7 +249,7 @@
     return h + '</article>';
   }
 
-  const puras = { esc, rotuloEstado, textoProgresso, haMin, agrupaPorAgente, textoOrigem, urlSegura, fraseErro, htmlCartao, htmlHistorico, htmlFormCartao, formataQuando };
+  const puras = { esc, rotuloEstado, textoProgresso, haMin, agrupaPorAgente, textoOrigem, urlSegura, fraseErro, htmlCartao, htmlHistorico, htmlFormCartao, formataQuando, textoPrazo };
   if (typeof document === 'undefined') return puras;
 
   /* ───────────── navegador ───────────── */
@@ -313,9 +346,9 @@
   /* ── Aba Tarefas ── */
   const E = {
     agentes: [], tarefas: [], contagem: null, etag: null,
-    filtroAgentes: new Set(), dia: 'hoje',
+    filtroAgentes: new Set(), dia: 'hoje', so: 'abertas', detalhes: false,
     abertos: new Set(), eventos: {}, form: null, msg: {},
-    mostraVazios: false, demo: false, pendente: false, ocupado: false,
+    demo: false, pendente: false, ocupado: false,
     focoId: null, ativa: false, jaCarregou: false,
   };
   const els = {};
@@ -388,7 +421,7 @@
         passos: [{ texto: 'pesquisa', feito: true }, { texto: 'roteiro', feito: false }], origem: 'Dono, 05/10 15h42: faz o roteiro do reels',
         versao: '0', atualizada_ha_min: 3, _demo: true }];
     }
-    return E.tarefas.filter(t => !E.filtroAgentes.size || E.filtroAgentes.has(t.agente));
+    return E.tarefas.filter(t => (!E.filtroAgentes.size || E.filtroAgentes.has(t.agente)) && (E.so !== 'abertas' || ehAberta(t)));
   }
 
   function avatar(a) {
@@ -397,58 +430,47 @@
     return `<span class="mz-foto" style="background:${cor}">${img ? `<img src="${esc(img)}" alt="">` : esc(a.avatar || (a.nome || '?').slice(0, 1))}</span>`;
   }
 
+  /* Seções como na aba Hoje: Esperando você, Travadas, Fazendo, Prontas e Canceladas, uma linha por tarefa. */
   function render() {
     const y = window.scrollY;
-    const visiveis = tarefasVisiveis();
-    const grupos = agrupaPorAgente(visiveis, E.agentes)
-      .filter(g => !E.filtroAgentes.size || E.filtroAgentes.has(g.agente.id) || g.tarefas.length);
-    const comTarefa = grupos.filter(g => g.tarefas.length), sem = grupos.filter(g => !g.tarefas.length);
-    const bloco = g => {
-      const abertas = g.tarefas.filter(t => t.aberta).length;
-      return `<section class="mz-bloco" data-agente="${esc(g.agente.id)}">` +
-        `<header class="mz-bloco-cab">${avatar(g.agente)}<h3>${esc(g.agente.nome)}</h3>` +
-        `<span class="mz-conta">${abertas} ${abertas === 1 ? 'aberta' : 'abertas'}</span>` +
-        `<button type="button" class="mz-ajuda" data-acao="ajuda-cartao" title="Como ler um cartão" aria-label="Como ler um cartão">?</button></header>` +
-        (g.tarefas.length
-          ? '<div class="mz-cartoes">' + g.tarefas.map(t => htmlCartao(t, {
-            aberto: E.abertos.has(t.id), eventos: E.eventos[t.id], demo: !!t._demo,
-            form: E.form && E.form.id === t.id ? E.form : null, msg: E.msg[t.id],
-          })).join('') + '</div>'
-          : '<p class="mz-vazio">Nenhuma tarefa neste filtro.</p>') +
-        '</section>';
-    };
-    let h = comTarefa.map(bloco).join('');
-    if (!comTarefa.length && E.jaCarregou) {
-      h = '<p class="mz-vazio grande">Nenhuma tarefa neste filtro. Quando um agente começar um trabalho, ele aparece aqui.</p>';
+    const vis = tarefasVisiveis();
+    const porId = new Map(E.agentes.map(a => [a.id, a]));
+    const linha = t => htmlCartao(t, {
+      aberto: E.abertos.has(t.id), eventos: E.eventos[t.id], demo: !!t._demo,
+      form: E.form && E.form.id === t.id ? E.form : null, msg: E.msg[t.id],
+      foto: avatar(porId.get(t.agente) || { id: t.agente, nome: t.agente }),
+    });
+    const de = e => vis.filter(t => normEstado(t.estado) === e);
+    const secoes = [
+      ['esperando', ICO.espera, 'Esperando você', de(ESTADO_DONO), true],
+      ['travada', ICO.trava, 'Travadas', de('travada'), true],
+      ['fazendo', ICO.fazendo, 'Fazendo', de('fazendo'), true],
+      ['concluida', ICO.pronto, E.dia === 'hoje' ? 'Prontas hoje' : 'Prontas', de('concluida'), false],
+      ['cancelada', ICO.cancel, 'Canceladas', de('cancelada'), false],
+    ];
+    let h = '';
+    for (const [id, icone, titulo, ts, sempre] of secoes) {
+      if (!ts.length && !sempre) continue;
+      h += `<div class="bh-sec tz-sec" data-sec="${id}">${icone}${esc(titulo)}<span class="q">${ts.length}</span></div>`;
+      if (ts.length) h += `<div class="bh-grupo tz-grupo">${ts.map(linha).join('')}</div>`;
     }
-    if (sem.length) {
-      h += `<button type="button" class="mz-btn mz-vazios-btn" data-acao="vazios" aria-expanded="${E.mostraVazios}">` +
-        `${E.mostraVazios ? 'esconder' : 'mostrar'} agentes sem tarefa (${sem.length})</button>`;
-      if (E.mostraVazios) h += '<div class="mz-sem">' + sem.map(bloco).join('') + '</div>';
+    if (!vis.length && E.jaCarregou) {
+      h += `<p class="bh-fraco tz-vazio">${E.so === 'abertas' ? 'Nenhuma tarefa aberta agora. Quando um agente começar um trabalho, ele aparece aqui.' : 'Nenhuma tarefa neste filtro.'}</p>`;
     }
     els.board.innerHTML = h;
     window.scrollTo(0, y);
-    renderContagem();
+    renderFiltros();
     bolinha('tarefas', abaAtual !== 'tarefas' && E.contagem && E.contagem.esperando_dono > 0);
   }
 
-  function renderContagem() {
-    const c = E.contagem;
-    if (!c) { els.contagem.innerHTML = '<span class="mz-vazio">Carregando a mesa...</span>'; return; }
-    const item = (n, rot, cl) => `<span class="mz-cont ${cl}${n ? ' tem' : ''}"><b>${esc(n)}</b> ${esc(rot)}</span>`;
-    els.contagem.innerHTML = item(c.esperando_dono, 'esperando você', 'esperando') + item(c.travadas, 'travadas', 'travada') +
-      item(c.paradas, 'paradas', 'parada') + item(c.abertas, 'abertas', 'abertas');
-  }
-
+  /* Filtros discretos: Abertas, Hoje e Todas em pílulas, e as fotos dos agentes para filtrar por quem. */
   function renderFiltros() {
-    const chips = E.agentes.map(a => `<button type="button" class="mz-chip${E.filtroAgentes.has(a.id) ? ' on' : ''}" data-acao="chip" data-agente="${esc(a.id)}" aria-pressed="${E.filtroAgentes.has(a.id)}">${esc(a.nome)}</button>`).join('');
-    const ehData = /^\d{4}-\d{2}-\d{2}$/.test(E.dia);
-    els.filtros.innerHTML =
-      `<div class="mz-grupo" role="group" aria-label="Filtrar por agente">${chips}</div>` +
-      '<div class="mz-grupo" role="group" aria-label="Filtrar por dia">' +
-      `<button type="button" class="mz-chip${E.dia === 'hoje' ? ' on' : ''}" data-acao="dia" data-dia="hoje">Hoje</button>` +
-      `<button type="button" class="mz-chip${E.dia === 'todos' ? ' on' : ''}" data-acao="dia" data-dia="todos">Todos</button>` +
-      `<input type="date" class="mz-data${ehData ? ' on' : ''}" id="mzData" aria-label="Escolher um dia" value="${ehData ? esc(E.dia) : ''}"></div>`;
+    if (!els.filtros) return;
+    const abertas = E.tarefas.filter(t => ehAberta(t) && (!E.filtroAgentes.size || E.filtroAgentes.has(t.agente))).length;
+    const chip = (so, rot, n) => `<button type="button" class="tz-chip${E.so === so ? ' on' : ''}" data-acao="so" data-so="${so}" aria-pressed="${E.so === so}">${rot}${n != null ? ` <em>${n}</em>` : ''}</button>`;
+    const fotos = E.agentes.map(a => `<button type="button" class="tz-av${E.filtroAgentes.has(a.id) ? ' on' : ''}" data-acao="chip" data-agente="${esc(a.id)}" aria-pressed="${E.filtroAgentes.has(a.id)}" title="Só as tarefas de ${esc(a.nome)}">${avatar(a)}</button>`).join('');
+    els.filtros.innerHTML = `<div class="tz-chips" role="group" aria-label="Quais tarefas">${chip('abertas', 'Abertas', abertas)}${chip('hoje', 'Hoje')}${chip('todas', 'Todas')}</div>` +
+      `<div class="tz-avs" role="group" aria-label="Filtrar por agente">${fotos}</div>`;
   }
 
   function focaTarefa(id) {
@@ -538,51 +560,65 @@
     if (v.titulo.trim() !== t.titulo) corpo.titulo = v.titulo.trim();
     if (v.nota.trim() !== (t.nota || '')) corpo.nota = v.nota.trim();
     if (v.link.trim() !== (t.link || '')) corpo.link = v.link.trim() || null;
+    if ((v.prazo || '') !== (t.prazo || '')) corpo.prazo = v.prazo || null;
     const prog = v.progresso.trim();
     if (prog === '') { if (t.progresso_origem === 'informado') corpo.progresso = null; }
     else if (Number(prog) !== t.progresso || t.progresso_origem !== 'informado') corpo.progresso = Number(prog);
     return aplica(id, 'PATCH', corpo, 'edição');
   }
 
-  /* ── Nova tarefa ── */
-  function abreNova() {
-    if (els.nova.firstChild) { els.nova.innerHTML = ''; els.novaBtn.setAttribute('aria-expanded', 'false'); atualizaSePendente(); return; }
-    const padrao = E.filtroAgentes.size === 1 ? [...E.filtroAgentes][0] : (E.agentes[0] && E.agentes[0].id);
-    const opAg = E.agentes.map(a => `<option value="${esc(a.id)}"${a.id === padrao ? ' selected' : ''}>${esc(a.nome)}</option>`).join('');
-    els.nova.innerHTML = '<form class="mz-form mz-nova-form" id="mzNovaForm" novalidate>' +
-      '<h4>Nova tarefa</h4>' +
-      `<label>Agente<select name="agente">${opAg}</select></label>` +
-      '<label>Título<input name="titulo" type="text" maxlength="120" required></label>' +
-      `<label>Origem (o pedido, com a data)<input name="origem" type="text" maxlength="300" required value="${esc(textoOrigem(new Date()))}"></label>` +
-      '<label>Tipo<select name="tipo"><option value="outro">outro</option><option value="conteudo">conteúdo</option><option value="desenvolvimento">desenvolvimento</option><option value="projeto">projeto</option></select></label>' +
-      '<label>Passos (um por linha, opcional)<textarea name="passos" rows="3"></textarea></label>' +
-      '<div id="mzNovaErro"></div>' +
-      '<div class="mz-linha"><button type="submit" class="mz-btn pri">Criar tarefa</button><button type="button" class="mz-btn" data-acao="fechar-nova">Voltar</button></div></form>';
-    els.novaBtn.setAttribute('aria-expanded', 'true');
-    els.nova.querySelector('[name=titulo]').focus();
+  /* ── Nova tarefa: o mesmo campo da aba Hoje. Escreve, escolhe o agente e manda; os detalhes (tipo,
+     passos e prazo) ficam atrás do ícone de ajustes. A origem ("Dono, data: ...") é montada sozinha. ── */
+  function agentePadrao() {
+    if (E.filtroAgentes.size === 1) return [...E.filtroAgentes][0];
+    const q = new URLSearchParams(location.search).get('a');
+    const ok = id => id && E.agentes.some(a => a.id === id && a.tipo !== 'admin');
+    return ok(q) ? q : ((E.agentes.find(a => a.tipo !== 'admin') || E.agentes[0] || {}).id || '');
+  }
+  function pintaCompositor() {
+    const sel = $('tzAgente');
+    if (sel && !sel.options.length && E.agentes.length) {
+      sel.innerHTML = E.agentes.map(a => `<option value="${esc(a.id)}">${esc(a.nome)}</option>`).join('');
+      sel.value = agentePadrao();
+      if (raiz.DGSeletorAgente) raiz.DGSeletorAgente.liga(sel, E.agentes);   // foto e cargo (21/10/2026)
+    }
+  }
+  function msgNova(t, erro) {
+    const m = $('tzMsg'); if (!m) return;
+    m.textContent = t; m.hidden = !t; m.classList.toggle('erro', !!erro);
+  }
+  async function enviaNova(tipo, botao) {
+    const frase = $('tzFrase'), t = frase.value.trim(), agente = $('tzAgente').value;
+    if (!t) { msgNova('Escreva primeiro o que é.', true); frase.focus(); return; }
+    botao.disabled = true;
+    try {
+      if (tipo === 'lembrete') {
+        const H = raiz.DGBoardHoje;
+        const r = H && H.entendeFrase(t, new Date());
+        if (!r || !r.texto) { msgNova('Para lembrete, diga quando: "amanhã às 9h", "daqui a 30 min", "sexta às 14h".', true); return; }
+        const res = await escreve('POST', '/api/v1/lembretes', Object.assign({ texto: r.texto, agente }, r.regra ? { regra: r.regra } : { daqui_min: r.daqui_min }), null);
+        if (!res.ok) { msgNova('Não deu certo: ' + res.erro.texto, true); return; }
+        msgNova(`Lembrete criado para ${H.descreve(r, new Date())}.`);
+      } else {
+        const corpo = { agente, titulo: t.split('\n')[0].slice(0, 120), origem: (textoOrigem(new Date()) + t).slice(0, 300), tipo: $('tzTipo').value };
+        const passos = $('tzPassos').value.split('\n').map(x => x.trim()).filter(Boolean);
+        if (passos.length) corpo.passos = passos.map(texto => ({ texto: texto.slice(0, 120), feito: false }));
+        if ($('tzPrazo').value) corpo.prazo = $('tzPrazo').value;
+        E.ocupado = true;
+        const res = await escreve('POST', '/api/v1/tarefas', corpo, null);
+        E.ocupado = false;
+        if (!res.ok) { msgNova('Não deu certo: ' + res.erro.texto, true); return; }
+        const n = (E.agentes.find(x => x.id === agente) || {}).nome || agente;
+        msgNova(`Tarefa criada para ${n}. Ele foi avisado.`);
+        $('tzPassos').value = ''; $('tzPrazo').value = ''; $('tzTipo').value = 'outro';
+        E.focoId = res.dados && res.dados.tarefa ? res.dados.tarefa.id : null;
+        await atualiza(true);
+      }
+      frase.value = '';
+    } finally { botao.disabled = false; }
   }
 
   function atualizaSePendente() { if (E.pendente && !E.form) atualiza(); }
-
-  async function enviaNova(f) {
-    const v = valoresDoForm(f);
-    const corpo = { agente: v.agente, titulo: v.titulo.trim(), origem: v.origem.trim(), tipo: v.tipo };
-    const passos = v.passos.split('\n').map(s => s.trim()).filter(Boolean);
-    if (passos.length) corpo.passos = passos.map(texto => ({ texto, feito: false }));
-    const caixa = $('mzNovaErro');
-    if (!corpo.agente) { caixa.innerHTML = htmlErros({ texto: 'Escolha o agente que vai fazer a tarefa.', campos: {} }); return; }
-    E.ocupado = true;
-    const res = await escreve('POST', '/api/v1/tarefas', corpo, null);
-    E.ocupado = false;
-    if (!res.ok) {
-      console.warn('mesa: criar tarefa recusado (' + res.status + '):', res.dados || res.erro);
-      caixa.innerHTML = htmlErros(res.erro);
-      return;
-    }
-    els.nova.innerHTML = ''; els.novaBtn.setAttribute('aria-expanded', 'false');
-    E.focoId = res.dados && res.dados.tarefa ? res.dados.tarefa.id : null;
-    await atualiza(true);
-  }
 
   /* ── Cliques ── */
   function aoClicar(ev) {
@@ -607,10 +643,10 @@
         renderFiltros(); render(); break;
       }
       case 'dia': E.dia = b.dataset.dia; E.etag = null; renderFiltros(); atualiza(true); break;
-      case 'vazios': E.mostraVazios = !E.mostraVazios; render(); break;
       case 'recarregar': E.agentes = []; atualiza(true); break;
-      case 'nova': abreNova(); break;
-      case 'fechar-nova': abreNova(); break;
+      case 'nova': enviaNova(b.dataset.tipo || 'tarefa', b); break;
+      case 'detalhes': E.detalhes = !E.detalhes; $('tzMais').hidden = !E.detalhes; b.classList.toggle('on', E.detalhes); b.setAttribute('aria-expanded', String(E.detalhes)); break;
+      case 'so': E.so = b.dataset.so; E.dia = E.so === 'todas' ? 'todos' : 'hoje'; E.etag = null; renderFiltros(); atualiza(true); break;
       case 'ajuda-contagem': iniciaPassos([passoContagem()]); break;
       case 'ajuda-filtros': iniciaPassos([passoFiltros()]); break;
       case 'ajuda-cartao': iniciaPassos(passosCartao(), true); break;
@@ -622,18 +658,17 @@
     const f = ev.target;
     if (!(f instanceof HTMLFormElement)) return;
     ev.preventDefault();
-    if (f.id === 'mzNovaForm') enviaNova(f);
-    else if (f.classList.contains('mz-form')) enviaForm(f);
+    if (f.classList.contains('mz-form')) enviaForm(f);
   }
 
   /* ── Tutorial ── */
-  const passoContagem = () => ({ alvo: '#mzContagem', titulo: 'A contagem do topo',
-    oque: 'Quantas tarefas pedem a sua atenção agora: esperando você, travadas, paradas e o total de abertas.',
-    como: 'O servidor conta a mesa inteira, de todos os agentes. "Parada" é uma tarefa em "fazendo" que ninguém atualiza há 45 minutos.',
-    porque: 'Você vê de relance se alguém está esperando uma resposta sua, sem precisar abrir cartão por cartão.' });
-  const passoFiltros = () => ({ alvo: '#mzFiltros', titulo: 'Filtros por agente e por dia',
-    oque: 'Os botões com o nome dos agentes mostram só o trabalho deles. Hoje, Todos e a data escolhem o dia das tarefas já fechadas.',
-    como: 'Marque um ou mais agentes. As tarefas abertas aparecem sempre; o dia só vale para as concluídas e canceladas (pelo dia em que foram fechadas).',
+  const passoContagem = () => ({ alvo: '.tz-sec', titulo: 'As seções',
+    oque: 'As tarefas separadas por situação: esperando você, travadas, fazendo e prontas, com quantas há em cada uma.',
+    como: 'O que precisa de você fica no alto. "Parada?" aparece numa tarefa em "fazendo" que ninguém atualiza há 45 minutos.',
+    porque: 'Você vê de relance se alguém está esperando uma resposta sua, sem abrir tarefa por tarefa.' });
+  const passoFiltros = () => ({ alvo: '#mzFiltros', titulo: 'Filtros',
+    oque: 'Abertas mostra só o que está em andamento; Hoje inclui o que fechou hoje; Todas mostra tudo. As fotos filtram por agente.',
+    como: 'Toque numa ou mais fotos para ver só o trabalho daqueles agentes; toque de novo para tirar.',
     porque: 'Com muitos agentes a mesa fica longa. O filtro deixa só o que você quer olhar agora.' });
   function passosCartao() {
     const abre = () => { const t = tarefasVisiveis()[0]; if (t) { E.abertos.add(t.id); render(); } };
@@ -643,11 +678,11 @@
         oque: 'Uma tarefa de um agente: o título, o estado, o que ele está fazendo agora e quando atualizou pela última vez.',
         como: 'O agente cria e atualiza o cartão sozinho enquanto trabalha. Toque no título para abrir os detalhes. A nota é o sinal de vida: uma linha com o que está acontecendo.',
         porque: 'Você acompanha o trabalho sem interromper a conversa com o agente.' },
-      { alvo: '.mz-cartao .mz-selo', titulo: 'O selo de estado',
+      { alvo: '.tz-sec', titulo: 'A situação da tarefa',
         oque: 'Diz em que pé a tarefa está: fazendo, travada, esperando você, parada?, concluída ou cancelada.',
         como: '"Travada" e "esperando você" vêm sempre com o motivo em destaque e sobem para o topo. "Parada?" aparece quando uma tarefa em "fazendo" passa de 45 minutos sem nenhuma atualização.',
         porque: 'O que precisa de você fica no alto, e o que parou sem avisar não passa despercebido.' },
-      { alvo: '.mz-cartao .mz-prog', titulo: 'A barra de progresso',
+      { alvo: '.mz-cartao .mz-barra', titulo: 'A barra de progresso',
         oque: 'Quanto da tarefa já foi feito.',
         como: 'Se o agente informou um número, vale o número. Sem número, é a conta dos passos feitos ÷ total. Sem nenhum dos dois, aparece "sem medida": a tarefa não foi medida, o que é diferente de 0%.',
         porque: 'Mostrar 0% numa tarefa que ninguém mediu seria mentira. "Sem medida" diz a verdade.' },
@@ -667,12 +702,9 @@
         como: 'A aba escolhida fica guardada neste aparelho. Um endereço terminando em #nome-da-aba abre direto nela.',
         porque: 'Tudo o que acompanha o trabalho dos agentes fica numa página só.' },
       passoContagem(), passoFiltros(),
-      { alvo: '#mzNovaBtn', titulo: 'Nova tarefa', oque: 'Cria uma tarefa para um agente, em nome do dono.',
-        como: 'Escolha o agente, escreva o título e o pedido (a origem já vem com a data). Os passos, um por linha, são opcionais e alimentam a barra de progresso.',
-        porque: 'Quando você quer que o trabalho fique acompanhado desde o começo, não precisa esperar o agente criar o cartão.' },
-      { alvo: '.mz-bloco', titulo: 'O bloco do agente', oque: 'Todas as tarefas de um agente juntas, com a foto, o nome e quantas estão abertas.',
-        como: 'Os blocos seguem a ordem dos agentes. Agentes sem tarefa no filtro atual ficam escondidos atrás do botão "mostrar agentes sem tarefa".',
-        porque: 'Você sabe quem está em quê sem misturar o trabalho de um agente com o de outro.' },
+      { alvo: '.tz-novo', titulo: 'Nova tarefa', oque: 'Cria uma tarefa para um agente, em nome do dono, como na aba Hoje.',
+        como: 'Escreva o que precisa, escolha o agente e toque em "Tarefa para". O ícone de ajustes abre tipo, passos e prazo. A origem, com a data, é preenchida sozinha.',
+        porque: 'Quando você quer que o trabalho fique acompanhado desde o começo, não precisa esperar o agente criar a tarefa.' },
       ...passosCartao(),
     ];
   }
@@ -685,24 +717,27 @@
   /* ── Montagem da aba ── */
   function montaTarefas(el) {
     el.innerHTML =
-      '<div class="mz-topo2">' +
-      '<div class="mz-contagem-lin"><div id="mzContagem" class="mz-contagem" data-tour="mz-contagem"></div>' +
-      '<button type="button" class="mz-ajuda" data-acao="ajuda-contagem" title="O que é a contagem" aria-label="O que é a contagem">?</button></div>' +
-      '<button type="button" class="mz-btn pri" id="mzNovaBtn" data-acao="nova" aria-expanded="false">+ Nova tarefa</button></div>' +
-      '<div id="mzNova"></div>' +
-      '<div class="mz-filtros-lin"><div id="mzFiltros" class="mz-filtros"></div>' +
-      '<button type="button" class="mz-ajuda" data-acao="ajuda-filtros" title="Como funcionam os filtros" aria-label="Como funcionam os filtros">?</button></div>' +
-      '<div id="mzErroCarga"></div><div id="mzBoard" class="mz-board"></div>';
-    els.contagem = $('mzContagem'); els.nova = $('mzNova'); els.novaBtn = $('mzNovaBtn');
+      '<div class="bh tz">' +
+      '<section class="bh-novo tz-novo" data-tour="mz-nova">' +
+      '<textarea id="tzFrase" rows="2" maxlength="500" placeholder="Escreva a tarefa: pede ao Data o relatório de evasão até sexta"></textarea>' +
+      `<div class="bh-acoes"><button type="button" class="bh-bt" data-acao="nova" data-tipo="lembrete">${ICO.sino}Lembrete</button>` +
+      `<button type="button" class="bh-bt pri" data-acao="nova" data-tipo="tarefa">${ICO.tarefa}Tarefa para</button>` +
+      '<select id="tzAgente" aria-label="Para qual agente"></select>' +
+      `<button type="button" class="tz-ic" data-acao="detalhes" aria-expanded="false" title="Mais detalhes: tipo, passos e prazo" aria-label="Mais detalhes">${ICO.ajustes}</button>` +
+      `<button type="button" class="tz-go" data-acao="nova" data-tipo="tarefa" title="Criar a tarefa" aria-label="Criar a tarefa">${ICO.enviar}</button></div>` +
+      '<div class="tz-mais" id="tzMais" hidden>' +
+      '<label>Tipo<select id="tzTipo"><option value="outro">outro</option><option value="conteudo">conteúdo</option><option value="desenvolvimento">desenvolvimento</option><option value="projeto">projeto</option></select></label>' +
+      '<label>Passos (um por linha, se quiser)<textarea id="tzPassos" rows="3"></textarea></label>' +
+      '<label>Prazo<input id="tzPrazo" type="date"></label></div>' +
+      '<p class="bh-msg" id="tzMsg" role="status" hidden></p></section>' +
+      '<div id="mzFiltros" class="tz-filtros" data-tour="mz-filtros"></div>' +
+      '<div id="mzErroCarga"></div><div id="mzBoard" class="tz-board"></div></div>';
     els.filtros = $('mzFiltros'); els.erro = $('mzErroCarga'); els.board = $('mzBoard');
     el.addEventListener('click', aoClicar);
     el.addEventListener('submit', aoEnviar);
-    el.addEventListener('change', ev => {
-      if (ev.target.id === 'mzData') { E.dia = ev.target.value || 'hoje'; E.etag = null; renderFiltros(); atualiza(true); }
-    });
-    renderContagem(); renderFiltros();
+    renderFiltros();
     E.ativa = true;
-    atualiza(true).then(aplicaHashTarefa);
+    atualiza(true).then(() => { pintaCompositor(); aplicaHashTarefa(); });
     setInterval(tick, INTERVALO_MS);
   }
 

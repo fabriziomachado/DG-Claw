@@ -24,7 +24,7 @@ test('conversa.html inclui a faixa com uma linha de script e uma de css', () => 
 
 test('sw.js guarda os estáticos dos lembretes e está na v19 ou mais', () => {
   const s = pub('sw.js');
-  assert.match(s, /dgclaw-estaticos-v(1[9]|[2-9][0-9])\b/);
+  assert.match(s, /dgclaw-estaticos-v(19|[2-9][0-9]|[1-9][0-9]{2,})\b/);
   for (const u of ['/lembretes-faixa.js', '/lembretes.js', '/lembretes.css']) assert.ok(s.includes(`'${u}'`), u);
 });
 

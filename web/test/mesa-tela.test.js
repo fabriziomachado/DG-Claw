@@ -70,7 +70,7 @@ test('cartão: progresso null mostra "sem medida" e nunca 0%; zero mostra 0%', (
 });
 
 test('cartão: links só http(s) ou caminho do Web, abrem em nova aba com noopener', () => {
-  const h = M.htmlCartao({ ...base, link: 'javascript:alert(1)', anexos: [{ rotulo: 'Planilha', url: 'https://x.com/a?b=1&c=2' }] }, {});
+  const h = M.htmlCartao({ ...base, link: 'javascript:alert(1)', anexos: [{ rotulo: 'Planilha', url: 'https://x.com/a?b=1&c=2' }] }, { aberto: true });
   assert.doesNotMatch(h, /href="javascript/);
   assert.match(h, /href="https:\/\/x\.com\/a\?b=1&amp;c=2" target="_blank" rel="noopener noreferrer"/);
   assert.equal(M.urlSegura('//evil.com'), '');
@@ -122,4 +122,15 @@ test('mesa.html: ordem dos scripts, casca no lugar do cabeçalho antigo e o Quad
 test('o menu da conversa tem o item Board (a antiga Mesa de tarefas)', () => {
   // o menu é o da casca (uma fonte só); a conversa.html monta ele pelo ponto de montagem
   assert.match(require('../public/casca').MARCACAO_MENU, /<a class="ml-tab" href="\/mesa"><span class="ml-ico" aria-hidden="true">▦<\/span>Board<\/a>/);
+});
+
+test('prazo: texto curto, perto e atrasado (21/10/2026)', () => {
+  const hoje = new Date(2026, 9, 21);
+  assert.deepEqual(M.textoPrazo('2026-10-21', hoje), { texto: 'até hoje', vencido: false, perto: true });
+  assert.equal(M.textoPrazo('2026-10-22', hoje).texto, 'até amanhã');
+  assert.equal(M.textoPrazo('2026-10-24', hoje).texto, 'até sáb, 24/10');
+  assert.equal(M.textoPrazo('2026-10-20', hoje).vencido, true);
+  assert.equal(M.textoPrazo('xx', hoje), null);
+  const h = M.htmlCartao({ ...base, prazo: '2020-01-01' }, {});
+  assert.match(h, /tz-prazo vencido/);
 });

@@ -290,6 +290,14 @@ function criarMidia({ dataDir, log, registro, publicDir }) {
             'Cache-Control': 'private, max-age=86400', 'X-Content-Type-Options': 'nosniff' });
           return res.end(req.method === 'HEAD' ? undefined : buf);
         } catch (err) {
+          // O ffmpeg não lê webp animado (nem alguns gif): para imagem de até 5 MB, a própria imagem serve de
+          // miniatura, e o navegador ainda mostra a animação (20/10/2026, a coruja do dono virava só arquivo).
+          if (e.kind === 'photo' && /^image\/(webp|gif)$/.test(e.mime) && st.size <= 5 * 1024 * 1024) {
+            res.writeHead(200, { 'Content-Type': e.mime, 'Content-Length': st.size,
+              'Cache-Control': 'private, max-age=86400', 'X-Content-Type-Options': 'nosniff' });
+            if (req.method === 'HEAD') return res.end();
+            return fs.createReadStream(real).on('error', () => res.destroy()).pipe(res);
+          }
           log('erro', `Miniatura ${id}: ${err.code || err.message}. Confira ffmpeg e permissões da pasta miniaturas.`);
           return erroJson(res, 503, 'Não consegui gerar a miniatura. Confira ffmpeg e a pasta de dados. O arquivo original só é baixado ao abrir.');
         }

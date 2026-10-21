@@ -189,6 +189,13 @@ garantir_gancho_novidades() {
     garantir_gancho_runner "$1" "${2:-<slug>}" "node /opt/dgclaw/app/scripts/novidades-hook.mjs" "de novidades"
 }
 
+# garantir_gancho_memoria <runner.json> [slug]
+# O lembrete automatico da memoria (hooks/memory-recall.sh, 20/10/2026): antes de cada resposta, busca nas
+# conversas antigas e na memoria semantica e anota o uso para a Saude do servidor.
+garantir_gancho_memoria() {
+    garantir_gancho_runner "$1" "${2:-<slug>}" "bash /opt/dgclaw/app/hooks/memory-recall.sh" "do lembrete da memoria"
+}
+
 # gerar_segredo <caminho> [uid:gid]
 # 32 bytes aleatorios em hexadecimal. So cria se nao existir: rodar de novo nao
 # troca o segredo de ninguem (trocar derrubaria a conversa entre Web e runner).

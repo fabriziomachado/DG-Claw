@@ -21,6 +21,9 @@ const { lerMultipart, nomeSeguro, gravaSemSobrescrever } = require('./lib/upload
 const { abrirStream } = require('./lib/sse');
 const { criarProxy } = require('./lib/proxy');
 const { criarCofreAgente } = require('./lib/cofre-agente');
+const { criarCotaVigia } = require('./lib/cota-vigia');
+const { criarLimites } = require('./lib/limites');
+const { criarMemoriaSemantica } = require('./lib/memoria-semantica');
 const { criarCofreRotas } = require('./lib/cofre-rotas');
 const { criarPaineisVivos } = require('./lib/paineis-vivos');
 const { criarMencoes } = require('./lib/mencoes');
@@ -118,6 +121,9 @@ function criarServidor(opcoes) {
   const arquivoConversa = criarArquivoConversa({ dataDir: config.dataDir, log });
   const caixaEntrada = criarCaixaEntrada({ registro, alertas, corteDe: (slug) => arquivoConversa.ultimoCorte(slug), log });
   const saudeServidor = criarSaudeServidor({ registro, conversa, log });
+  const cotaVigia = opcoes.cotaVigia || criarCotaVigia({ log });
+  const memoriaSemantica = criarMemoriaSemantica({ registro, log, agora: opcoes.agora });
+  const limites = criarLimites({ registro, conversa, push, log, dataDir: config.dataDir, tz: config.tz, agora: opcoes.agora, buscarUso: opcoes.buscarUso });
   // A conversa como a tela vê: depois do último /clear (o antes fica em Histórico > Arquivadas).
   const mencoes = criarMencoes({ config, registro, conversa, log });
   mencoes.retoma();
@@ -278,6 +284,18 @@ function criarServidor(opcoes) {
     return H.enviaJson(res, r.status, r.corpo, cab);
   }
 
+  /* Teste do avatar dormindo (20/10/2026): <dados>/sono-teste.json { "<slug>": "<até quando, ISO>" } faz o
+     avatar daquele agente dormir até a hora marcada, sem mexer no estado de verdade. O Admin grava para
+     o dono ver como fica; vencido, não vale mais. */
+  function sonoTeste() {
+    try {
+      const d = JSON.parse(fs.readFileSync(path.join(config.dataDir, 'sono-teste.json'), 'utf8'));
+      const out = {};
+      for (const [k, v] of Object.entries(d || {})) if (Date.parse(v) > Date.now()) out[k] = true;
+      return out;
+    } catch (_) { return {}; }
+  }
+
   // ── API ──────────────────────────────────────────────────────────────────
   function avatarDe(a) {
     const inicial = (a.nome[0] || '?').toUpperCase();
@@ -298,6 +316,7 @@ function criarServidor(opcoes) {
       provedor: a.provedor, modelo: a.modelo, rotulo_provedor: rotulo,
       tem_painel: !!a.porta_painel, painel_url: a.porta_painel ? `/p/${a.slug}/` : null,
       voz: voz.vozDoAgente(a), tem_voz: voz.vozDoAgente(a), microfone: voz.microfone,
+      avatar_sono: avatares.sono(a.slug),
     }, avatarDe(a));
   }
 
@@ -327,6 +346,8 @@ function criarServidor(opcoes) {
     if ((p === '/api/v1/lembretes' || p.startsWith('/api/v1/lembretes/')) && await lembretes.rotas(req, res, url, sessao)) return undefined;
     if (p === '/api/v1/caixa' && await caixaEntrada.rotas(req, res, url, sessao)) return undefined;
     if (p === '/api/v1/saude-servidor' && await saudeServidor.rotas(req, res, url, sessao)) return undefined;
+    if (p.startsWith('/api/v1/limites') && await limites.rotas(req, res, url, sessao)) return undefined;
+    if (p.startsWith('/api/v1/memoria') && await memoriaSemantica.rotas(req, res, url, sessao)) return undefined;
 
     if (p === '/api/v1/onboarding') {
       if (falhaDoRegistro(req, res, true)) return;
@@ -367,7 +388,12 @@ function criarServidor(opcoes) {
       if (falhaDoRegistro(req, res, true)) return undefined;
       const agentes = {};
       await Promise.all(registro.estado().agentes.map(async (a) => {
-        try { const e = await conversa.atividade(a); agentes[a.slug] = { estado: e.estado }; }
+        // parado_desde: desde quando está sem trabalhar (o avatar dorme depois de uns minutos, sono.js)
+        try {
+          const e = await conversa.atividade(a);
+          agentes[a.slug] = { estado: e.estado, parado_desde: e.parado_desde || null };
+          if (sonoTeste()[a.slug]) agentes[a.slug].sono_teste = true;
+        }
         catch (_) { agentes[a.slug] = { estado: 'sem_sinal' }; }
       }));
       return H.enviaJson(res, 200, { ok: true, agentes });
@@ -486,7 +512,7 @@ function criarServidor(opcoes) {
       return res.end(fs.readFileSync(path.join(__dirname, 'docs', 'TRILHA-E-PERMISSAO.md'), 'utf8'));
     }
 
-    if (/^\/api\/v1\/agents\/[^/]+\/avatar$/.test(p)) {
+    if (/^\/api\/v1\/agents\/[^/]+\/avatar(\/(adormecendo|dormindo|parado|trabalhando|trabalhando-parado))?$/.test(p)) {
       if (falhaDoRegistro(req, res, true)) return undefined;
       if (await avatares.tratar(req, res, url, sessao, { enviaJson: H.enviaJson, erroJson: H.erroJson, lerCorpo: H.lerCorpo, agentePublico })) return undefined;
     }
@@ -519,10 +545,39 @@ function criarServidor(opcoes) {
       // ele já fez continuam. Só o dono, pela sessão do login (um agente não cancela o outro pela caixa).
       if (acao === 'interromper' && m === 'POST') {
         if (sessao && sessao.via === 'caixa') return H.erroJson(res, 403, 'Só o dono interrompe um agente, pelo painel.');
+        // O registro da conversa antes do Esc: se nada mudar e o runner seguir "trabalhando" depois de uns
+        // segundos, o agente está congelado (21/10/2026: o Tech travou numa busca de ferramenta e não reagia a
+        // tecla nenhuma). A tela então oferece reiniciar a sessão (POST .../destravar).
+        const marca = async () => {
+          let tam = null;
+          try { const t = await conversa.thread(agente); if (t.arquivo) tam = fs.statSync(t.arquivo).size; } catch (_) { /* sem registro */ }
+          return tam;
+        };
+        const antes = await marca();
         const r = await runner.input(agente, { text: '\u001b', submit: false });
         if (!r || r.ok === false) return H.erroJson(res, 502, `Não consegui interromper ${agente.nome}: ${(r && r.erro) || 'o runner não respondeu'}.`);
         log('info', `${agente.slug}: o dono interrompeu o trabalho em andamento (Esc).`);
+        let parou = false;
+        for (let i = 0; i < 8 && !parou; i++) {
+          await new Promise((ok) => setTimeout(ok, 1000));
+          const e = await runner.estado(agente);
+          parou = !(e && e.ok && e.estado && e.estado.status === 'working') || (await marca()) !== antes;
+        }
+        if (!parou) log('aviso', `${agente.slug}: não reagiu ao Esc em 8 s (registro parado e runner em working); a tela oferece reiniciar.`);
+        return H.enviaJson(res, 200, { ok: true, parou, travado: !parou });
+      }
+      // Agente congelado: reinicia a sessão no runner (a mesma conversa; a fila de mensagens continua).
+      if (acao === 'destravar' && m === 'POST') {
+        if (sessao && sessao.via === 'caixa') return H.erroJson(res, 403, 'Só o dono reinicia um agente, pelo painel.');
+        const r = await runner.reiniciar(agente);
+        if (!r || r.ok === false) return H.erroJson(res, 502, `Não consegui reiniciar ${agente.nome}: ${(r && r.erro) || 'o runner não respondeu'}.`);
+        log('info', `${agente.slug}: o dono reiniciou a sessão (agente travado).`);
         return H.enviaJson(res, 200, { ok: true });
+      }
+      // A conta liberou antes da hora do aviso de limite? (lib/cota-vigia.js; a tarja da cota pergunta)
+      if (acao === 'cota' && m === 'GET') {
+        if (sessao && sessao.via === 'caixa') return H.erroJson(res, 403, 'Só o dono confere a cota, pelo painel.');
+        return H.enviaJson(res, 200, cotaVigia.consulta(agente, String(url.searchParams.get('desde') || '')));
       }
       // 👍 / 👎 numa resposta (lib/feedback.js); GET devolve os votos desta conversa
       if (acao === 'feedback') {
@@ -560,7 +615,7 @@ function criarServidor(opcoes) {
       if (acao === 'upload' && m === 'POST') return upload(req, res, agente);
       if (acao === 'comandos' && m === 'GET') return H.enviaJson(res, 200, Object.assign({ ok: true, agente: agente.slug }, await comandos.catalogo(agente)));
       if (acao === 'comando' && m === 'POST') return comandoPost(req, res, agente);
-      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'interromper', 'mencao', 'aviso', 'pedido', 'upload', 'permissao', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
+      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'interromper', 'destravar', 'cota', 'mencao', 'aviso', 'pedido', 'upload', 'permissao', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
     }
 
     mm = /^\/api\/v1\/media\/([0-9a-f]{16})\/visual$/.exec(p);
@@ -954,7 +1009,7 @@ function criarServidor(opcoes) {
   });
 
   return {
-    servidor, config, registro, auth, midia, conversa, log, caixa, push, lembretes, avisos, cofreAgente,
+    servidor, config, registro, auth, midia, conversa, log, caixa, push, limites, lembretes, avisos, cofreAgente,
     ouvir(porta, host) {
       return new Promise((resolve, reject) => {
         servidor.once('error', reject);
@@ -967,7 +1022,7 @@ function criarServidor(opcoes) {
         });
       });
     },
-    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); vigiaAlertas.parar(); avisos.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
+    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); vigiaAlertas.parar(); limites.parar(); avisos.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
   };
 }
 
@@ -975,6 +1030,7 @@ module.exports = { criarServidor, proximoSeguro };
 
 if (require.main === module) {
   const s = criarServidor();
+  s.limites.iniciar();   // o vigia dos limites lê a conta de verdade: só no servidor de verdade, nunca nos testes
   s.ouvir().then((a) => {
     s.log('info', `DG Claw Web escutando em http://${a.address}:${a.port} (agentes: ${s.config.agentesPath}, dados: ${s.config.dataDir}).`);
   }).catch((e) => {

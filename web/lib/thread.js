@@ -194,7 +194,16 @@ function criarMontagem({ tz, midia }) {
 
   /** A fala do dono, com os marcadores [anexo: ...] virando mídia. `dg` vem de parseDgchat. */
   function empurraDono(estado, agente, dg, ep) {
-    // um pedido novo do dono começa a conta de tokens e de memória da próxima resposta
+    // um pedido novo do dono começa a conta de tokens e de memória da próxima resposta. O que o agente
+    // guardou na memória DEPOIS da última fala do turno (comum: responde e só então anota) vai para essa
+    // fala, em vez de se perder (20/10/2026, o dono não via o chip quando o Admin gravava no fim).
+    if (estado.memTurno && estado.memTurno.length) {
+      for (let i = estado.eventos.length - 1; i >= 0; i--) {
+        const ev = estado.eventos[i];
+        if (ev.quem === 'dono' || ev.origin === 'dono') break;
+        if (ev.quem === 'agente' && ev.origin !== 'trilha' && !ev.trilha) { ev.memorias = (ev.memorias || []).concat(estado.memTurno).slice(0, 8); break; }
+      }
+    }
     estado.usoTurno = null; estado.memTurno = []; estado.inicioTurnoEp = ep;
     const caminhos = [];
     const corpo = dg.interno.replace(ANEXO_LINHA, (_, cam) => {
@@ -487,7 +496,9 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
      vez) e o que ele escreveu nos arquivos de memória. Quando ele responde (dgchat reply), isso vai junto da
      fala, em `uso` ({entrada, cache, saida, ms}) e `memorias` ([{tipo, texto}]), e recomeça do zero. */
   const RX_MEMORIA = /(?:^|\/)(MEMORY\.md|working-memory\.md|CREATOR\.md|memory\/[^/]+\.md)$/i;
-  function tipoDaMemoria(arquivo, secao) {
+  const TIPO_FRONT = { feedback: 'Regra', user: 'Sobre você', project: 'Contexto', reference: 'Fato' };
+  function tipoDaMemoria(arquivo, secao, front) {
+    if (front && TIPO_FRONT[front]) return TIPO_FRONT[front];
     const s = String(secao || '').toLowerCase();
     if (/regra/.test(s)) return 'Regra';
     if (/prefer/.test(s)) return 'Preferência';
@@ -505,10 +516,22 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
     for (const l0 of novo.split('\n')) {
       const l = l0.trim();
       if (/^#{1,4}\s/.test(l)) { secao = l; continue; }
-      if (!/^[-*]\s+\S/.test(l) || velho.has(l)) continue;
-      out.push({ secao, texto: l.replace(/^[-*]\s+/, '').replace(/\*\*(.+?)\*\*/g, '$1').slice(0, 220) });
+      if (!/^(?:[-*]|\d{1,3}\.)\s+\S/.test(l) || velho.has(l)) continue;
+      out.push({ secao, texto: limpaTopico(l) });
     }
+    if (!out.length) { const p = prosaDaMemoria(novo); if (p) out.push(p); }
     return nome === 'Write' ? out.slice(-5) : out.slice(0, 5);
+  }
+  const limpaTopico = (l) => l.replace(/^(?:[-*]|\d{1,3}\.)\s+/, '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').slice(0, 220);
+  /* Memória em prosa (o formato com frontmatter: description + texto): vale a description; sem ela, a
+     primeira frase do texto. O tipo vem do "type:" do frontmatter. */
+  function prosaDaMemoria(texto) {
+    const t = String(texto || '');
+    const front = (/^\s*type:\s*(\w+)/m.exec(t) || [])[1] || '';
+    const desc = (/^description:\s*["']?(.+?)["']?\s*$/m.exec(t) || [])[1];
+    const corpo = t.replace(/^---[\s\S]*?---\s*/, '').split('\n').map((l) => l.trim()).find((l) => l && !/^[#*]|^\*\*Why/.test(l));
+    const frase = desc || (corpo && corpo.split(/(?<=[.!?])\s/)[0]);
+    return frase && frase.length > 8 ? { secao: '', front: front.toLowerCase(), texto: frase.replace(/\*\*(.+?)\*\*/g, '$1').slice(0, 220) } : null;
   }
   function anotaUso(estado, o) {
     const m = o.message || {};
@@ -527,8 +550,19 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
      replace são as novas. É heurística: só mostra o que achou, e nunca afirma o que não viu. */
   function memoriaDoComando(comando) {
     const cmd = String(comando || '');
-    const arq = (/(MEMORY\.md|working-memory\.md|CREATOR\.md)/i.exec(cmd) || [])[1];
-    if (!arq || !/(open\([^)]*['"]w|write_text|>>|sed\s+-i|tee\s+-a)/.test(cmd)) return [];
+    const arq = (/(MEMORY\.md|working-memory\.md|CREATOR\.md|memory\/[\w.-]+\.md)/i.exec(cmd) || [])[1]
+      || (/\bcd\s+\S*\/memory\b/.test(cmd) && (/\b([\w-]+\.md)\b/.exec(cmd) || [])[1]);   // cd …/memory && cat >> arquivo.md
+    if (!arq || !/(open\([^)]*['"][wa]|write_text|>>?\s*\S*\.md|sed\s+-i|tee\s+-a)/.test(cmd)) return [];
+    // cat >> arquivo.md <<'EOF' ... EOF: o texto do heredoc é o que foi gravado
+    const doc = /cat\s+>>?\s*\S*\.md\S*\s+<<-?\s*['"]?(\w+)['"]?\n([\s\S]*?)\n\1\b/.exec(cmd) || /<<-?\s*['"]?(\w+)['"]?\s+>>?\s*\S*\.md\S*\n([\s\S]*?)\n\1\b/.exec(cmd);
+    if (doc) {
+      const fora = [];
+      for (const l0 of doc[2].split('\n')) { const l = l0.trim(); if (/^(?:[-*]|\d{1,3}\.)\s+\S.{6,}/.test(l)) fora.push({ arq, secao: '', texto: limpaTopico(l) }); }
+      if (!fora.length) { const p = prosaDaMemoria(doc[2]); if (p) fora.push({ arq, ...p }); }
+      return fora.slice(0, 5);
+    }
+    const eco = /echo\s+(["'])((?:[-*]|\d{1,3}\.)\s+[\s\S]{6,}?)\1\s*>>/.exec(cmd);
+    if (eco) return [{ arq, secao: '', texto: limpaTopico(eco[2]) }];
     const txt = cmd.replace(/\\n/g, '\n');
     const velhos = new Set();
     for (const m of txt.matchAll(/replace\(\s*(['"])([\s\S]*?)\1\s*,/g)) for (const l of m[2].split('\n')) velhos.add(l.trim());
@@ -540,7 +574,9 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
       if (h && /^#{1,4}\s/.test(h[1])) secao = h[1];
       const b = /^-\s+(\S.{6,})/.exec(l);
       if (!b || velhos.has(l)) continue;
-      out.push({ arq, secao, texto: b[1].replace(/\*\*(.+?)\*\*/g, '$1').replace(/["'),;\\]+$/, '').slice(0, 220) });
+      const texto = b[1].replace(/\*\*(.+?)\*\*/g, '$1').replace(/["']\s*,\s*\d+\)*\s*$/, '').replace(/["'),;\\]+$/, '').slice(0, 220);
+      if (/^\(?vazio\b|[{}]|\$\{|\$\w|["']\s*;|\|'/.test(texto)) continue;   // pedaço de código, e não um tópico
+      out.push({ arq, secao, texto });
     }
     return out.slice(0, 5);
   }
@@ -548,7 +584,7 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
     if (nome === 'Bash') {
       for (const l of memoriaDoComando(inp.command)) {
         if (estado.memTurno.length >= 8) break;
-        estado.memTurno.push({ tipo: tipoDaMemoria(l.arq, l.secao), texto: mascarar(l.texto) });
+        estado.memTurno.push({ tipo: tipoDaMemoria(l.arq, l.secao, l.front), texto: mascarar(l.texto) });
       }
       return;
     }
@@ -557,7 +593,7 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
     if (!RX_MEMORIA.test(arq)) return;
     for (const l of linhasNovas(nome, inp)) {
       if (estado.memTurno.length >= 8) break;
-      estado.memTurno.push({ tipo: tipoDaMemoria(arq, l.secao), texto: mascarar(l.texto) });
+      estado.memTurno.push({ tipo: tipoDaMemoria(arq, l.secao, l.front), texto: mascarar(l.texto) });
     }
   }
   function penduraNaFala(estado, ep) {
@@ -625,9 +661,22 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
             return;
           }
           estado.ecoCompact = false;
+          estado.ecoModelo = false;
           if (n) {
             const a = TAG_ARGS_COMANDO.exec(txt);
             const args = a ? a[1].trim() : '';
+            // /model sonnet (modo economia, lib/limites.js) e /model default viram uma linha discreta no meio da
+            // conversa, e não um balão do dono com o resultado do terminal (20/10/2026)
+            if (/^\/?model$/.test(n) && /^(sonnet|default)$/i.test(args)) {
+              estado.ecoModelo = true;
+              const ep = epDe(o.timestamp, estado);
+              const { hhmm, dia } = fmtHoraDia(ep, tz);
+              const eco = /^sonnet$/i.test(args);
+              estado.eventos.push({ id: crypto.createHash('sha1').update(`linha|${ep}|${args}`).digest('hex').slice(0, 16), ep, hhmm, dia, origin: 'linha',
+                text: eco ? `${hhmm} · modo economia ligado, ${agente.nome} usa o Sonnet até a semana renovar` : `${hhmm} · modo economia desligado, ${agente.nome} voltou ao modelo de sempre`,
+                kind: 'text', media: null, fmt: 'text', editada: false, reacoes: [], cita: null, via: 'plataforma', quem: 'agente', economia: eco });
+              return;
+            }
             estado.trigger = 'owner';
             empurra(estado, agente, { ep: epDe(o.timestamp, estado), origin: 'dono', text: `${n.startsWith('/') ? n : `/${n}`}${args ? ` ${args}` : ''}`, caminhos: [], via: 'plataforma', quem: 'pessoa' });
           }
@@ -637,6 +686,7 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
         if (saida && !fila) {
           const ep = epDe(o.timestamp, estado);
           // Resultado de /compact: pelo eco anterior, ou pelo texto "Compacted" (versões sem eco).
+          if (estado.ecoModelo) { estado.ecoModelo = false; return; }   // "Set model to Sonnet": a linha já disse
           if (estado.ecoCompact || /^Compacted\b/.test(saida[2].replace(ANSI, '').trim())) saidaDeCompactacao(estado, agente, ep, saida[1], saida[2]);
           else empurraComando(estado, { ep, texto: saida[2], saida: saida[1] });
         }

@@ -568,12 +568,16 @@ montar_casa() {
     # settings.json nasce pronto e de dono root DO HOST (la dentro aparece como
     # "nobody"): arquivo que nao existe e lugar vago, e quem esta dentro pode ocupar
     # com um hook. Ver a licao no README da jaula de agentes.
+    # Atencao (21/10/2026): isto NAO e uma trava. A pasta ~/.claude e do agente, entao ele pode
+    # trocar o arquivo por outro; o proprio `claude plugin install` (mais abaixo) regrava por
+    # rename e o arquivo passa a ser do agente. Um hook ali roda como o agente, dentro da caixa,
+    # sem poder a mais. O que protege o host e a caixa (usuario remapeado, sem privilegio, firewall).
     if [ "$ENSAIO" = 1 ]; then
         printf '   [ensaio] escreveria %s/.claude/settings.json (dono 0:0, modo 444)\n' "$h"
     else
         if [ ! -s "$h/.claude/settings.json" ]; then
             # shellcheck disable=SC2016 # $comentario e texto do JSON, nao variavel
-            printf '{\n  "$comentario": "Nasce pronto de proposito: arquivo de hook que nao existe e porta destrancada.",\n  "hooks": {},\n  "skipDangerousModePermissionPrompt": true\n}\n' \
+            printf '{\n  "$comentario": "Nasce pronto de proposito: arquivo de hook que nao existe e porta destrancada.",\n  "hooks": {},\n  "skipDangerousModePermissionPrompt": true,\n  "promptSuggestionEnabled": false\n}\n' \
                 | escrever_arquivo "$h/.claude/settings.json" 444 0:0
         else
             # Agente criado antes desta chave existir: o Claude Code abriria o aviso do modo Bypass

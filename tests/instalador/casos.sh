@@ -89,7 +89,7 @@ caso_admin_claude_pula_o_aviso_do_bypass() {
     novo_cenario
     afirma "instala com claude" instalacao_basica
     local st="$RAIZ/root/.claude/settings.json"
-    afirma "settings do HOME do Admin nasce so com a chave" jq -e '. == {skipDangerousModePermissionPrompt: true}' "$st"
+    afirma "settings do HOME do Admin nasce so com as chaves" jq -e '. == {skipDangerousModePermissionPrompt: true, promptSuggestionEnabled: false}' "$st"
     limpar_cenario
 }
 
@@ -100,7 +100,7 @@ caso_admin_settings_existente_e_mesclado_sem_perder_nada() {
     printf '{"model": "opus", "hooks": {"Stop": []}}\n' >"$st"
     chmod 600 "$st"
     afirma "instala com claude" instalacao_basica
-    afirma "a chave entrou" jq -e '.skipDangerousModePermissionPrompt == true' "$st"
+    afirma "a chave entrou" jq -e '.skipDangerousModePermissionPrompt == true and .promptSuggestionEnabled == false' "$st"
     afirma "o resto ficou" jq -e '.model == "opus" and .hooks.Stop == []' "$st"
     afirma "o modo do arquivo foi mantido" modo_e "$st" 600
     limpar_cenario

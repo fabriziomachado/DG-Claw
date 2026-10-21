@@ -22,9 +22,11 @@ const RX_ROTA = /^\/api\/v1\/agents\/([^/]+)\/avatar$/;
 // Avatar dormindo (20/10/2026, pedido do dono): <slug>-adormecendo.webp (toca uma vez), <slug>-dormindo.webp
 // (repete) e <slug>-dormindo.png (parado, para quem pede menos movimento), na mesma pasta das fotos.
 // Trabalhando (20/10/2026): <slug>-trabalhando.webp (repete enquanto trabalha) e <slug>-trabalhando.png (parado).
-const RX_ROTA_SONO = /^\/api\/v1\/agents\/([^/]+)\/avatar\/(adormecendo|dormindo|parado|trabalhando|trabalhando-parado)$/;
+// Precisa de você (21/10/2026): <slug>-pede.webp e <slug>-pede.png; travada: <slug>-travada.webp e .png.
+const RX_ROTA_SONO = /^\/api\/v1\/agents\/([^/]+)\/avatar\/(adormecendo|dormindo|parado|trabalhando|trabalhando-parado|pede|pede-parado|travada|travada-parado)$/;
 const ARQ_SONO = { adormecendo: '-adormecendo.webp', dormindo: '-dormindo.webp', parado: '-dormindo.png',
-  trabalhando: '-trabalhando.webp', 'trabalhando-parado': '-trabalhando.png' };
+  trabalhando: '-trabalhando.webp', 'trabalhando-parado': '-trabalhando.png',
+  pede: '-pede.webp', 'pede-parado': '-pede.png', travada: '-travada.webp', 'travada-parado': '-travada.png' };
 const ERRO_TIPO = 'Escolha uma foto PNG, JPEG ou WebP.';
 
 /** Tipo pela assinatura dos primeiros bytes. Devolve o demuxer do ffmpeg ou null. */
@@ -64,7 +66,7 @@ function criarAvatares({ dataDir, registro, log, ffmpeg = 'ffmpeg', timeoutMs = 
         if (st.isFile() && st.size > 0) out[tipo] = '/api/v1/agents/' + slug + '/avatar/' + tipo + '?v=' + Math.round(st.mtimeMs).toString(36);
       } catch (_) { /* esse pedaço não existe */ }
     }
-    return out.dormindo || out.trabalhando ? out : null;
+    return out.dormindo || out.trabalhando || out.pede || out.travada ? out : null;
   }
 
   function servirSono(req, res, slug, tipo) {

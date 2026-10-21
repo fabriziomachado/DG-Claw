@@ -203,6 +203,7 @@
       if (sel && !sel.options.length) {
         sel.innerHTML = agentes.map(a => `<option value="${esc(a.id)}">${esc(a.nome)}</option>`).join('');
         sel.value = agentePadrao();
+        if (raiz.DGSeletorAgente) raiz.DGSeletorAgente.liga(sel, agentes);   // foto e cargo (21/10/2026)
       }
       pinta(tf.tarefas || [], lb, cx.total || 0);
     } catch (e) {

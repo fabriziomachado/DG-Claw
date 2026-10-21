@@ -370,8 +370,7 @@
     const ag = opcoes.agente;
     pintaMoldura(ag);
     $('mlNome').textContent = ag.nome;
-    $('mlSub').textContent = ag.tipo === 'admin' ? 'administrador do servidor'
-      : (ag.subtitulo || [ag.provedor, ag.modelo].filter(Boolean).join(' · '));
+    $('mlSub').textContent = ag.subtitulo || (ag.tipo === 'admin' ? 'administrador do servidor' : [ag.provedor, ag.modelo].filter(Boolean).join(' · '));
     document.documentElement.classList.add('ml-ativo');
 
     const troca = $('mlTroca'), btn = $('mlTrocaBtn');

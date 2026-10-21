@@ -580,6 +580,7 @@
     if (sel && !sel.options.length && E.agentes.length) {
       sel.innerHTML = E.agentes.map(a => `<option value="${esc(a.id)}">${esc(a.nome)}</option>`).join('');
       sel.value = agentePadrao();
+      if (raiz.DGSeletorAgente) raiz.DGSeletorAgente.liga(sel, E.agentes);   // foto e cargo (21/10/2026)
     }
   }
   function msgNova(t, erro) {

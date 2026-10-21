@@ -10,96 +10,18 @@
 <link rel="icon" href="/icons/icon-192.png">
 <link rel="stylesheet" href="/tema.css">
 <script src="/tema.js"></script>
-<link rel="stylesheet" href="/lembretes.css">
+<link rel="stylesheet" href="/mesa.css">
+<link rel="stylesheet" href="/avisos.css">
+<link rel="stylesheet" href="/lembretes-aba.css">
 <link rel="stylesheet" href="/casca.css">
 <link rel="stylesheet" href="/menu-lado.css">
 <link rel="stylesheet" href="/sem-zoom.css">
 <script src="/sem-zoom.js"></script>
+<style>body{margin:0;background:var(--dg-fundo)}</style>
 </head>
-<body class="lp">
-<main class="lp-main">
-  <p class="lp-msg erro" id="msgGeral" role="alert" hidden></p>
-
-  <section class="lp-sec" id="secAvisos" data-tour="avisos" aria-label="Avisos neste aparelho">
-    <h2><span>Avisos neste aparelho</span><button type="button" class="lp-ajuda" data-ajuda="avisos" aria-label="Tutorial dos avisos no aparelho">?</button></h2>
-    <p class="lp-fraco" id="avisosEstado">Conferindo…</p>
-    <div class="lp-linha">
-      <button type="button" class="lp-btn pri" id="btnAtivar">Ativar avisos neste aparelho</button>
-      <button type="button" class="lp-btn" id="btnDesativar" hidden>Desativar neste aparelho</button>
-      <button type="button" class="lp-btn" id="btnTeste">Mandar aviso de teste</button>
-    </div>
-    <p class="lp-msg" id="avisosMsg" role="status" hidden></p>
-  </section>
-
-  <section class="lp-sec" id="secNovo" data-tour="novo" aria-label="Novo lembrete">
-    <h2><span>Novo lembrete</span><button type="button" class="lp-ajuda" data-ajuda="novo" aria-label="Tutorial do novo lembrete">?</button></h2>
-    <form class="lp-form" id="formNovo" novalidate>
-      <label class="larga">O que lembrar
-        <textarea id="fTexto" maxlength="500" required placeholder="ex.: ligar pro contador"></textarea>
-      </label>
-      <label>De qual agente
-        <select id="fAgente"></select>
-      </label>
-      <label>Quando
-        <select id="fQuando">
-          <option value="daqui">Daqui a N minutos</option>
-          <option value="unico">Uma vez, numa data e hora</option>
-          <option value="diario">Todo dia</option>
-          <option value="semanal">Toda semana, em certos dias</option>
-          <option value="a_cada_n_dias">A cada N dias</option>
-        </select>
-      </label>
-      <label data-so="daqui">Daqui a quantos minutos
-        <input id="fDaqui" type="number" min="1" max="10080" value="30" inputmode="numeric">
-      </label>
-      <label data-so="unico">Data
-        <input id="fData" type="date">
-      </label>
-      <label data-so="unico diario semanal a_cada_n_dias">Hora
-        <input id="fHora" type="time" value="09:00">
-      </label>
-      <div class="larga dias" data-so="semanal" id="fDias">
-        <label><input type="checkbox" value="seg">seg</label><label><input type="checkbox" value="ter">ter</label>
-        <label><input type="checkbox" value="qua">qua</label><label><input type="checkbox" value="qui">qui</label>
-        <label><input type="checkbox" value="sex">sex</label><label><input type="checkbox" value="sab">sáb</label>
-        <label><input type="checkbox" value="dom">dom</label>
-      </div>
-      <label data-so="a_cada_n_dias">De quantos em quantos dias
-        <input id="fN" type="number" min="1" max="365" value="3" inputmode="numeric">
-      </label>
-      <label data-so="a_cada_n_dias">Contando a partir de
-        <input id="fInicio" type="date">
-      </label>
-      <label data-so="diario semanal a_cada_n_dias">Último dia (opcional)
-        <input id="fFim" type="date">
-      </label>
-      <label>Insistir de quantos em quantos minutos
-        <input id="fIntervalo" type="number" min="1" max="120" value="5" inputmode="numeric">
-      </label>
-      <label>Máximo de avisos por vez
-        <input id="fTeto" type="number" min="1" max="60" value="12" inputmode="numeric">
-      </label>
-      <label class="marca larga"><input id="fPeloAgente" type="checkbox" checked>Também avisar pelo agente (Telegram, WhatsApp)</label>
-      <div class="larga lp-linha">
-        <button type="submit" class="lp-btn pri" id="btnCriar">Criar lembrete</button>
-      </div>
-    </form>
-    <p class="lp-msg" id="novoMsg" role="status" hidden></p>
-  </section>
-
-  <section class="lp-sec" id="secLista" data-tour="lista" aria-label="Seus lembretes">
-    <h2><span>Seus lembretes</span><button type="button" class="lp-ajuda" data-ajuda="lista" aria-label="Tutorial da lista de lembretes">?</button></h2>
-    <div class="lp-filtros">
-      <select id="filtroAgente" aria-label="Filtrar por agente"><option value="">Todos os agentes</option></select>
-      <select id="filtroEstado" aria-label="Filtrar por estado">
-        <option value="">Todos os estados</option><option value="ativo">Ativos</option>
-        <option value="pausado">Pausados</option><option value="encerrado">Encerrados</option>
-      </select>
-    </div>
-    <div id="lista"><p class="lp-vazio">Carregando…</p></div>
-    <p class="lp-agendador" id="agendador"></p>
-  </section>
-</main>
+<body>
+<!-- a mesma aba Lembretes do Board (lembretes-aba.js), aberta sozinha -->
+<div id="lembretesRaiz"></div>
 
 <script src="/avisos-aparelho.js"></script>
 <script src="/tour.js"></script>
@@ -107,8 +29,9 @@
 <script src="/casca.js"></script>
 <script src="/sono.js" defer></script>
 <script src="/lembretes.js"></script>
+<script src="/lembretes-aba.js"></script>
 <script>
-DGCasca.monta({ pagina: 'lembretes', titulo: 'Lembretes', aoTutorial: function () { if (window.DGLembretesTutorial) window.DGLembretesTutorial(); } });
+DGCasca.monta({ pagina: 'lembretes', titulo: 'Lembretes', aoTutorial: function () { if (window.DGLembretesAba) window.DGLembretesAba.tutorial(); } });
 </script>
 </body>
 </html>

@@ -763,8 +763,8 @@
     if (raiz.DGAvisos && typeof raiz.DGAvisos.montar === 'function' && !abas.some(a => a.id === 'avisos')) {
       registrar({ id: 'avisos', titulo: raiz.DGAvisos.titulo || 'Quadro de avisos', montar: raiz.DGAvisos.montar, bolinha: raiz.DGAvisos.bolinha });
     }
-    // ordem fixa das abas, venha quem vier primeiro: Hoje, Tarefas, Avisos (as outras depois)
-    const ORDEM = ['hoje', 'tarefas', 'avisos'];
+    // ordem fixa das abas, venha quem vier primeiro: Hoje, Tarefas, Avisos, Lembretes (as outras depois)
+    const ORDEM = ['hoje', 'tarefas', 'avisos', 'lembretes'];
     abas.sort((x, y) => (ORDEM.indexOf(x.id) + 1 || 99) - (ORDEM.indexOf(y.id) + 1 || 99));
     abasIniciadas = true;
     for (const a of abas) criaAba(a);

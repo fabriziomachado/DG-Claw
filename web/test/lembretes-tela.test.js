@@ -28,18 +28,42 @@ test('sw.js guarda os estáticos dos lembretes e está na v19 ou mais', () => {
   for (const u of ['/lembretes-faixa.js', '/lembretes.js', '/lembretes.css']) assert.ok(s.includes(`'${u}'`), u);
 });
 
-test('lembretes.html carrega avisos, tour e a tela, com Tutorial e ? por seção', () => {
+test('lembretes.html é a mesma aba do Board, com avisos no aparelho, tour e a casca', () => {
   const h = pub('lembretes.html');
-  for (const src of ['/avisos-aparelho.js', '/tour.js', '/lembretes.js']) assert.ok(h.includes(`<script src="${src}">`), src);
-  assert.ok(h.includes('href="/lembretes.css"'));
-  // o Tutorial e o título agora vêm do cabeçalho da casca; a página não tem mais cabeçalho próprio
+  for (const src of ['/avisos-aparelho.js', '/tour.js', '/lembretes.js', '/lembretes-aba.js']) assert.ok(h.includes(`<script src="${src}">`), src);
+  for (const css of ['/avisos.css', '/lembretes-aba.css']) assert.ok(h.includes(`href="${css}"`), css);
+  assert.match(h, /id="lembretesRaiz"/);
   assert.match(h, /DGCasca\.monta\(\{ pagina: 'lembretes'/);
-  assert.doesNotMatch(h, /lp-voltar|lp-topo/);
+  assert.doesNotMatch(h, /lp-voltar|lp-topo|data-ajuda=/);
   assert.ok(h.indexOf('href="/casca.css"') < h.indexOf('href="/menu-lado.css"'), 'casca.css vem antes do menu-lado.css');
-  assert.equal((h.match(/data-ajuda="/g) || []).length, 3);
-  assert.match(h, /Ativar avisos neste aparelho/);
-  assert.match(h, /Mandar aviso de teste/);
   assert.match(h, /name="viewport"[^>]*width=device-width/);
+});
+
+test('o Board tem a aba Lembretes depois de Avisos', () => {
+  const h = pub('mesa.html');
+  for (const src of ['/avisos-aparelho.js', '/lembretes.js', '/lembretes-aba.js']) assert.ok(h.includes(`<script src="${src}">`), src);
+  assert.ok(h.indexOf('/mesa.js') < h.indexOf('/lembretes-aba.js'));
+  assert.match(pub('mesa.js'), /ORDEM = \['hoje', 'tarefas', 'avisos', 'lembretes'\]/);
+});
+
+test('aba: grupos tocando agora, hoje, amanhã, mais adiante e os parados', () => {
+  const Aba = require('../public/lembretes-aba');
+  const l = (id, proxima, estado = 'ativo') => ({ id, proxima, estado });
+  const gs = Aba.grupos([l('a', '2026-10-21T14:00:00-03:00'), l('b', '2026-10-22T08:00:00-03:00'), l('c', '2026-10-30T09:00:00-03:00'),
+    l('d', '2026-10-21T09:00:00-03:00'), l('e', null, 'pausado'), l('f', null, 'encerrado'), l('g', null, 'encerrado')],
+    [{ id: 'oc1', lembrete_id: 'g' }], '2026-10-21', '2026-10-22');
+  assert.deepEqual(gs.map(g => g.id), ['tocando', 'hoje', 'amanha', 'depois', 'pausado', 'encerrado']);
+  assert.deepEqual(gs[1].itens.map(x => x.l.id), ['d', 'a']);
+  assert.deepEqual(gs[5].itens.map(x => x.l.id), ['f'], 'o encerrado que está tocando aparece só em Tocando agora');
+  assert.equal(Aba.quandoCurto('2026-10-21T14:00:00-03:00', '2026-10-21', '2026-10-22'), '14:00');
+  assert.equal(Aba.quandoCurto('2026-10-24T08:00:00-03:00', '2026-10-21', '2026-10-22'), 'sáb 24/10');
+  assert.equal(Aba.quandoCurto(null, '2026-10-21', '2026-10-22'), '');
+  assert.equal(Aba.rotuloOcorrencia({ estado: 'insistindo', envio: 3, teto: 12 }), 'insistindo, 3º aviso de 12');
+  assert.equal(Aba.rotuloOcorrencia({ estado: 'adiada', adiada_ate: '2026-10-21T14:10:00-03:00' }), 'adiado até 14:10');
+  assert.equal(Aba.regraCurta('uma vez, em 21/10/2026 às 08:50'), 'uma vez');
+  assert.equal(Aba.regraCurta('todo dia às 14:00'), 'todo dia às 14:00');
+  assert.equal(Aba.diaNoFuso(new Date('2026-10-21T01:50:00Z'), 'America/Sao_Paulo'), '2026-10-20');
+  assert.deepEqual(Aba.QUANDO.map(x => x[0]), ['daqui', 'unico', 'diario', 'semanal', 'a_cada_n_dias']);
 });
 
 test('faixa: linha com agente, texto, "aviso n de teto" e os botões; HTML do texto é escapado', () => {

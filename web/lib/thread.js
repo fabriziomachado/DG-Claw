@@ -66,6 +66,9 @@ const REMINDER = /<system-reminder>[\s\S]*?<\/system-reminder>/g;
 const ANEXO_LINHA = /^\[anexo:\s*(.+?)\]\s*$/gm;
 // "↩ <pergunta>" (cartão de escolha) ou "↩ [<id>] <trecho>" (responder citando uma mensagem, 19/10/2026)
 const RX_CITA = /^↩ (?:\[([a-f0-9]{8,40})\] )?([^\n]{1,200})\n([\s\S]+)$/;
+// Caminho de arquivo com extensão citado no texto: absoluto, ~/, ./ ou relativo com pelo menos uma pasta
+// (entregas/x/resumo.md). Nome solto (resumo.md) fica de fora para não pegar exemplo nem palavra comum.
+const CITADO = /(?<![\w/.~-])((?:\/|~\/|\.\/)?(?:[\w.-]+\/)+[\w.-]+\.[A-Za-z0-9]{1,8})(?![\w/])/g;
 const ROTULO_EMOJI = { photo: '📷 foto', video: '🎬 vídeo', audio: '🎤 áudio', document: '📄 arquivo' };
 const CHUNK = 4 * 1024 * 1024;
 
@@ -250,12 +253,48 @@ function criarMontagem({ tz, midia }) {
     return true;
   }
 
+  /**
+   * Arquivos que o agente citou só no texto ("está em entregas/x/resumo.md") viram cartão logo abaixo
+   * da fala, como se ele tivesse usado o send_file (21/10/2026: o dono via o caminho e não tinha como
+   * abrir). Só entra arquivo que existe dentro da casa do agente, fora de pastas ocultas, até 3 por
+   * fala, e não repete o que já foi mandado como arquivo neste turno.
+   */
+  function empurraCitados(estado, agente, { ep, origin, texto }) {
+    const cont = agente.home_container && agente.home_container.replace(/\/+$/, '');
+    if (!cont) return;
+    const vistos = new Set();
+    for (let i = estado.eventos.length - 1, n = 0; i >= 0 && n < 40; i--, n++) {
+      const ev = estado.eventos[i];
+      if (ev.quem !== 'agente') break;
+      if (ev.media && ev.media.path) vistos.add(path.posix.normalize(ev.media.path));
+    }
+    const caminhos = [];
+    for (const m of String(texto).matchAll(CITADO)) {
+      const bruto = m[1].replace(/[.,;:!?)]+$/, '');
+      const rel = bruto.startsWith('~/') ? bruto.slice(2) : bruto.replace(/^\.\//, '');
+      const visto = path.posix.normalize(bruto.startsWith('/') ? bruto : `${cont}/${rel}`);
+      if (!(visto === cont || visto.startsWith(cont + '/'))) continue;
+      if (visto.slice(cont.length).split('/').some(seg => seg.startsWith('.'))) continue;
+      if (vistos.has(visto)) continue;
+      vistos.add(visto);
+      caminhos.push(visto);
+      if (caminhos.length >= 3) break;
+    }
+    caminhos.forEach((visto, i) => {
+      const host = paraHost(visto, agente);
+      const media = midia.registrar(agente.slug, host, { visto, nome: path.basename(host) });
+      if (!media || !media.disponivel) return;
+      estado.eventos.push(monta(estado, agente, { ep: ep + 0.0001 * (i + 1), origin, text: ROTULO_EMOJI[media.kind] || '📄 arquivo', kind: media.kind, media, via: 'plataforma', quem: 'agente' }));
+    });
+  }
+
   /** Mensagem do agente por dgchat reply (texto) ou send_file (mídia). `inp` = argumentos da tool. */
   function empurraAgente(estado, agente, { ep, origin, arquivo, inp }) {
     if (!arquivo) {
       const t = typeof inp.text === 'string' ? inp.text.trim() : '';
       if (!t) return false;
       empurra(estado, agente, { ep, origin, text: t, caminhos: [], via: 'plataforma', quem: 'agente' });
+      empurraCitados(estado, agente, { ep, origin, texto: t });
       return true;
     }
     const visto = String(inp.path || '').trim();

@@ -397,6 +397,9 @@
 @media (prefers-reduced-motion:reduce){.vazio .vz-av{animation:none}}
 /* tela baixa (iPhone SE e afins): a foto diminui para a conversa vazia caber sem rolar */
 @media (max-height:760px){.vazio .vz-av{width:120px;height:120px;font-size:48px;margin-bottom:14px}}
+.vazio .vz-quem{display:flex;flex-direction:column;align-items:center;gap:2px;margin:-4px 0 18px}
+.vazio .vz-nome{font-size:15px;font-weight:600;color:var(--dg-texto)}
+.vazio .vz-cargo{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dg-texto-3)}
 .vazio b{display:block;font-size:22px;font-weight:650;letter-spacing:-.01em;color:var(--dg-texto);margin-bottom:6px}
 .vazio small{display:block;font-size:14.5px;line-height:1.5;color:var(--dg-texto-2);max-width:24em}
 .vazio .vz-link{font:inherit;color:var(--dg-azul-forte);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px}

@@ -1885,8 +1885,11 @@ function htmlVazio() {
   const sug = EH_ADMIN ? '' : '<div class="vz-sug" role="list">' + (sugestoesAgente || SUGESTOES_VAZIO).map(t =>
     `<button type="button" role="listitem" class="vz-chip" data-vz-sugestao="${esc(t.texto)}">` +
     (ROTULO_SUGESTAO[t.tipo] ? `<span class="vz-tipo">${ROTULO_SUGESTAO[t.tipo]}</span>` : '') + `${esc(t.texto)}</button>`).join('') + '</div>';
+  // nome e função logo abaixo da foto (21/10/2026, pedido do dono): o cargo é o subtitulo do registro
+  const quem = `<div class="vz-quem"><span class="vz-nome">${esc(AGENTE.nome || '')}</span>` +
+    (AGENTE.subtitulo ? `<span class="vz-cargo">${esc(AGENTE.subtitulo)}</span>` : '') + '</div>';
   return `<div class="vazio"><div class="vz-av" style="background:${esc(AGENTE.cor || '#2f9e5e')}" aria-hidden="true">${foto}</div>` +
-    `<b>Como posso ajudar?</b><small>${sub}</small>${sug}</div>`;
+    `${quem}<b>Como posso ajudar?</b><small>${sub}</small>${sug}</div>`;
 }
 wrap.addEventListener('click', ev => {
   const b = ev.target.closest('[data-vz-sugestao]');
@@ -2014,7 +2017,7 @@ function render(opt) {
       }
     }
     itens.push([m.id, `<div class="row ${lado}${ehVisual(m.media) ? ' vis' : ''}${troca}" data-msg="${esc(m.id)}">` +
-                      `<div class="bub">${m.mencaoPergunta ? destacaMencao(htmlCorpo(m), m) : htmlCorpo(m)}</div>${lado === 'her' ? htmlAcoes(m, htmlHora(m)) : htmlHora(m)}</div>`]);
+                      `<div class="bub">${m.mencaoPergunta ? destacaMencao(htmlCorpo(m), m) : destacaNomes(htmlCorpo(m))}</div>${lado === 'her' ? htmlAcoes(m, htmlHora(m)) : htmlHora(m)}</div>`]);
     anterior = lado;
   }
   if (!itens.length && carregouUmaVez) itens.push(['vazio', htmlVazio()]);
@@ -4634,15 +4637,31 @@ function destacaMencao(html, m) {
   const marca = esc('@' + a.nome);
   return html.replace(marca, `<span class="mencao-nome"${corMencao(a)}>${marca}</span>`);
 }
+/* @Nome solto no meio de qualquer fala (21/10/2026, o dono citou "( @Tech )" na conversa do Admin e não viu o
+   destaque): só visual, não chama ninguém. Mexe só no texto entre as tags (nunca dentro de href ou atributo). */
+function destacaNomes(html) {
+  if (!html.includes('@') || !agentesMenu.length) return html;
+  const nomes = agentesMenu.map(a => esc(a.nome)).filter(Boolean).sort((x, y) => y.length - x.length).map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const rx = new RegExp('(^|[\\s(\\[])@(' + nomes.join('|') + ')(?=$|[\\s,.!?:;)\\]])', 'gi');
+  let dentroCodigo = 0;
+  return html.split(/(<[^>]*>)/).map(pedaco => {
+    if (pedaco.startsWith('<')) { if (/^<(code|pre|a)\b/i.test(pedaco)) dentroCodigo++; else if (/^<\/(code|pre|a)>/i.test(pedaco)) dentroCodigo = Math.max(0, dentroCodigo - 1); return pedaco; }
+    if (dentroCodigo) return pedaco;
+    return pedaco.replace(rx, (_, antes, nome) => {
+      const a = agentesMenu.find(x => esc(x.nome).toLowerCase() === nome.toLowerCase());
+      return `${antes}<span class="mencao-nome"${corMencao(a)}>@${nome}</span>`;
+    });
+  }).join('');
+}
 
 /* No campo de digitar o texto não tem cor por palavra: uma camada por cima do campo, com o mesmo texto
-   transparente, pinta só o fundo dos @Nome que batem com um agente. Fora da conversa do Admin, onde o @
-   não chama ninguém. */
+   transparente, pinta só o fundo dos @Nome que batem com um agente. Vale também na conversa do Admin
+   (21/10/2026), onde o @ só destaca e não chama ninguém. */
 const espelho = document.createElement('div');
 espelho.id = 'entradaEspelho'; espelho.setAttribute('aria-hidden', 'true');
-if (!EH_ADMIN && entrada && entrada.parentElement) entrada.after(espelho);
+if (entrada && entrada.parentElement) entrada.after(espelho);
 function pintaEspelho() {
-  if (EH_ADMIN || !espelho.isConnected) return;
+  if (!espelho.isConnected) return;
   const ags = mencionaveis();
   const t = entrada.value;
   if (!t.includes('@') || !ags.length) { if (espelho.innerHTML) espelho.innerHTML = ''; return; }

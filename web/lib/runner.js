@@ -65,6 +65,8 @@ function criarRunner({ log, timeoutMs }) {
   }
 
   return {
+    /** A chamada crua (GET de leitura): os ajudantes (lib/ajudantes.js) leem as sessões paralelas por ela. */
+    chamar,
     /** Reinicia a sessão do agente no runner: a mesma conversa, processo novo (destrava um agente congelado). */
     async reiniciar(agente) {
       const r = await chamar(agente, 'POST', `/api/agents/${encodeURIComponent(agente.agente_id)}/reiniciar`, {}, 60000);

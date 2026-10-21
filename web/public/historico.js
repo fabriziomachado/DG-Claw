@@ -125,7 +125,7 @@
       const av = ev.target.closest('[data-arquivada]'); if (av) return abreArquivada(av.dataset.arquivada);
       const nova = ev.target.closest('[data-hist-nova]'); if (nova) return novaConversa(nova);
       const vai = ev.target.closest('[data-ir]'); if (vai) return irPara(vai);
-      if (ev.target.closest('[data-hist-volta]')) return mostraAba(aba);
+      if (ev.target.closest('[data-hist-volta]')) { mostraAba(aba); if (agente && agente.soArquivadas) el.querySelector('.hist-abas').hidden = true; return; }
       const sug = ev.target.closest('[data-sugestao]');
       if (sug) { const q = el.querySelector('#histQ'); q.value = sug.dataset.sugestao; busca(q.value); }
     });
@@ -159,6 +159,10 @@
       return;
     }
     if (meu !== pedido) return;
+    if (!arq.length && agente.soArquivadas) {
+      lista.innerHTML = cab + '<div class="hist-vazio"><p>Nenhuma conversa arquivada ainda.</p></div>';
+      return;
+    }
     if (!arq.length) {
       lista.innerHTML = cab + `<div class="hist-vazio">${ICO.relogio.replace('width="16" height="16"', 'width="28" height="28"')}` +
         '<p>Nenhuma conversa arquivada ainda.</p>' +
@@ -227,7 +231,15 @@
     if (!agente || agente.id !== ag.id) { agente = ag; ultimaBusca = ''; el.querySelector('#histQ').value = ''; el.dataset.memorias = ''; }
     el.hidden = false;
     document.documentElement.classList.add('hist-aberto');
+    // Admin (soArquivadas): sem busca nem memórias, só a lista do que o /clear arquivou
+    el.classList.toggle('so-arquivadas', !!ag.soArquivadas);
+    el.querySelector('.hist-busca').hidden = el.querySelector('.hist-so').hidden = !!ag.soArquivadas;
     mostraAba('conversas');
+    if (ag.soArquivadas) {
+      el.querySelector('.hist-abas').hidden = true;
+      el.querySelector('#histSub').textContent = 'As conversas que você arquivou com Nova conversa ou /clear.';
+      return;
+    }
     setTimeout(() => { if (matchMedia('(pointer:fine)').matches) el.querySelector('#histQ').focus(); }, 60);
     const sub = el.querySelector('#histSub');
     try {

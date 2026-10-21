@@ -87,11 +87,22 @@ test('só abre arquivo que está na lista de memórias', async () => {
   assert.strictEqual(chamadas.filter((a) => a.includes('head')).length, 1);
 });
 
-test('o Admin não tem histórico e o histórico não muda nada', async () => {
-  const h = criarHistorico({ registro, log: () => {}, roda: comRoda([]).roda });
+test('o Admin só tem as conversas arquivadas e o histórico não muda nada', async () => {
+  const { roda, chamadas } = comRoda([]);
+  const h = criarHistorico({ registro, log: () => {}, roda });
   let res = resposta();
   await h.tratar({ method: 'GET' }, res, new URL('http://x/api/v1/historico/admin'), dono);
-  assert.strictEqual(res.status, 404);
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(res.corpo.so_arquivadas, true);
+  for (const rota of ['busca?q=teste', 'memorias', 'sugestoes']) {
+    res = resposta();
+    await h.tratar({ method: 'GET' }, res, new URL('http://x/api/v1/historico/admin/' + rota), dono);
+    assert.strictEqual(res.status, 404, rota);
+  }
+  res = resposta();
+  await h.tratar({ method: 'GET' }, res, new URL('http://x/api/v1/historico/admin/arquivadas'), dono);
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(chamadas.length, 0);
   res = resposta();
   await h.tratar({ method: 'POST' }, res, new URL('http://x/api/v1/historico/ana/busca'), dono);
   assert.strictEqual(res.status, 405);

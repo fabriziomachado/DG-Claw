@@ -370,6 +370,7 @@ document.addEventListener('dgavatar', ev => {
       if (r.ok) d = await r.json();
     } catch (_) { return; }
     if (!d || !d.agentes) return;
+    if (window.DGAjudantes) window.DGAjudantes.pinta(d);   // selo na fileira e linha acima do campo
     for (const a of outros) marcaTrabalhando(a.id, (d.agentes[a.id] || {}).estado === 'trabalhando');
   }
   quemTrabalha(); setInterval(quemTrabalha, 6000);
@@ -405,6 +406,8 @@ if (EH_ADMIN) {
 }
 entrada.placeholder = 'Pergunte ao ' + AGENTE.nome;
 if (EH_ADMIN) $('avisoAdmin').hidden = false;
+// ajudantes do agente aberto: linha acima do campo (ajudantes.js); o "avisar" é uma mensagem normal ao agente
+if (window.DGAjudantes) window.DGAjudantes.liga(AGENTE, texto => enviarTexto(texto));
 if (!caps.microfone) document.documentElement.classList.add('sem-mic');
 if (!caps.voz) document.documentElement.classList.add('sem-voz');
 
@@ -1875,15 +1878,18 @@ if (!EH_ADMIN) {
 function htmlVazio() {
   const img = AGENTE.avatar_img || (/^https:\/\//i.test(AGENTE.avatar || '') ? AGENTE.avatar : '');
   const foto = img ? `<img src="${esc(img)}" alt="">` : esc(AGENTE.avatar || (AGENTE.nome || '?').slice(0, 1));
-  const comHist = !EH_ADMIN && !!window.DGHistorico;
+  const comHist = !!window.DGHistorico;
   const sub = arquivadasTela && comHist
     ? 'Conversa nova. As anteriores estão no <button type="button" class="vz-link" data-abre-historico>Histórico</button>.'
     : `Mande a primeira mensagem para o ${esc(AGENTE.nome)}. A resposta aparece aqui.`;
   const sug = EH_ADMIN ? '' : '<div class="vz-sug" role="list">' + (sugestoesAgente || SUGESTOES_VAZIO).map(t =>
     `<button type="button" role="listitem" class="vz-chip" data-vz-sugestao="${esc(t.texto)}">` +
     (ROTULO_SUGESTAO[t.tipo] ? `<span class="vz-tipo">${ROTULO_SUGESTAO[t.tipo]}</span>` : '') + `${esc(t.texto)}</button>`).join('') + '</div>';
+  // nome e função logo abaixo da foto (21/10/2026, pedido do dono): o cargo é o subtitulo do registro
+  const quem = `<div class="vz-quem"><span class="vz-nome">${esc(AGENTE.nome || '')}</span>` +
+    (AGENTE.subtitulo ? `<span class="vz-cargo">${esc(AGENTE.subtitulo)}</span>` : '') + '</div>';
   return `<div class="vazio"><div class="vz-av" style="background:${esc(AGENTE.cor || '#2f9e5e')}" aria-hidden="true">${foto}</div>` +
-    `<b>Como posso ajudar?</b><small>${sub}</small>${sug}</div>`;
+    `${quem}<b>Como posso ajudar?</b><small>${sub}</small>${sug}</div>`;
 }
 wrap.addEventListener('click', ev => {
   const b = ev.target.closest('[data-vz-sugestao]');
@@ -1947,7 +1953,7 @@ function render(opt) {
     itens.push(['topo', maisAntigas
       ? `<div class="topo">${carregandoAntigas ? 'carregando mensagens antigas…'
                                               : 'role para ver as antigas'}</div>`
-      : arquivadasTela && !EH_ADMIN && window.DGHistorico
+      : arquivadasTela && window.DGHistorico
         ? '<div class="topo topo-arq">Conversa nova. As anteriores estão no <button type="button" data-abre-historico>Histórico</button></div>'
         : '<div class="topo">início da conversa</div>']);
   }
@@ -2011,7 +2017,7 @@ function render(opt) {
       }
     }
     itens.push([m.id, `<div class="row ${lado}${ehVisual(m.media) ? ' vis' : ''}${troca}" data-msg="${esc(m.id)}">` +
-                      `<div class="bub">${m.mencaoPergunta ? destacaMencao(htmlCorpo(m), m) : htmlCorpo(m)}</div>${lado === 'her' ? htmlAcoes(m, htmlHora(m)) : htmlHora(m)}</div>`]);
+                      `<div class="bub">${m.mencaoPergunta ? destacaMencao(htmlCorpo(m), m) : destacaNomes(htmlCorpo(m))}</div>${lado === 'her' ? htmlAcoes(m, htmlHora(m)) : htmlHora(m)}</div>`]);
     anterior = lado;
   }
   if (!itens.length && carregouUmaVez) itens.push(['vazio', htmlVazio()]);
@@ -4631,15 +4637,31 @@ function destacaMencao(html, m) {
   const marca = esc('@' + a.nome);
   return html.replace(marca, `<span class="mencao-nome"${corMencao(a)}>${marca}</span>`);
 }
+/* @Nome solto no meio de qualquer fala (21/10/2026, o dono citou "( @Tech )" na conversa do Admin e não viu o
+   destaque): só visual, não chama ninguém. Mexe só no texto entre as tags (nunca dentro de href ou atributo). */
+function destacaNomes(html) {
+  if (!html.includes('@') || !agentesMenu.length) return html;
+  const nomes = agentesMenu.map(a => esc(a.nome)).filter(Boolean).sort((x, y) => y.length - x.length).map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const rx = new RegExp('(^|[\\s(\\[])@(' + nomes.join('|') + ')(?=$|[\\s,.!?:;)\\]])', 'gi');
+  let dentroCodigo = 0;
+  return html.split(/(<[^>]*>)/).map(pedaco => {
+    if (pedaco.startsWith('<')) { if (/^<(code|pre|a)\b/i.test(pedaco)) dentroCodigo++; else if (/^<\/(code|pre|a)>/i.test(pedaco)) dentroCodigo = Math.max(0, dentroCodigo - 1); return pedaco; }
+    if (dentroCodigo) return pedaco;
+    return pedaco.replace(rx, (_, antes, nome) => {
+      const a = agentesMenu.find(x => esc(x.nome).toLowerCase() === nome.toLowerCase());
+      return `${antes}<span class="mencao-nome"${corMencao(a)}>@${nome}</span>`;
+    });
+  }).join('');
+}
 
 /* No campo de digitar o texto não tem cor por palavra: uma camada por cima do campo, com o mesmo texto
-   transparente, pinta só o fundo dos @Nome que batem com um agente. Fora da conversa do Admin, onde o @
-   não chama ninguém. */
+   transparente, pinta só o fundo dos @Nome que batem com um agente. Vale também na conversa do Admin
+   (21/10/2026), onde o @ só destaca e não chama ninguém. */
 const espelho = document.createElement('div');
 espelho.id = 'entradaEspelho'; espelho.setAttribute('aria-hidden', 'true');
-if (!EH_ADMIN && entrada && entrada.parentElement) entrada.after(espelho);
+if (entrada && entrada.parentElement) entrada.after(espelho);
 function pintaEspelho() {
-  if (EH_ADMIN || !espelho.isConnected) return;
+  if (!espelho.isConnected) return;
   const ags = mencionaveis();
   const t = entrada.value;
   if (!t.includes('@') || !ags.length) { if (espelho.innerHTML) espelho.innerHTML = ''; return; }
@@ -5207,14 +5229,14 @@ function desenhaAlertas() {
   pintaBadgeApp();
   alertasCaixa.hidden = true;   // a pilha lateral antiga não aparece mais
   const c = contagensFiltro();
-  // o Histórico fica sempre à mão nos agentes (o Admin não guarda histórico pesquisável)
-  const temHist = !EH_ADMIN && !!window.DGHistorico;
+  // o Histórico fica sempre à mão (no Admin, só com as conversas arquivadas)
+  const temHist = !!window.DGHistorico;
   filtrosEl.hidden = !(temHist || c.nv || c.temEntregas || filtro !== 'tudo');
   const chip = (k, rot, n, cls) => `<button type="button" class="filtro${filtro === k ? ' on' : ''}${cls ? ' ' + cls : ''}" data-filtro="${k}" aria-pressed="${filtro === k}">` +
     `${rot}${n ? ` <b>${n}</b>` : ''}</button>`;
   filtrosEl.innerHTML = chip('tudo', 'Tudo', 0) + chip('nao-vistas', 'Não vistas', c.nv) +
     chip('pedidos', 'Pedem ação', c.pedidos, c.pedidos ? 'tem-pedido' : '') + chip('entregas', 'Entregas', c.entregas) +
-    (temHist ? `<button type="button" class="filtro filtro-hist" data-historico title="Buscar nas conversas antigas e ver as memórias">${window.DGHistorico.ICONE}Histórico</button>` : '');
+    (temHist ? `<button type="button" class="filtro filtro-hist" data-historico title="${EH_ADMIN ? 'Ver as conversas arquivadas' : 'Buscar nas conversas antigas e ver as memórias'}">${window.DGHistorico.ICONE}Histórico</button>` : '');
   aplicaFiltro();
 }
 function idsDoFiltro() {
@@ -5248,10 +5270,10 @@ async function garanteMensagemDoAlerta(a) {
   maisAntigas = !!d.mais_antigas;
 }
 wrap.addEventListener('click', ev => {
-  if (ev.target.closest('[data-abre-historico]')) window.DGHistorico.abre({ id: AGENTE.id, nome: AGENTE.nome || 'o agente' }, 'arquivadas');
+  if (ev.target.closest('[data-abre-historico]')) window.DGHistorico.abre({ id: AGENTE.id, nome: AGENTE.nome || 'o agente', soArquivadas: EH_ADMIN }, 'arquivadas');
 });
 filtrosEl.addEventListener('click', async ev => {
-  if (ev.target.closest('[data-historico]')) { window.DGHistorico.abre({ id: AGENTE.id, nome: AGENTE.nome || 'o agente' }); return; }
+  if (ev.target.closest('[data-historico]')) { window.DGHistorico.abre({ id: AGENTE.id, nome: AGENTE.nome || 'o agente', soArquivadas: EH_ADMIN }); return; }
   const b = ev.target.closest('[data-filtro]'); if (!b) return;
   filtro = b.dataset.filtro;
   try {

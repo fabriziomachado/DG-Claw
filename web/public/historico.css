@@ -10,7 +10,7 @@
 @media (prefers-reduced-motion:reduce){.hist-caixa,.hist-fundo{animation:none}}
 html.hist-aberto,html.hist-aberto body{overflow:hidden}
 
-.hist-cab{display:flex;align-items:flex-start;gap:12px;padding:16px 16px 10px}
+.hist-cab{display:flex;align-items:flex-start;gap:12px;padding:16px 16px 10px;padding-top:calc(16px + env(safe-area-inset-top))}
 .hist-cab > div{flex:1;min-width:0}
 .hist-cab h2{margin:0;font-size:18px;font-weight:650;letter-spacing:-.01em}
 .hist-sub{margin:2px 0 0;font-size:13px;color:var(--dg-texto-2)}
@@ -19,12 +19,12 @@ html.hist-aberto,html.hist-aberto body{overflow:hidden}
 .hist-x:hover,.hist-volta:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
 
 .hist-abas{display:flex;gap:4px;padding:0 16px;border-bottom:1px solid var(--dg-borda)}
-.hist-abas[hidden]{display:none}
+.hist-abas[hidden],.hist-busca[hidden],.hist-so[hidden]{display:none}
 .hist-abas button{font:inherit;font-size:14px;padding:10px 4px;margin-right:16px;border:0;background:none;color:var(--dg-texto-2);cursor:pointer;
   border-bottom:2px solid transparent;margin-bottom:-1px}
 .hist-abas button[aria-selected="true"]{color:var(--dg-texto);border-bottom-color:var(--dg-texto);font-weight:600}
 
-.hist-corpo{flex:1;min-height:0;display:flex;flex-direction:column}
+.hist-corpo{flex:1;min-height:0;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom)}
 .hist-corpo[hidden]{display:none}
 .hist-busca{display:flex;align-items:center;gap:8px;margin:12px 16px 8px;padding:0 12px;min-height:44px;border-radius:22px;
   border:1px solid var(--dg-borda);background:var(--dg-superficie);color:var(--dg-texto-3)}

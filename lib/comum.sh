@@ -119,6 +119,9 @@ gerar_primeiro_acesso() {
 # "Bypass Permissions mode ... 1. No, exit / 2. Yes, I accept" a cada boot; o Enter do runner
 # escolhe o padrao ("No, exit") e o agente cai em loop (16/10/2026). So esta chave resolve:
 # `bypassPermissionsModeAccepted` no ~/.claude.json nao.
+# Junto vai `"promptSuggestionEnabled": false`: depois de cada turno o Claude Code roda um agente
+# escondido que sugere o proximo pedido; o gancho PreToolUse dele chega ao runner DEPOIS do Stop e
+# o agente fica "trabalhando" para sempre na tela (21/10/2026, Tech). Ninguem ve a sugestao aqui.
 # - arquivo ausente ou vazio: cria so com a chave;
 # - JSON valido (objeto): mescla com jq, preservando o resto;
 # - JSON invalido: NAO mexe, avisa com o caminho e o que fazer (devolve 0: o resto da
@@ -135,15 +138,15 @@ garantir_pular_aviso_bypass() {
             aviso "$alvo nao e um JSON valido (objeto); nao mexi nele. O Claude Code vai abrir o aviso do modo Bypass e o agente nao sobe sozinho. Corrija o arquivo (ou apague-o, se nao tiver nada seu) e rode de novo, ou acrescente a mao: \"skipDangerousModePermissionPrompt\": true"
             return 0
         fi
-        if jq -e '.skipDangerousModePermissionPrompt == true' "$alvo" >/dev/null 2>&1; then
+        if jq -e '.skipDangerousModePermissionPrompt == true and .promptSuggestionEnabled == false' "$alvo" >/dev/null 2>&1; then
             return 0
         fi
         [ -n "$modo" ] || modo="$(stat -c '%a' "$alvo")"
         [ -n "$quem" ] || quem="$(stat -c '%u:%g' "$alvo")"
-        novo="$(jq '. + {skipDangerousModePermissionPrompt: true}' "$alvo")" \
+        novo="$(jq '. + {skipDangerousModePermissionPrompt: true, promptSuggestionEnabled: false}' "$alvo")" \
             || falha "o jq nao conseguiu mesclar a chave em $alvo." "confira se o arquivo e um JSON valido (jq . $alvo) e rode de novo."
     else
-        novo='{"skipDangerousModePermissionPrompt": true}'
+        novo='{"skipDangerousModePermissionPrompt": true, "promptSuggestionEnabled": false}'
     fi
     printf '%s\n' "$novo" | escrever_arquivo "$alvo" "${modo:-644}" "$quem"
 }

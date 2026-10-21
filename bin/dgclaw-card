@@ -43,6 +43,8 @@
 #      Se o card abriu mas o "dgclaw-monitor add" falhou, a saida e 8: o card esta aberto e SEM monitor,
 #      e a mensagem traz o comando para ligar o monitor a mao.
 #   8  (so no "abrir --monitor") o card abriu e o pedido foi entregue, mas o monitor nao ligou
+#   9  "esperar": o card nunca comecou (parado, sem nenhuma mensagem, por DGCLAW_CARD_SEM_COMECO
+#      segundos, padrao 120): o pedido nao chegou. Reenvie com "dgclaw-card mandar <id> --arquivo F".
 set -euo pipefail
 umask 077
 
@@ -269,6 +271,10 @@ cmd_estado() {
 
 cmd_esperar() {
   local id="${1:-}" max=900 visto=0 seguidas=0 status fila ultimo passo="${DGCLAW_CARD_INTERVALO:-5}"
+  # Card que nunca comecou (21/10/2026: o pedido sumiu na entrega e o agente esperou 30 min por nada):
+  # parado, sem fila e sem nenhuma mensagem por este tempo, o esperar desiste e diz para reenviar.
+  local sem_comeco="${DGCLAW_CARD_SEM_COMECO:-120}" parado_desde=""
+  [[ "$sem_comeco" =~ ^[0-9]+$ ]] || sem_comeco=120
   validar_id "$id"; shift
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -282,7 +288,7 @@ cmd_esperar() {
     chamar_ou_sair GET "/api/agents/$id"
     status="$(campo .data.status)"; fila="$(campo .data.sessao.fila)"; fila="${fila:-0}"
     case "$status" in
-      working) visto=1; seguidas=0 ;;
+      working) visto=1; seguidas=0; parado_desde="" ;;
       errored)
         CODIGO=6 die "o card $id parou com erro: $(campo .data.error). Veja 'dgclaw-card estado $id'; se for falta de login, peca ao dono para conectar o provedor no painel." ;;
       idle|completed|resumable|stopped)
@@ -293,6 +299,12 @@ cmd_esperar() {
           if [ "$visto" = 1 ] && [ "$status" = idle ]; then echo "O card $id terminou o turno. Leia com: dgclaw-card ler $id"; return 0; fi
           chamar_ou_sair GET "/api/agents/$id/conversation?limit=2"
           ultimo="$(printf '%s' "$RESP" | jq -r '.data | last | .role // empty' 2>/dev/null || true)"
+          if [ "$visto" = 0 ] && [ -z "$ultimo" ]; then
+            [ -n "$parado_desde" ] || parado_desde=$SECONDS
+            if [ $((SECONDS - parado_desde)) -ge "$sem_comeco" ]; then
+              CODIGO=9 die "o card $id nao comecou: esta parado ha $((SECONDS - parado_desde)) segundos sem nenhuma mensagem, entao o pedido nao chegou. Reenvie com: dgclaw-card mandar $id --arquivo <arquivo do pedido> (e espere de novo), ou feche com: dgclaw-card fechar $id."
+            fi
+          else parado_desde=""; fi
           if [ "$ultimo" = "assistant" ]; then
             seguidas=$((seguidas+1))
             if [ "$seguidas" -ge 2 ]; then echo "O card $id terminou o turno. Leia com: dgclaw-card ler $id"; return 0; fi

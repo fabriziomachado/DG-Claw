@@ -242,11 +242,15 @@ envio registra o erro e a faixa e o aviso no aparelho seguem normalmente.
 - **Faixa ⏰** em todas as conversas (`/a/<agente>`): uma linha por ocorrência tocando, com o
   nome do agente, o texto, "aviso 3 de 12", e os botões **Feito** e **Adiar** (10 min, 30 min,
   1 h). Atualiza a cada 15 s e quando a aba volta ao foco.
-- **Tela Lembretes** (`/lembretes`, no menu lateral): a lista com a regra em português, a
-  próxima vez, pausar, retomar, apagar, criar um novo e o histórico das ocorrências. É ali que
-  fica o botão **Ativar avisos neste aparelho** e o **Mandar aviso de teste**.
-- As duas têm o botão **Tutorial** (visita guiada) e o `?` por seção, explicando o que é, como o
-  DG Claw calcula e por que está ali.
+- **Aba Lembretes** do Board (`/mesa#lembretes`), a mesma que abre sozinha em `/lembretes` (menu
+  lateral): no topo, se os avisos estão ativos neste aparelho (Ativar, aviso de teste, desligar); o
+  campo com "quando" e "de qual agente" em pílulas e, atrás do ícone de ajustes, a insistência, o
+  máximo de avisos, o último dia e o aviso pelo agente; filtros (ativos, pausados, encerrados, todos e
+  as fotos dos agentes); a lista em grupos (tocando agora com Feito e Adiar, hoje, amanhã, mais
+  adiante, pausados, encerrados), com histórico, pausar, retomar e apagar no "⋯". Hoje e amanhã
+  seguem o fuso do servidor. Código em `public/lembretes-aba.js` e `lembretes-aba.css`; as contas do
+  formulário continuam em `public/lembretes.js`.
+- A faixa e a aba têm o **Tutorial** (visita guiada) no cabeçalho.
 
 ## Onde fica cada coisa
 

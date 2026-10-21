@@ -5,15 +5,15 @@
    abrir rápido e para o app instalado ter o que mostrar. NUNCA mexe em /api/,
    /p/, /login, /sair nem nas páginas de conversa (/a/...): conteúdo da conversa,
    painéis e sessão passam direto para a rede, sem cópia nenhuma. */
-const VERSAO = 'dgclaw-estaticos-v116';
+const VERSAO = 'dgclaw-estaticos-v129';
 const ESTATICOS = [
-  '/tema.css', '/tema.js', '/dgui.css', '/dgui.js', '/historico.css', '/historico.js', '/conversa.css', '/chat.css', '/conversa.js', '/icones-topo.js', '/menu-lado.js', '/menu-lado.css', '/casca.js', '/casca.css', '/fileira.css', '/sessao-paralela.js', '/caixa.js', '/caixa.css', '/saude.js', '/saude.css', '/board-hoje.js', '/cota.js', '/seletor-agente.js', '/economia.js', '/sono.js', '/login-cartao.js', '/trilha-tela.js', '/vendor/highlight-11.9.0.min.js', '/rolagem.js', '/tour.js',
+  '/tema.css', '/tema.js', '/dgui.css', '/dgui.js', '/historico.css', '/historico.js', '/conversa.css', '/chat.css', '/conversa.js', '/icones-topo.js', '/menu-lado.js', '/menu-lado.css', '/casca.js', '/casca.css', '/ajudantes.js', '/fileira.css', '/sessao-paralela.js', '/caixa.js', '/caixa.css', '/saude.js', '/saude.css', '/board-hoje.js', '/cota.js', '/seletor-agente.js', '/economia.js', '/sono.js', '/login-cartao.js', '/trilha-tela.js', '/vendor/highlight-11.9.0.min.js', '/rolagem.js', '/tour.js',
   '/onboarding.js', '/onboarding.css',
   '/campo-cofre.js', '/campo-cofre.css',
   '/barra.js', '/barra.css',
   '/sigilo.js', '/sigilo.css',
   '/avisos-aparelho.js',
-  '/lembretes-faixa.js', '/lembretes.js', '/lembretes.css',
+  '/lembretes-faixa.js', '/lembretes.js', '/lembretes.css', '/lembretes-aba.js', '/lembretes-aba.css',
   '/foco-tela.js', '/foco-tela.css',
   '/login.css', '/login.js', '/sem-zoom.css', '/sem-zoom.js',
   '/manifest.webmanifest',

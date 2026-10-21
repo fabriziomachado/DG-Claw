@@ -264,3 +264,25 @@ test('thread: responder citando uma mensagem ("↩ [id] trecho") guarda de quem 
   assert.equal(ev[1].cita.id, id); assert.equal(ev[1].cita.origin, 'dono'); assert.equal(ev[1].cita.texto, 'primeira');
   assert.equal(typeof ev[1].cita.ep, 'number');
 });
+
+test('thread: arquivo citado só no texto vira cartão (só se existir na casa, sem oculto e sem repetir)', () => {
+  const { agente, leitor, home } = preparar();
+  fs.mkdirSync(path.join(home, 'entregas', 'rd'), { recursive: true });
+  fs.writeFileSync(path.join(home, 'entregas', 'rd', 'resumo.md'), '# oi');
+  fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
+  fs.writeFileSync(path.join(home, '.claude', 'x.json'), '{}');
+  const tmp = path.join(pastaTemp('jsonl'), 's.jsonl');
+  const tu = (id, name, input, ts) => JSON.stringify({ type: 'assistant', timestamp: ts, message: { role: 'assistant', content: [{ type: 'tool_use', id, name, input }] } }) + '\n';
+  fs.writeFileSync(tmp,
+    tu('t1', 'mcp__dgchat__reply', { chat: 'c_ana', text: 'O relatório está em `entregas/rd/resumo.md`, e o PDF em /home/agente/out/relatorio.pdf. Fora: entregas/nao/existe.md, ~/.claude/x.json e /etc/passwd.txt' }, '2026-10-12T15:00:01.000Z') +
+    tu('t2', 'mcp__dgchat__send_file', { chat: 'c_ana', path: '/home/agente/out/relatorio.pdf', caption: 'Segue' }, '2026-10-12T15:00:02.000Z') +
+    tu('t3', 'mcp__dgchat__reply', { chat: 'c_ana', text: 'Mandei o out/relatorio.pdf acima.' }, '2026-10-12T15:00:03.000Z'));
+  const { eventos } = leitor.ler(tmp, agente);
+  const arquivos = eventos.filter((e) => e.media).map((e) => e.media.path);
+  assert.deepEqual(arquivos, ['/home/agente/entregas/rd/resumo.md', '/home/agente/out/relatorio.pdf', '/home/agente/out/relatorio.pdf'],
+    'os dois citados existentes viram cartão; o send_file seguinte vale; a fala 3 não repete o que acabou de ir');
+  const cartao = eventos[1];
+  assert.equal(cartao.quem, 'agente');
+  assert.equal(cartao.media.disponivel, true);
+  assert.equal(cartao.kind, 'document');
+});

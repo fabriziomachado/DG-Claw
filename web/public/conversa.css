@@ -382,13 +382,24 @@
   width:var(--pct,0%);background:#2f9e5e;border-radius:0 2px 2px 0;transition:width .3s}
 
 /* ── Conversa vazia: avatar do agente, pergunta curta e sugestões (padrão de estado vazio) ── */
-.vazio{max-width:30em;margin:0 auto;padding:clamp(20px,8vh,96px) 20px 24px;text-align:center;color:var(--dg-texto-2);
+/* conversa vazia no meio da altura (21/10/2026, pedido do dono): o wrap ocupa a altura do chat e centraliza */
+.wrap:has(> .vazio){min-height:100%;display:flex;flex-direction:column;justify-content:center;justify-content:safe center}
+.vazio{width:100%;box-sizing:border-box;max-width:30em;margin:0 auto;padding:12px 20px 24px;text-align:center;color:var(--dg-texto-2);
   display:flex;flex-direction:column;align-items:center;animation:vz-entra .3s ease-out}
 @keyframes vz-entra{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.vazio{animation:none}}
-.vazio .vz-av{width:72px;height:72px;border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;
-  font-size:30px;font-weight:600;color:#fff;margin-bottom:16px;box-shadow:0 0 0 4px var(--dg-fundo),0 0 0 5px var(--dg-borda)}
+.vazio .vz-av{width:clamp(128px,26vh,224px);height:clamp(128px,26vh,224px);border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;
+  font-size:88px;font-weight:600;color:#fff;margin-bottom:20px;box-shadow:0 0 0 4px var(--dg-fundo),0 0 0 5px var(--dg-borda)}
 .vazio .vz-av img{width:100%;height:100%;object-fit:cover}
+/* movimento suave do avatar da conversa vazia (21/10/2026, pedido do dono): flutua uns pixels e respira */
+.vazio .vz-av{animation:vz-flutua 5s ease-in-out infinite;will-change:transform}
+@keyframes vz-flutua{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.015)}}
+@media (prefers-reduced-motion:reduce){.vazio .vz-av{animation:none}}
+/* tela baixa (iPhone SE e afins): a foto diminui para a conversa vazia caber sem rolar */
+@media (max-height:760px){.vazio .vz-av{width:120px;height:120px;font-size:48px;margin-bottom:14px}}
+.vazio .vz-quem{display:flex;flex-direction:column;align-items:center;gap:2px;margin:-4px 0 18px}
+.vazio .vz-nome{font-size:15px;font-weight:600;color:var(--dg-texto)}
+.vazio .vz-cargo{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dg-texto-3)}
 .vazio b{display:block;font-size:22px;font-weight:650;letter-spacing:-.01em;color:var(--dg-texto);margin-bottom:6px}
 .vazio small{display:block;font-size:14.5px;line-height:1.5;color:var(--dg-texto-2);max-width:24em}
 .vazio .vz-link{font:inherit;color:var(--dg-azul-forte);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
@@ -662,6 +673,9 @@ html[data-tema="escuro"] .cartaoarq-info{color:#9bb0a0}
 #btnMic.gravando{background:var(--dg-superficie-2);color:var(--dg-texto);border:1px solid var(--dg-borda)}
 #btnMic.gravando:hover{background:var(--dg-borda)}
 html.pwa .barra{padding-bottom:max(10px, calc(env(safe-area-inset-bottom) - 10px))}
+/* App do iPhone com a janela mais curta que a tela (21/10/2026; conta no conversa.html): o iOS não desenha a
+   página no pé da tela, então o respiro do indicador de início já fica fora dela e o campo desce até o fim da janela. */
+html.pwa.pwa-falta:not(.teclado) .barra{padding-bottom:10px}
 html.teclado .barra{padding-bottom:10px}
 /* rodinha no mic enquanto ele liga e enquanto transcreve; "Transcrevendo" no meio do campo */
 #btnMic svg.gira{animation:giraMic .8s linear infinite}

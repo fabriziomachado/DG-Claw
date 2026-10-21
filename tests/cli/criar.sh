@@ -107,11 +107,11 @@ igual "gmail: rodar o criar de novo nao desfaz a escolha do dono" "marca-do-dono
 dono_real() { if [ "$(id -u)" -eq 0 ]; then stat -c %u:%g "$1"; else awk -v p="$1" '$2 == p {print $1}' "$DGCLAW_RAIZ/.chown-simulado" | tail -1; fi; }
 echo "criar: o aviso do modo Bypass do Claude Code (skipDangerousModePermissionPrompt)"
 ST="$H/.claude/settings.json"
-igual "settings.json nasce com a chave e com os hooks vazios" "true {}" "$(jq -r '"\(.skipDangerousModePermissionPrompt) \(.hooks)"' "$ST")"
+igual "settings.json nasce com a chave, sem sugestoes e com os hooks vazios" "true false {}" "$(jq -r '"\(.skipDangerousModePermissionPrompt) \(.promptSuggestionEnabled) \(.hooks)"' "$ST")"
 chmod 644 "$ST"
 printf '{"hooks": {"Stop": []}, "model": "x"}\n' >"$ST"
 criar_agente ana --nome "Ana Silva"
-igual "settings.json antigo: a chave entra e o resto fica" "true x" "$(jq -r '"\(.skipDangerousModePermissionPrompt) \(.model)"' "$ST")"
+igual "settings.json antigo: as chaves entram e o resto fica" "true false x" "$(jq -r '"\(.skipDangerousModePermissionPrompt) \(.promptSuggestionEnabled) \(.model)"' "$ST")"
 afirma "settings.json antigo: os hooks dele continuam" jq -e '.hooks.Stop == []' "$ST"
 igual "settings.json mesclado segue 0:0 444" "0:0 444" "$(dono_real "$ST") $(stat -c %a "$ST")"
 chmod 644 "$ST"

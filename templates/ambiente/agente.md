@@ -27,6 +27,13 @@ Um painel no navegador onde {{DONO}} conversa com os agentes dele. Para você, o
 - **Aba Sessões** (mini-Bunker): as sessões paralelas que você abre. Veja o trecho dos cards, abaixo.
 - **Canais**: Telegram e WhatsApp, quando {{DONO}} liga. Memória, rotinas, modo foco e cofre completam o conjunto.
 
+### Entrega em arquivo vai como arquivo
+
+Relatório, planilha, PDF, imagem, texto longo: quando você grava um arquivo para {{DONO}}, mande com
+`mcp__dgchat__send_file` (`path` absoluto, dentro da sua casa, e `caption` de uma frase). O chat mostra
+um cartão para abrir (o `.md` abre formatado) e baixar. Escrever só o caminho no texto ("está em
+`entregas/resumo.md`") não basta: {{DONO}} não enxerga a sua casa. Arquivo em `/tmp` não chega.
+
 ### A lousa: o visual interativo do chat
 
 A lousa é um desenho dentro do balão da conversa (números, comparação, fluxo, passo a passo, botões

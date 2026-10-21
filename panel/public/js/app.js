@@ -1771,14 +1771,22 @@ async function loadMemory() {
       <span class="mi-date">${formatDate(f.modified)}</span>
     </button>`;
 
+  // ícones de traço do sistema (21/10/2026: emoji na interface foge do padrão do S2 Bot)
+  const SVG = (d) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const ICONE = {
+    longa: SVG('<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5zM20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z"/>'),
+    diario: SVG('<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M8.5 3v4M15.5 3v4"/>'),
+    json: SVG('<path d="M9 4H8a2 2 0 0 0-2 2v3.5A2.5 2.5 0 0 1 3.5 12 2.5 2.5 0 0 1 6 14.5V18a2 2 0 0 0 2 2h1M15 4h1a2 2 0 0 1 2 2v3.5a2.5 2.5 0 0 0 2.5 2.5 2.5 2.5 0 0 0-2.5 2.5V18a2 2 0 0 1-2 2h-1"/>'),
+    texto: SVG('<path d="M14 3.5H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5z"/><path d="M14 3.5v5h5M9 13h6M9 16.5h4"/>'),
+  };
   let html = '';
   if (data.main && data.main.modified) {
-    html += item('MEMORY.md', '📜', 'MEMORY.md, a memória longa', data.main,
+    html += item('MEMORY.md', ICONE.longa, 'MEMORY.md, a memória longa', data.main,
       'Os fatos que ficam: uma linha por coisa importante, com o link para o diário do dia. Clique para ler e editar.');
   }
   for (const f of data.files || []) {
     const isDate = /^\d{4}-\d{2}-\d{2}\.md$/.test(f.name);
-    const icon = isDate ? '📅' : (f.name.endsWith('.json') ? '💎' : '📖');
+    const icon = isDate ? ICONE.diario : (f.name.endsWith('.json') ? ICONE.json : ICONE.texto);
     const nome = isDate ? `${f.name.slice(8, 10)}/${f.name.slice(5, 7)}/${f.name.slice(0, 4)}, diário` : f.name;
     const dica = isDate ? 'O diário que a reflexão da noite escreveu sobre este dia.' : 'Um assunto que ele separou num arquivo próprio.';
     html += item(`memory/${f.name}`, icon, nome, f, dica);
@@ -2503,11 +2511,12 @@ const CATEGORY_LABELS = {
   'outro': '⬜ Outro',
 };
 
+// formato brasileiro (21/10/2026): US$ 69,23 em vez de $69.23
 function fmtUSD(n) {
-  return '$' + (Number(n) || 0).toFixed(2);
+  return 'US$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function fmtUSD4(n) {
-  return '$' + (Number(n) || 0).toFixed(4);
+  return 'US$ ' + (Number(n) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 4, maximumFractionDigits: 4 });
 }
 function fmtDur(ms) {
   if (!ms) return '--';

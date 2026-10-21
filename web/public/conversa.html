@@ -149,6 +149,7 @@ if (navigator.standalone === true ||
 <script src="/sessao-paralela.js"></script>
 <script src="/cota.js"></script>
 <script src="/economia.js"></script>
+<script src="/ajudantes.js"></script>
 <script src="/conversa.js"></script>
 <script src="/icones-topo.js"></script>
 <script>
@@ -196,6 +197,24 @@ if (navigator.standalone === true ||
     if (!teclado && (window.scrollY || topo)) { try { window.scrollTo(0, 0); } catch(e){} }
     if (perto && chat) chat.scrollTop = chat.scrollHeight;
   }
+  /* App instalado no iPhone (21/10/2026): às vezes o iOS entrega uma janela mais curta que a tela
+     (innerHeight menor que screen.height) e não desenha a página no pé da tela. Aí o respiro do
+     indicador de início já fica fora da página: com a classe pwa-falta a barra perde esse respiro
+     (conversa.css). Só age no app instalado, sem teclado e com falta pequena. */
+  function falta(){
+    if (!raiz.classList.contains('pwa')) return;
+    var deitado = window.matchMedia && matchMedia('(orientation: landscape)').matches;
+    var tela = deitado ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
+    var f = Math.round(tela - window.innerHeight);
+    var ok = f > 0 && f < 120 && !raiz.classList.contains('vv');
+    raiz.style.setProperty('--app-falta', (ok ? f : 0) + 'px');
+    raiz.classList.toggle('pwa-falta', ok);
+  }
+  falta();
+  window.addEventListener('resize', function(){ setTimeout(falta, 60); });
+  window.addEventListener('orientationchange', function(){ setTimeout(falta, 350); });
+  document.addEventListener('focusout', function(){ setTimeout(falta, 400); });
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) setTimeout(falta, 60); });
   function agenda(){ if (!agendado) { agendado = true; requestAnimationFrame(ajusta); } }
   /* O iPhone às vezes deixa a tela deslizada para cima depois do teclado, sem
      avisar a volta. Aí as janelas por cima (Compartilhados, visor, menu) abriam

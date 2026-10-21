@@ -320,6 +320,7 @@
   }
 
   function inicia() {
+    if (!$('formNovo')) return;   // só as contas (montaCorpo, fmt...): a tela agora é a aba de lembretes-aba.js
     // o botão Tutorial fica no cabeçalho da casca (casca.js), que chama esta função
     window.DGLembretesTutorial = iniciaTutorial;
     document.querySelectorAll('[data-ajuda]').forEach(b => { b.onclick = () => ajuda(b.dataset.ajuda); });

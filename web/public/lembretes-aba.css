@@ -1,0 +1,43 @@
+/* lembretes-aba.css: a aba Lembretes do Board e a página /lembretes (21/10/2026). Usa as peças do avisos.css
+   (av-pil, av-chip, av-grupo, av-aviso...) e só acrescenta o que é dos lembretes (classes lb-). */
+.lb-raiz{padding:12px 12px 40px}
+.lb-aparelho{display:flex;align-items:center;gap:8px;margin:0 4px 10px;font-size:12.5px;color:var(--dg-texto-3)}
+.lb-aparelho[hidden]{display:none}
+.lb-aparelho>svg{flex:0 0 auto}
+.lb-aparelho.on>svg{color:var(--dg-entrega-texto)}
+.lb-aparelho span{flex:1;min-width:0}
+.lb-aparelho .av-ic{width:28px;height:28px}
+.lb-fim{display:inline-flex;align-items:center;gap:6px;margin-left:auto}
+.lb-fim .av-cont{margin-left:0}
+.lb-aparelho .lb-leve{border:0;color:var(--dg-azul-forte);padding:0 4px}
+.lb-aparelho .bh-bt{min-height:30px;padding:0 12px;font-size:12.5px}
+.lb-quando{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:0 4px;font-size:13px;color:var(--dg-texto-2)}
+.lb-quando [hidden]{display:none}
+.lb-quando label{display:inline-flex;align-items:center;gap:6px}
+.lb-raiz .lb-quando input{width:auto;min-height:32px;padding:4px 8px;border:1px solid var(--dg-borda);border-radius:999px;background:var(--dg-fundo);color:var(--dg-texto);font:inherit;font-size:13px}
+.lb-raiz .lb-quando input[type=number]{width:64px;text-align:center}
+.lb-dias{display:inline-flex;gap:4px;flex-wrap:wrap}
+.lb-dia{position:relative;cursor:pointer}
+.lb-dia input{position:absolute;opacity:0;width:1px;height:1px}
+.lb-dia span{display:inline-block;min-width:34px;padding:5px 8px;border-radius:999px;border:1px solid var(--dg-borda);text-align:center;font-size:12.5px;font-weight:600;color:var(--dg-texto-2)}
+.lb-dia input:checked+span{background:var(--dg-texto);border-color:var(--dg-texto);color:var(--dg-fundo)}
+.lb-dia input:focus-visible+span{outline:2px solid var(--dg-azul);outline-offset:1px}
+.av-mais-campos .lb-par{display:flex;gap:8px}
+.av-mais-campos .lb-par label{flex:1;min-width:0}
+.av-mais-campos [hidden]{display:none}
+.lb-raiz .av-mais-campos .lb-marca{flex-direction:row;align-items:center;gap:8px;font-size:13px;color:var(--dg-texto-2)}
+.lb-raiz .av-mais-campos .lb-marca input{width:auto;min-height:0;accent-color:var(--dg-azul)}
+.lb-raiz .bh-msg{margin:0 4px;font-size:13px;color:var(--dg-entrega-texto)}
+.lb-raiz .bh-msg.erro{color:var(--dg-erro-texto)}
+.lb-regra{color:var(--dg-texto-3)}
+.lb-raiz .av-aviso .av-hora{font-weight:600;color:var(--dg-texto-2)}
+.lb-raiz .av-grupo .av-aviso{padding:11px 12px;align-items:flex-start}
+.lb-tocando .av-tipo{background:var(--dg-pedido-fundo)!important;color:var(--dg-pedido-texto)!important}
+.lb-acoes,.lb-ops{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+.lb-acoes .bh-bt,.lb-ops .bh-bt{min-height:30px;padding:0 12px;font-size:12.5px}
+.lb-ops .lb-perigo{color:var(--dg-erro-texto)}
+.lb-hist{margin-top:6px;padding:8px 10px;border-radius:10px;background:var(--dg-superficie-2);font-size:12.5px}
+.lb-hist ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px}
+.lb-hist .av-tipo{font-size:11px;padding:1px 8px;border-radius:999px;background:var(--dg-fundo);color:var(--dg-texto-2)}
+.lb-hist .av-fraco{margin:0}
+.lb-rodape{margin:14px 4px 0;font-size:12px;color:var(--dg-texto-3)}

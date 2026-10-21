@@ -10,6 +10,7 @@ const H = require('./lib/http');
 const { carregaConfig } = require('./lib/config');
 const { criarRegistro } = require('./lib/registro');
 const { criarRunner } = require('./lib/runner');
+const { criarAjudantes } = require('./lib/ajudantes');
 const { criarAuth } = require('./lib/auth');
 const { criarMidia } = require('./lib/media');
 const { criarCompartilhados } = require('./lib/compartilhados');
@@ -85,6 +86,7 @@ function criarServidor(opcoes) {
 
   const registro = criarRegistro({ caminho: config.agentesPath, log });
   const runner = criarRunner({ log, timeoutMs: opcoes.timeoutRunnerMs });
+  const ajudantes = criarAjudantes({ runner, agora: opcoes.agora });
   const auth = criarAuth({ config, log, agora: opcoes.agora });
   const primeiroAcesso = criarPrimeiroAcesso({ config, auth, log, agora: opcoes.agora });
   const midia = criarMidia({ dataDir: config.dataDir, log, registro, publicDir: config.publicDir });
@@ -392,6 +394,10 @@ function criarServidor(opcoes) {
         try {
           const e = await conversa.atividade(a);
           agentes[a.slug] = { estado: e.estado, parado_desde: e.parado_desde || null };
+          // os cards (sessões paralelas) que ele abriu: selo na fileira e linha na conversa (21/10/2026)
+          if (a.tipo !== 'admin' && e.estado !== 'sem_sinal') {
+            try { agentes[a.slug].ajudantes = await ajudantes.lista(a); } catch (_) { agentes[a.slug].ajudantes = []; }
+          }
           if (sonoTeste()[a.slug]) agentes[a.slug].sono_teste = true;
         }
         catch (_) { agentes[a.slug] = { estado: 'sem_sinal' }; }

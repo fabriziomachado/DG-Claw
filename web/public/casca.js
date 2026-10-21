@@ -91,6 +91,14 @@
   if (!raiz.document) return { escolheAgente, MARCACAO_CABECALHO, MARCACAO_MENU };
 
   /* ── Parte com DOM ─────────────────────────────────────────────────────── */
+  /* Sem piscar o painel antigo (21/10/2026, o dono via o visual velho por um instante ao recarregar): o painel
+     do agente (/p/<slug>/) só chama monta() depois de buscar config e poderes, e até lá o navegador já
+     desenhou o layout antigo. Este script roda no <head>: esconde a página até monta() pôr html.casca, e
+     mostra assim mesmo depois de 4 s se a casca não montar (erro de rede, script quebrado). */
+  if (/^\/p\//.test(location.pathname) && !document.documentElement.classList.contains('casca')) {
+    document.documentElement.classList.add('casca-espera');
+    setTimeout(() => document.documentElement.classList.remove('casca-espera'), 4000);
+  }
   const $ = id => document.getElementById(id);
   const est = { pagina: '', titulo: '', aoTutorial: null, pronto: false, extras: null, agente: null, lista: [] };
 
@@ -189,6 +197,7 @@
         if (r.ok) d = await r.json();
       } catch (_) { return; }
       if (!d || !d.agentes) return;
+      if (raiz.DGAjudantes) raiz.DGAjudantes.pinta(d);   // selo dos ajudantes na foto (ajudantes.js)
       for (const a of lista) {
         const el = doAgente(a.id);
         const sim = (d.agentes[a.id] || {}).estado === 'trabalhando';
@@ -201,6 +210,10 @@
       }
     }
     avisos(); setInterval(avisos, 30000);
+    // os ajudantes (ajudantes.js) vêm junto da casca: as telas não precisam carregar mais um script
+    if (!raiz.DGAjudantes && !document.querySelector('script[src="/ajudantes.js"]')) {
+      const sc = document.createElement('script'); sc.src = '/ajudantes.js'; document.head.appendChild(sc);
+    }
     trabalho(); setInterval(trabalho, 6000);
     document.addEventListener('visibilitychange', () => { avisos(); trabalho(); });
     document.addEventListener('dgavatar', ev => {
@@ -279,6 +292,7 @@
     if ($('cabecalho')) return Promise.resolve();   // já montada
     document.documentElement.classList.add('casca');
     document.body.insertAdjacentHTML('afterbegin', MARCACAO_CABECALHO + MARCACAO_MENU);
+    document.documentElement.classList.remove('casca-espera');
     pintaTitulo();
     $('btnMenu').onclick = () => abreMenu(true);
     $('btnFechaMenu').onclick = () => abreMenu(false);

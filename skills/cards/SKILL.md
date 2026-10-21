@@ -48,6 +48,8 @@ dgclaw-card ler "$id" --n 2
 
 - `esperar` volta quando o card termina o turno. Se estourar o tempo (código 7), o card segue
   trabalhando: avise o dono e espere mais com `--max`, ou leia o parcial com `ler`.
+- Se o card nunca começar (código 9: parado 2 minutos sem nenhuma mensagem), o pedido não chegou.
+  Mande de novo com `dgclaw-card mandar "$id" --arquivo /tmp/pedido.md` e espere de novo.
 - Para uma pergunta nova no mesmo card: `dgclaw-card mandar "$id" "texto"` e espere de novo.
 - `dgclaw-card estado "$id"` mostra provedor, auth, modelo e situação. `dgclaw-card listar` mostra
   os cards abertos.

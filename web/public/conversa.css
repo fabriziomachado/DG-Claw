@@ -322,8 +322,6 @@
      a barra desce até o indicador de início, com só o respiro pra ele. */
   html.pwa body{position:fixed;top:0;left:0;right:0;bottom:0;height:auto}
   html.pwa .barra{padding-bottom:max(6px, calc(env(safe-area-inset-bottom) - 14px))}
-  /* o iOS deu uma janela mais curta que a tela: o corpo desce até o fim dela (conta no conversa.html) */
-  html.pwa.pwa-falta:not(.vv) body{bottom:calc(-1 * var(--app-falta,0px))}
   /* Com o visualViewport medido (script no fim da página), o corpo tem a altura
      e a posição da área VISÍVEL: com teclado aberto a barra fica logo acima
      dele. Teclado aberto: o respiro do indicador de início sobra, sai. */
@@ -664,6 +662,9 @@ html[data-tema="escuro"] .cartaoarq-info{color:#9bb0a0}
 #btnMic.gravando{background:var(--dg-superficie-2);color:var(--dg-texto);border:1px solid var(--dg-borda)}
 #btnMic.gravando:hover{background:var(--dg-borda)}
 html.pwa .barra{padding-bottom:max(10px, calc(env(safe-area-inset-bottom) - 10px))}
+/* App do iPhone com a janela mais curta que a tela (21/10/2026; conta no conversa.html): o iOS não desenha a
+   página no pé da tela, então o respiro do indicador de início já fica fora dela e o campo desce até o fim da janela. */
+html.pwa.pwa-falta:not(.teclado) .barra{padding-bottom:10px}
 html.teclado .barra{padding-bottom:10px}
 /* rodinha no mic enquanto ele liga e enquanto transcreve; "Transcrevendo" no meio do campo */
 #btnMic svg.gira{animation:giraMic .8s linear infinite}

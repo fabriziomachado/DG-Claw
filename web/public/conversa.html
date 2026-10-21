@@ -197,9 +197,9 @@ if (navigator.standalone === true ||
     if (perto && chat) chat.scrollTop = chat.scrollHeight;
   }
   /* App instalado no iPhone (21/10/2026): às vezes o iOS entrega uma janela mais curta que a tela
-     (innerHeight menor que screen.height) e o corpo, preso ao fim da janela, para antes do fim da
-     tela, deixando um vão embaixo do campo. Mede a falta e estica o corpo até o fim da tela. Só age
-     no app instalado, sem teclado e com falta pequena; nos outros casos não muda nada. */
+     (innerHeight menor que screen.height) e não desenha a página no pé da tela. Aí o respiro do
+     indicador de início já fica fora da página: com a classe pwa-falta a barra perde esse respiro
+     (conversa.css). Só age no app instalado, sem teclado e com falta pequena. */
   function falta(){
     if (!raiz.classList.contains('pwa')) return;
     var deitado = window.matchMedia && matchMedia('(orientation: landscape)').matches;

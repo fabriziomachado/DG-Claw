@@ -189,6 +189,7 @@
         if (r.ok) d = await r.json();
       } catch (_) { return; }
       if (!d || !d.agentes) return;
+      if (raiz.DGAjudantes) raiz.DGAjudantes.pinta(d);   // selo dos ajudantes na foto (ajudantes.js)
       for (const a of lista) {
         const el = doAgente(a.id);
         const sim = (d.agentes[a.id] || {}).estado === 'trabalhando';
@@ -201,6 +202,10 @@
       }
     }
     avisos(); setInterval(avisos, 30000);
+    // os ajudantes (ajudantes.js) vêm junto da casca: as telas não precisam carregar mais um script
+    if (!raiz.DGAjudantes && !document.querySelector('script[src="/ajudantes.js"]')) {
+      const sc = document.createElement('script'); sc.src = '/ajudantes.js'; document.head.appendChild(sc);
+    }
     trabalho(); setInterval(trabalho, 6000);
     document.addEventListener('visibilitychange', () => { avisos(); trabalho(); });
     document.addEventListener('dgavatar', ev => {

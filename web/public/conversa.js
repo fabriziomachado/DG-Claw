@@ -370,6 +370,7 @@ document.addEventListener('dgavatar', ev => {
       if (r.ok) d = await r.json();
     } catch (_) { return; }
     if (!d || !d.agentes) return;
+    if (window.DGAjudantes) window.DGAjudantes.pinta(d);   // selo na fileira e linha acima do campo
     for (const a of outros) marcaTrabalhando(a.id, (d.agentes[a.id] || {}).estado === 'trabalhando');
   }
   quemTrabalha(); setInterval(quemTrabalha, 6000);
@@ -405,6 +406,8 @@ if (EH_ADMIN) {
 }
 entrada.placeholder = 'Pergunte ao ' + AGENTE.nome;
 if (EH_ADMIN) $('avisoAdmin').hidden = false;
+// ajudantes do agente aberto: linha acima do campo (ajudantes.js); o "avisar" é uma mensagem normal ao agente
+if (window.DGAjudantes) window.DGAjudantes.liga(AGENTE, texto => enviarTexto(texto));
 if (!caps.microfone) document.documentElement.classList.add('sem-mic');
 if (!caps.voz) document.documentElement.classList.add('sem-voz');
 

@@ -593,3 +593,17 @@ test('pelo servidor de verdade: o agente usa a Mesa pela caixa e o pedido ao don
     assert.equal((await pedir('GET', '/api/v1/tarefas')).json.tarefas.length, 1);
   } finally { await s.fechar(); fs.rmSync(s.dir, { recursive: true, force: true }); }
 });
+
+test('prazo: grava na criação, muda na edição e recusa data inválida (21/10/2026)', async () => {
+  const m = await montar();
+  try {
+    const t = await criarTarefa(m, { prazo: '2026-10-24' });
+    assert.equal(t.prazo, '2026-10-24');
+    const r = await m.pedir('PATCH', '/api/v1/tarefas/' + t.id, { json: { prazo: null }, cabecalhos: { 'If-Match': t.versao } });
+    assert.ok([200, 428].includes(r.status) || r.status < 300, r.texto);
+    const ruim = await m.pedir('POST', '/api/v1/tarefas', { json: Object.assign({ agente: 'luna', prazo: '24/10' }, NOVA) });
+    assert.equal(ruim.status, 400);
+    assert.match(ruim.json.erros.prazo, /AAAA-MM-DD/);
+    assert.equal((await criarTarefa(m)).prazo, null);
+  } finally { await m.fechar(); }
+});

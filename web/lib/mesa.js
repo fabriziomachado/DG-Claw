@@ -21,7 +21,7 @@ const TIPOS = ['conteudo', 'desenvolvimento', 'projeto', 'outro'];
 const ESTADOS = ['fazendo', 'travada', 'esperando_dono', 'concluida', 'cancelada'];
 const ABERTOS = new Set(['fazendo', 'travada', 'esperando_dono']);
 const PEDEM_MOTIVO = new Set(['travada', 'esperando_dono']);
-const CAMPOS_COMPARADOS = ['titulo', 'origem', 'tipo', 'estado', 'motivo', 'progresso', 'passos', 'nota', 'link', 'anexos'];
+const CAMPOS_COMPARADOS = ['titulo', 'origem', 'tipo', 'estado', 'motivo', 'progresso', 'passos', 'nota', 'link', 'anexos', 'prazo'];
 const RX_DIA = /^\d{4}-\d{2}-\d{2}$/;
 const RX_SLUG = /^[a-z0-9][a-z0-9-]{0,31}$/;
 
@@ -125,6 +125,12 @@ function normalizaEntrada(corpo, modo) {
   for (const [k, max] of [['motivo', LIMITES.motivo], ['nota', LIMITES.nota]]) {
     if (tem(k)) { const t = textoCampo(corpo[k], k, max, { anulavel: true }, erros); if (t !== undefined) v[k] = t; }
   }
+  // prazo (21/10/2026, pedido do dono): o dia em que a tarefa precisa estar pronta, AAAA-MM-DD, ou null
+  if (tem('prazo')) {
+    if (corpo.prazo === null || corpo.prazo === '') v.prazo = null;
+    else if (ehTexto(corpo.prazo) && RX_DIA.test(corpo.prazo) && !Number.isNaN(Date.parse(corpo.prazo + 'T12:00:00Z'))) v.prazo = corpo.prazo;
+    else erros.prazo = 'precisa ser uma data AAAA-MM-DD, ou null';
+  }
   if (tem('tipo')) {
     if (TIPOS.includes(corpo.tipo)) v.tipo = corpo.tipo; else erros.tipo = `valores aceitos: ${TIPOS.join(', ')}`;
   }
@@ -187,7 +193,7 @@ function calculaLeitura(t, agoraMs, comEventos) {
     id: t.id, agente: t.agente, titulo: t.titulo, origem: t.origem, tipo: t.tipo, estado: t.estado,
     aberta, parada: t.estado === 'fazendo' && decorrido > PARADA_MIN * 60000,
     ...calculaProgresso(t),
-    motivo: t.motivo, nota: t.nota, passos: t.passos, link: t.link, anexos: t.anexos,
+    motivo: t.motivo, nota: t.nota, passos: t.passos, link: t.link, anexos: t.anexos, prazo: t.prazo || null,
     versao: String(t.versao), criada_por: t.criada_por, criada_em: t.criada_em,
     atualizada_em: t.atualizada_em, atualizada_em_epoch: t.atualizada_em_epoch,
     concluida_em: t.concluida_em, fechada_em: t.fechada_em,
@@ -351,7 +357,7 @@ function criarMesa(opcoes) {
       if (mudancas.nota) partes.push(`nota "${curto(String(mudancas.nota.depois || ''), 140)}"`);
       if (mudancas.estado) partes.push(`estado ${mudancas.estado.antes} para ${mudancas.estado.depois}`);
       if (mudancas.motivo) partes.push(`motivo ${mudancas.motivo.depois ? `"${curto(mudancas.motivo.depois, 100)}"` : 'removido'}`);
-      for (const k of ['titulo', 'origem', 'tipo', 'progresso', 'passos', 'link', 'anexos']) if (mudancas[k]) partes.push(`${k} alterado`);
+      for (const k of ['titulo', 'origem', 'tipo', 'progresso', 'passos', 'link', 'anexos', 'prazo']) if (mudancas[k]) partes.push(`${k} alterado`);
       corpo = `O dono ${mudancas.nota ? 'respondeu' : 'mudou'} na tarefa ${ref}: ${partes.join('; ')}`;
     }
     return curto(`[Mesa] ${corpo}`.replace(/\s+/g, ' '), 600);
@@ -372,6 +378,7 @@ function criarMesa(opcoes) {
     if (v.titulo !== undefined) t.titulo = v.titulo;
     if (v.origem !== undefined) t.origem = v.origem;
     if (v.tipo !== undefined) t.tipo = v.tipo;
+    if (v.prazo !== undefined) t.prazo = v.prazo;
     if (v.progresso !== undefined) t.progresso = v.progresso;
     if (v.nota !== undefined) t.nota = v.nota;
     if (v.link !== undefined) t.link = v.link;
@@ -471,6 +478,7 @@ function criarMesa(opcoes) {
       progresso: v.progresso === undefined ? null : v.progresso,
       nota: v.nota === undefined ? null : v.nota,
       passos: v.passos || [], link: v.link === undefined ? null : v.link, anexos: v.anexos || [],
+      prazo: v.prazo === undefined ? null : v.prazo,
       versao: 0, criada_por: por(quem), criada_em: isoLocal(ms, tz), atualizada_em: null, atualizada_em_epoch: 0,
       concluida_em: null, fechada_em: null, eventos: [],
     };

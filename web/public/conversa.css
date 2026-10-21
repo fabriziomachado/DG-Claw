@@ -944,7 +944,6 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 .men-op small{margin-left:auto;color:var(--dg-texto-3);font-size:12px;max-width:50%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .men-foto{flex:0 0 24px;width:24px;height:24px;border-radius:50%;overflow:hidden;display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700}
 .men-foto img{width:100%;height:100%;object-fit:cover}
-.mencao-nome{color:var(--dg-azul-forte);font-weight:600}
 .men-cartao{border:1px solid var(--dg-borda);border-radius:14px;background:var(--dg-superficie);padding:10px 12px;max-width:100%}
 .men-cab{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--dg-texto-2)}
 .men-cab b{color:var(--dg-texto);font-weight:600}
@@ -1127,3 +1126,12 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 .selo-eco{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;text-decoration:none;white-space:nowrap;
   background:color-mix(in srgb,var(--dg-serie-2) 16%,transparent);color:var(--dg-serie-2);margin:0 6px;align-self:center}
 .selo-eco[hidden]{display:none}
+/* @Nome em destaque (21/10/2026): pílula na cor do agente no balão; no campo, só o fundo, por uma camada
+   transparente por cima do texto (conversa.js, pintaEspelho) */
+.mencao-nome{padding:0 6px;border-radius:999px;font-weight:600;
+  background:color-mix(in srgb,var(--c,var(--dg-azul)) 22%,transparent);color:color-mix(in srgb,var(--c,var(--dg-azul)) 62%,var(--dg-texto))}
+#entradaEspelho{position:absolute;box-sizing:border-box;border-style:solid;border-color:transparent;margin:0;color:transparent;
+  white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word;overflow:hidden;pointer-events:none;z-index:1}
+#entradaEspelho:empty{display:none}
+#entradaEspelho .esp-men{border-radius:6px;background:color-mix(in srgb,var(--c,var(--dg-azul)) 26%,transparent);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--c,var(--dg-azul)) 26%,transparent)}

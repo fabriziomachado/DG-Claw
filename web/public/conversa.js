@@ -3406,6 +3406,7 @@ async function interrompe() {
   finally { btnEnviar.disabled = false; }
 }
 function ajustaCampo() {
+  try { pintaEspelho(); } catch (_) { /* a camada do @ ainda não existe (início da página) */ }
   const antes = entrada.offsetHeight;
   entrada.style.height = CAMPO_MIN + 'px';
   const cs = getComputedStyle(entrada);
@@ -4582,12 +4583,52 @@ function marcaDivisor() {
    dele volta aqui num cartão (lib/mencoes.js), e este agente recebe a resposta para continuar. */
 const mencionaveis = () => agentesMenu.filter(a => a.tipo !== 'admin' && a.id !== AGENTE.id);
 const fotoAg = a => { const img = a && (a.avatar_img || (/^https:\/\//i.test(a.avatar || '') ? a.avatar : '')); return img ? `<img src="${esc(img)}" alt="">` : esc((a && (a.avatar || a.nome) || '?').slice(0, 1)); };
+/* @Nome em destaque (21/10/2026, pedido do dono, opção A): uma pílula na cor do agente, no balão e no campo. */
+const corMencao = a => ` style="--c:${esc((a && a.cor) || '#3b82f6')}"`;
 function destacaMencao(html, m) {
-  if (m.mencaoPergunta.varios) return html.replace(/(^|>)((?:@[^\s<]+\s)+)/, (_, a, b) => a + b.trim().split(/\s+/).map(x => `<span class="mencao-nome">${x}</span>`).join(' ') + ' ');
+  if (m.mencaoPergunta.varios) return html.replace(/(^|>)((?:@[^\s<]+\s)+)/, (_, a, b) => a + b.trim().split(/\s+/).map(x => {
+    const ag = agentesMenu.find(y => '@' + y.nome.toLowerCase() === x.toLowerCase());
+    return `<span class="mencao-nome"${corMencao(ag)}>${x}</span>`;
+  }).join(' ') + ' ');
   const a = agentesMenu.find(x => x.id === m.mencaoPergunta.para);
   if (!a) return html;
   const marca = esc('@' + a.nome);
-  return html.replace(marca, `<span class="mencao-nome">${marca}</span>`);
+  return html.replace(marca, `<span class="mencao-nome"${corMencao(a)}>${marca}</span>`);
+}
+
+/* No campo de digitar o texto não tem cor por palavra: uma camada por cima do campo, com o mesmo texto
+   transparente, pinta só o fundo dos @Nome que batem com um agente. Fora da conversa do Admin, onde o @
+   não chama ninguém. */
+const espelho = document.createElement('div');
+espelho.id = 'entradaEspelho'; espelho.setAttribute('aria-hidden', 'true');
+if (!EH_ADMIN && entrada && entrada.parentElement) entrada.after(espelho);
+function pintaEspelho() {
+  if (EH_ADMIN || !espelho.isConnected) return;
+  const ags = mencionaveis();
+  const t = entrada.value;
+  if (!t.includes('@') || !ags.length) { if (espelho.innerHTML) espelho.innerHTML = ''; return; }
+  const nomes = ags.map(a => a.nome).sort((x, y) => y.length - x.length).map(n => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  const rx = new RegExp('(^|\\s)@(' + nomes.join('|') + ')(?=$|[\\s,.!?:;])', 'gi');
+  let html = '', ult = 0, m;
+  while ((m = rx.exec(t))) {
+    const ini = m.index + m[1].length, fim = ini + 1 + m[2].length;
+    const a = ags.find(x => x.nome.toLowerCase() === m[2].toLowerCase());
+    html += esc(t.slice(ult, ini)) + `<span class="esp-men"${corMencao(a)}>${esc(t.slice(ini, fim))}</span>`;
+    ult = fim;
+  }
+  if (!ult) { if (espelho.innerHTML) espelho.innerHTML = ''; return; }
+  espelho.innerHTML = html + esc(t.slice(ult)) + '\u200b';
+  // a mesma caixa do campo (o tema e o celular mudam padding e fonte): copia do estilo calculado
+  const cs = getComputedStyle(entrada);
+  for (const k of ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'borderTopWidth', 'borderRightWidth', 'borderBottomWidth',
+    'borderLeftWidth', 'fontFamily', 'fontSize', 'fontWeight', 'lineHeight', 'letterSpacing', 'wordSpacing', 'textIndent']) espelho.style[k] = cs[k];
+  Object.assign(espelho.style, { left: entrada.offsetLeft + 'px', top: entrada.offsetTop + 'px', width: entrada.offsetWidth + 'px', height: entrada.offsetHeight + 'px' });
+  espelho.scrollTop = entrada.scrollTop;
+}
+if (entrada) {
+  entrada.addEventListener('input', pintaEspelho);
+  entrada.addEventListener('scroll', () => { espelho.scrollTop = entrada.scrollTop; });
+  window.addEventListener('resize', pintaEspelho);
 }
 function htmlEquipe(m) {
   const me = m.mencao;

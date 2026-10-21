@@ -196,6 +196,24 @@ if (navigator.standalone === true ||
     if (!teclado && (window.scrollY || topo)) { try { window.scrollTo(0, 0); } catch(e){} }
     if (perto && chat) chat.scrollTop = chat.scrollHeight;
   }
+  /* App instalado no iPhone (21/10/2026): às vezes o iOS entrega uma janela mais curta que a tela
+     (innerHeight menor que screen.height) e o corpo, preso ao fim da janela, para antes do fim da
+     tela, deixando um vão embaixo do campo. Mede a falta e estica o corpo até o fim da tela. Só age
+     no app instalado, sem teclado e com falta pequena; nos outros casos não muda nada. */
+  function falta(){
+    if (!raiz.classList.contains('pwa')) return;
+    var deitado = window.matchMedia && matchMedia('(orientation: landscape)').matches;
+    var tela = deitado ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
+    var f = Math.round(tela - window.innerHeight);
+    var ok = f > 0 && f < 120 && !raiz.classList.contains('vv');
+    raiz.style.setProperty('--app-falta', (ok ? f : 0) + 'px');
+    raiz.classList.toggle('pwa-falta', ok);
+  }
+  falta();
+  window.addEventListener('resize', function(){ setTimeout(falta, 60); });
+  window.addEventListener('orientationchange', function(){ setTimeout(falta, 350); });
+  document.addEventListener('focusout', function(){ setTimeout(falta, 400); });
+  document.addEventListener('visibilitychange', function(){ if (!document.hidden) setTimeout(falta, 60); });
   function agenda(){ if (!agendado) { agendado = true; requestAnimationFrame(ajusta); } }
   /* O iPhone às vezes deixa a tela deslizada para cima depois do teclado, sem
      avisar a volta. Aí as janelas por cima (Compartilhados, visor, menu) abriam

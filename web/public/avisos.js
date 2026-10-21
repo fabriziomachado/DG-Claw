@@ -21,6 +21,13 @@
     ['resumo_do_dia', 'resumo do dia'],
   ];
   const ROTULO_TIPO = Object.fromEntries(TIPOS);
+  const ico = (d, t) => `<svg viewBox="0 0 24 24" width="${t || 16}" height="${t || 16}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const ICO = {
+    tipo: ico('<path d="M4 7h16M4 12h10M4 17h7"/>'), aj: ico('<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/>', 18),
+    enviar: ico('<path d="M12 19V5M6 11l6-6 6 6"/>', 18), dn: ico('<path d="m6 9 6 6 6-6"/>', 13), dia: ico('<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/>'),
+    ok: ico('<path d="m5 12 4.5 4.5L19 7"/>', 13), espera: ico('<circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 1.5"/>', 13), falha: ico('<path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17h.01"/>', 13),
+    mais: ico('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'),
+  };
   const MAX_TEXTO = 280, MAX_LINHAS = 2, MAX_LINK = 500, MAX_ASSUNTO = 60;
   const DIAS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
   const p2 = n => String(n).padStart(2, '0');
@@ -104,7 +111,9 @@
     return '';
   }
 
-  /* opcoes: { agentes, retirar: true (mostra o botão Retirar), motivoAberto: id do aviso com o campo aberto } */
+  /* O aviso como linha, no estilo das abas Hoje e Tarefas (21/10/2026, pedido do dono): a foto de quem mandou,
+     "Data → Tech", o tipo numa etiqueta discreta, a hora, o texto e se chegou. Retirar fica no "⋯".
+     opcoes: { agentes, fotos: {slug: html}, motivoAberto: id do aviso com o campo de motivo aberto, menuAberto: id } */
   function htmlAviso(a, opcoes) {
     const o = opcoes || {};
     const inativo = a.ativo === false || !!a.retirado_em || !!a.substituido_por;
@@ -115,32 +124,38 @@
     const entregas = resumirEntregas(a);
     const tags = (Array.isArray(a.tags) ? a.tags : []).map(t => `<span class="av-tag">#${esc(t)}</span>`).join('');
     const assunto = a.assunto ? `<span class="av-assunto">${esc(a.assunto)}</span>` : '';
-    const link = linkSeguro(a.link)
+    const link = a.link && linkSeguro(a.link)
       ? `<a class="av-link" href="${esc(a.link)}" target="_blank" rel="noopener noreferrer">${esc(a.link)}</a>` : '';
+    const foto = (o.fotos && o.fotos[a.agente]) || `<span class="av-foto">${esc(Array.from(autor || '?')[0])}</span>`;
+    const ent = entregas.length ? (() => {
+      const ruim = entregas.filter(e => e.estado === 'falha'), falta = entregas.filter(e => e.estado === 'espera');
+      const quem = l => l.map(e => nomeDe(e.slug, o.agentes)).join(', ');
+      if (ruim.length) return `<span class="av-ent falha">${ICO.falha}${esc(ruim.map(e => e.texto).join('; '))}</span>`;
+      if (falta.length) return `<span class="av-ent espera">${ICO.espera}ainda não chegou para ${esc(quem(falta))}</span>`;
+      return `<span class="av-ent ok" title="${esc(entregas.map(e => e.texto).join('; '))}">${ICO.ok}chegou para ${esc(quem(entregas))}</span>`;
+    })() : '';
     const retirar = !inativo && o.retirar !== false
-      ? `<button type="button" class="av-btn av-mini" data-av-retirar="${esc(a.id)}">Retirar</button>` : '';
-    const campo = !inativo && String(o.motivoAberto) === String(a.id)
+      ? `<span class="av-menu"><button type="button" class="av-mais" data-av-menu="${esc(a.id)}" aria-label="Mais ações" title="Mais ações">${ICO.mais}</button>` +
+        (String(o.menuAberto) === String(a.id) ? `<span class="av-menu-op"><button type="button" class="av-btn av-mini" data-av-retirar="${esc(a.id)}">Retirar</button></span>` : `<button type="button" class="av-vh" data-av-retirar="${esc(a.id)}" tabindex="-1" aria-hidden="true"></button>`) +
+        '</span>' : '';
+    const campo = o.motivoAberto != null && String(o.motivoAberto) === String(a.id)
       ? `<form class="av-retirada" data-av-retirada="${esc(a.id)}">` +
-        `<label>Motivo (opcional)<input type="text" name="motivo" maxlength="200" autocomplete="off"></label>` +
-        `<button type="submit" class="av-btn av-perigo">Confirmar a retirada</button>` +
+        '<input name="motivo" type="text" maxlength="200" placeholder="Motivo (opcional)" aria-label="Motivo da retirada">' +
+        '<button type="submit" class="av-btn av-perigo">Confirmar a retirada</button>' +
         `<button type="button" class="av-btn" data-av-cancela="${esc(a.id)}">Cancelar</button></form>` : '';
-    return `<article class="av-aviso av-t-${tipo}${inativo ? ' av-apagado' : ''}" data-av-id="${esc(a.id)}">` +
-      `<header class="av-topo"><span class="av-tipo">${esc(rotulo)}</span>` +
-      `<b class="av-autor">${esc(autor)}</b><span class="av-hora">${esc(hora(a.criado_em))}</span>` +
-      `<span class="av-para">para ${esc(paraQuem(a, o.agentes))}</span></header>` +
+    return `<article class="av-aviso av-t-${tipo}${inativo ? ' av-apagado' : ''}" data-av-id="${esc(a.id)}">${foto}<div class="av-corpo">` +
+      `<header class="av-topo"><b class="av-autor">${esc(autor)}</b><span class="av-para">→ ${esc(paraQuem(a, o.agentes))}</span>` +
+      `<span class="av-tipo">${esc(rotulo)}</span><span class="av-hora">${esc(hora(a.criado_em))}</span></header>` +
       `<p class="av-texto">${esc(a.texto)}</p>` +
-      (link ? `<p class="av-linha">${link}</p>` : '') +
-      (assunto || tags ? `<p class="av-linha">${assunto}${tags}</p>` : '') +
+      (link || assunto || tags ? `<p class="av-linha">${assunto}${tags}${link}</p>` : '') +
       (sit ? `<p class="av-situacao">${esc(sit)}</p>` : '') +
-      (entregas.length ? `<ul class="av-entregas">${entregas.map(e =>
-        `<li class="av-e-${e.estado}">${esc(e.texto)}</li>`).join('')}</ul>` : '') +
-      (retirar ? `<div class="av-acoes">${retirar}</div>` : '') + campo + '</article>';
+      `<div class="av-pe">${ent}${retirar}</div>` + campo + '</div></article>';
   }
 
   function htmlLista(avisos, opcoes) {
     return agruparPorDia(avisos, opcoes && opcoes.agora).map(g =>
-      `<section class="av-dia"><h3 class="av-dia-t">${esc(g.rotulo)}</h3>` +
-      g.avisos.map(a => htmlAviso(a, opcoes)).join('') + '</section>').join('');
+      `<section class="av-dia"><h3 class="av-dia-t">${ICO.dia}${esc(g.rotulo)}<span class="q">${g.avisos.length}</span></h3>` +
+      `<div class="av-grupo">${g.avisos.map(a => htmlAviso(a, opcoes)).join('')}</div></section>`).join('');
   }
 
   /* f = { tipo, para: [slugs] | 'todos', texto, link, assunto }. Devolve { ok, erros:{campo:msg}, dados }. */
@@ -240,7 +255,7 @@
     ],
   };
 
-  const estado = { agentes: [], tipos: TIPOS, avisos: [], ultimoId: 0, abertoRetirar: null, filtro: { agente: '', tipo: '', retirados: false } };
+  const estado = { agentes: [], tipos: TIPOS, avisos: [], ultimoId: 0, abertoRetirar: null, menuAberto: null, fotos: {}, filtro: { agente: '', tipo: '', retirados: false } };
   let setBolinha = null, visto = 0, raizEl = null, timer = null, carregou = false, busca = 0, espia = null;
   // O maior id já visto fica no aparelho: assim a aba da Mesa acende a bolinha antes de ser aberta.
   const CHAVE_VISTO = 'dgclaw.avisos.visto';
@@ -265,33 +280,28 @@
   }
 
   function tela() {
-    return `<div class="av-tela">
+    return `<div class="av-tela bh">
 <header class="av-cab" data-av-tour="titulo"><h1>Quadro de avisos</h1>
 <button type="button" class="av-btn" data-av-tutorial="pagina">Tutorial</button></header>
 <p id="avStatus" class="av-status" role="status" aria-live="polite"></p>
-<section class="av-sec" data-av-tour="postar" aria-labelledby="avTPostar">
-<h2 id="avTPostar">Postar <button type="button" class="av-ajuda" data-av-tutorial="postar" aria-label="Ajuda sobre postar">?</button></h2>
-<form id="avForm" class="av-form" novalidate>
-<div class="av-campo"><label for="avTipo">Tipo</label><select id="avTipo" name="tipo"></select><p class="av-erro" data-erro="tipo" hidden></p></div>
-<div class="av-campo" data-av-tour="para"><span class="av-rot" id="avParaRot">Para</span>
-<div id="avPara" class="av-para-lista" role="group" aria-labelledby="avParaRot"></div><p class="av-erro" data-erro="para" hidden></p></div>
-<div class="av-campo" data-av-tour="texto"><label for="avTexto">Texto</label>
-<textarea id="avTexto" name="texto" rows="3" maxlength="400"></textarea>
-<p class="av-cont"><span id="avCont">0/${MAX_TEXTO}</span></p><p class="av-erro" data-erro="texto" hidden></p></div>
-<div class="av-campo"><label for="avLink">Link (opcional)</label><input id="avLink" name="link" type="url" inputmode="url" autocomplete="off" placeholder="https://"><p class="av-erro" data-erro="link" hidden></p></div>
-<div class="av-campo"><label for="avAssunto">Assunto (opcional)</label><input id="avAssunto" name="assunto" type="text" maxlength="80" autocomplete="off"><p class="av-erro" data-erro="assunto" hidden></p></div>
-<p class="av-erro" data-erro="geral" hidden></p>
-<button type="submit" id="avPostar" class="av-btn av-primario">Postar</button>
-<p id="avResposta" class="av-resposta" role="status" hidden></p>
-</form></section>
-<section class="av-sec" data-av-tour="filtros" aria-labelledby="avTFiltros">
-<h2 id="avTFiltros">Filtros <button type="button" class="av-ajuda" data-av-tutorial="filtros" aria-label="Ajuda sobre os filtros">?</button></h2>
-<div class="av-filtros"><div class="av-campo"><label for="avFAgente">Agente</label><select id="avFAgente"></select></div>
-<div class="av-campo"><label for="avFTipo">Tipo</label><select id="avFTipo"></select></div>
-<label class="av-check"><input type="checkbox" id="avFRetirados"> Ver retirados</label></div></section>
-<section class="av-sec" data-av-tour="lista" aria-labelledby="avTLista">
-<h2 id="avTLista">Avisos <button type="button" class="av-ajuda" data-av-tutorial="lista" aria-label="Ajuda sobre os avisos">?</button></h2>
-<div id="avLista" class="av-lista" aria-live="polite"></div></section></div>`;
+<form id="avForm" class="bh-novo av-novo" novalidate data-av-tour="postar">
+<textarea id="avTexto" name="texto" rows="2" maxlength="400" placeholder="Escreva um aviso para os agentes: a partir de hoje, relatórios saem em PDF" data-av-tour="texto"></textarea>
+<p class="av-erro" data-erro="texto" hidden></p>
+<div class="bh-acoes">
+<label class="av-pil">${ICO.tipo}<select id="avTipo" name="tipo" aria-label="Tipo do aviso"></select>${ICO.dn}</label>
+<span class="av-dest" data-av-tour="para"><button type="button" class="av-pil" id="avParaBtn" aria-haspopup="true" aria-expanded="false">para <span id="avParaFotos" class="av-fotos"></span><span id="avParaTx">todos</span>${ICO.dn}</button>
+<div id="avPara" class="av-para-menu" role="group" aria-label="Para quem" hidden></div></span>
+<button type="button" class="av-ic" id="avAjustes" aria-expanded="false" title="Link e assunto" aria-label="Link e assunto">${ICO.aj}</button>
+<span class="av-cont"><span id="avCont">0/${MAX_TEXTO}</span></span>
+<button type="submit" id="avPostar" class="av-go" title="Postar o aviso" aria-label="Postar o aviso">${ICO.enviar}</button></div>
+<div class="av-mais-campos" id="avMaisCampos" hidden>
+<label>Link (opcional)<input id="avLink" name="link" type="url" inputmode="url" autocomplete="off" placeholder="https://"></label><p class="av-erro" data-erro="link" hidden></p>
+<label>Assunto (opcional)<input id="avAssunto" name="assunto" type="text" maxlength="80" autocomplete="off"></label><p class="av-erro" data-erro="assunto" hidden></p></div>
+<p class="av-erro" data-erro="tipo" hidden></p><p class="av-erro" data-erro="para" hidden></p><p class="av-erro" data-erro="geral" hidden></p>
+<p id="avResposta" class="bh-msg av-resposta" role="status" hidden></p>
+</form>
+<div class="av-filtros" data-av-tour="filtros" id="avFiltros"></div>
+<div id="avLista" class="av-lista" aria-live="polite" data-av-tour="lista"></div></div>`;
   }
 
   function opcoesTipo(sel, comTodos) {
@@ -299,22 +309,51 @@
       estado.tipos.map(t => `<option value="${esc(t[0] || t.id)}">${esc(t[1] || t.rotulo)}</option>`).join('');
   }
 
+  // fotos dos agentes (GET /api/v1/agents): a lista de avisos traz só slug e nome
+  async function carregaFotos() {
+    try {
+      const r = await fetch('/api/v1/agents', { credentials: 'same-origin', cache: 'no-store' });
+      const d = r.ok ? await r.json() : null;
+      (d && d.agentes || []).forEach(a => {
+        const img = a.avatar_img || (/^https:\/\//i.test(a.avatar || '') ? a.avatar : '');
+        estado.fotos[a.id] = `<span class="av-foto" style="background:${esc(a.cor || '#5b6472')}">${img ? `<img src="${esc(img)}" alt="">` : esc(Array.from(a.avatar || a.nome || '?')[0])}</span>`;
+      });
+      estado.fotos.dono = '<span class="av-foto av-voce">Você</span>';
+      if (raizEl) { pintaAgentes(); pintaFiltros(); if (carregou && !digitando()) pintaLista(); }
+    } catch (_) { /* sem fotos: fica a inicial */ }
+  }
+
+  /* "para quem": Todos ou agentes escolhidos, num menu com as fotos (mesmos campos de antes: destino e para) */
   function pintaAgentes() {
     const r = raizEl;
     const lista = estado.agentes;
     const paraEl = q(r, '#avPara');
     const marcados = Array.from(paraEl.querySelectorAll('input[name=para]:checked')).map(i => i.value);
-    paraEl.innerHTML = '<label class="av-check"><input type="radio" name="destino" value="todos" checked> Todos</label>' +
-      '<label class="av-check"><input type="radio" name="destino" value="alguns"> Escolher agentes</label>' +
-      '<div class="av-escolha" hidden>' + (lista.length ? lista.map(a =>
-        `<label class="av-check"><input type="checkbox" name="para" value="${esc(a.slug || a.id)}"` +
-        `${marcados.includes(a.slug || a.id) ? ' checked' : ''}> ${esc(a.nome || a.slug)}</label>`).join('')
-        : '<span class="av-fraco">Nenhum agente de trabalho encontrado.</span>') + '</div>';
-    const fa = q(r, '#avFAgente');
-    const atual = fa.value;
-    fa.innerHTML = '<option value="">Todos os agentes</option><option value="dono">Você</option>' +
-      lista.map(a => `<option value="${esc(a.slug || a.id)}">${esc(a.nome || a.slug)}</option>`).join('');
-    fa.value = atual || estado.filtro.agente;
+    const alguns = marcados.length > 0;
+    paraEl.innerHTML = `<label class="av-op"><input type="radio" name="destino" value="todos"${alguns ? '' : ' checked'}> Todos os agentes</label>` +
+      `<input type="radio" name="destino" value="alguns" hidden${alguns ? ' checked' : ''}>` +
+      (lista.length ? lista.map(a => {
+        const id = a.slug || a.id;
+        return `<label class="av-op"><input type="checkbox" name="para" value="${esc(id)}"${marcados.includes(id) ? ' checked' : ''}>${estado.fotos[id] || ''}<span>${esc(a.nome || a.slug)}</span></label>`;
+      }).join('') : '<span class="av-fraco">Nenhum agente de trabalho encontrado.</span>');
+    pintaPara();
+  }
+  function pintaPara() {
+    const r = raizEl;
+    const marcados = Array.from(r.querySelectorAll('#avPara input[name=para]:checked')).map(i => i.value);
+    const ids = marcados.length ? marcados : estado.agentes.map(a => a.slug || a.id);
+    q(r, '#avParaFotos').innerHTML = ids.slice(0, 4).map(id => estado.fotos[id] || '').join('');
+    q(r, '#avParaTx').textContent = marcados.length ? marcados.map(id => nomeDe(id, estado.agentes)).join(', ') : 'todos';
+  }
+
+  /* filtros em pílulas: tipo, retirados e as fotos para filtrar por quem mandou */
+  function pintaFiltros() {
+    const f = estado.filtro;
+    const chip = (tipo, rot) => `<button type="button" class="av-chip${f.tipo === tipo ? ' on' : ''}" data-av-ftipo="${tipo}" aria-pressed="${f.tipo === tipo}">${rot}</button>`;
+    const quem = [{ id: 'dono', nome: 'Você' }].concat(estado.agentes.map(a => ({ id: a.slug || a.id, nome: a.nome })));
+    q(raizEl, '#avFiltros').innerHTML = `<div class="av-chips">${chip('', 'Todos')}${chip('pedido', 'Pedidos')}${chip('entrega', 'Entregas')}${chip('decisao', 'Decisões')}` +
+      `<button type="button" class="av-chip${f.retirados ? ' on' : ''}" data-av-fretirados aria-pressed="${f.retirados}">Retirados</button></div>` +
+      `<div class="av-fquem">${quem.filter(x => estado.fotos[x.id]).map(x => `<button type="button" class="av-fav${f.agente === x.id ? ' on' : ''}" data-av-fagente="${esc(x.id)}" aria-pressed="${f.agente === x.id}" title="Só os avisos de ${esc(x.nome)}">${estado.fotos[x.id]}</button>`).join('')}</div>`;
   }
 
   function mostraErro(campo, msg) {
@@ -358,7 +397,7 @@
       caixa.innerHTML = '<p class="av-vazio">Nenhum aviso nos últimos 7 dias.</p>';
       return;
     }
-    caixa.innerHTML = htmlLista(estado.avisos, { agentes: estado.agentes, motivoAberto: estado.abertoRetirar });
+    caixa.innerHTML = htmlLista(estado.avisos, { agentes: estado.agentes, fotos: estado.fotos, motivoAberto: estado.abertoRetirar, menuAberto: estado.menuAberto });
   }
 
   /* não troca a lista debaixo de quem está escrevendo o motivo da retirada */
@@ -374,10 +413,7 @@
       if (Array.isArray(d.tipos) && d.tipos.length) {
         estado.tipos = d.tipos.map(t => Array.isArray(t) ? t : [t.id, t.rotulo]);
       }
-      if (!carregou) {
-        q(raizEl, '#avTipo').innerHTML = opcoesTipo(null, false);
-        q(raizEl, '#avFTipo').innerHTML = opcoesTipo(null, true);
-      }
+      if (!carregou) q(raizEl, '#avTipo').innerHTML = opcoesTipo(null, false);
       estado.avisos = d.avisos || [];
       const maior = Math.max(maiorId(estado.avisos), Number(d.cursor) || 0);
       const aparente = raizEl.offsetParent !== null && document.visibilityState === 'visible';
@@ -400,8 +436,7 @@
   }
 
   function atualizaAgentes() {
-    const fa = q(raizEl, '#avFAgente');
-    if (fa.options.length - 2 !== estado.agentes.length) pintaAgentes();
+    if (q(raizEl, '#avPara').querySelectorAll('input[name=para]').length !== estado.agentes.length) { pintaAgentes(); pintaFiltros(); }
   }
 
   function dadosForm() {
@@ -431,7 +466,7 @@
       f.texto.value = ''; f.link.value = ''; f.assunto.value = '';
       f.querySelector('input[name=destino][value=todos]').checked = true;
       f.querySelectorAll('input[name=para]').forEach(i => { i.checked = false; });
-      q(raizEl, '.av-escolha').hidden = true;
+      pintaPara();
       contador();
       resp.textContent = 'Aviso #' + ((d.aviso && d.aviso.id) || '?') + ' postado.';
       resp.hidden = false;
@@ -488,23 +523,29 @@
     elemento.innerHTML = tela();
     carregou = false;
     q(elemento, '#avTipo').innerHTML = opcoesTipo(null, false);
-    q(elemento, '#avFTipo').innerHTML = opcoesTipo(null, true);
-    pintaAgentes();
+    pintaAgentes(); pintaFiltros(); carregaFotos();
     q(elemento, '#avTexto').addEventListener('input', contador);
     q(elemento, '#avForm').addEventListener('submit', posta);
     elemento.addEventListener('change', ev => {
       const t = ev.target;
-      if (t.name === 'destino') q(elemento, '.av-escolha').hidden = t.value !== 'alguns';
-      if (t.id === 'avFAgente') estado.filtro.agente = t.value;
-      if (t.id === 'avFTipo') estado.filtro.tipo = t.value;
-      if (t.id === 'avFRetirados') estado.filtro.retirados = t.checked;
-      if (/^avF/.test(t.id || '')) carrega(true);
+      if (t.name === 'destino' && t.value === 'todos') elemento.querySelectorAll('#avPara input[name=para]').forEach(i => { i.checked = false; });
+      if (t.name === 'para') {
+        const algum = !!elemento.querySelector('#avPara input[name=para]:checked');
+        elemento.querySelector(`#avPara input[name=destino][value=${algum ? 'alguns' : 'todos'}]`).checked = true;
+      }
+      if (t.name === 'destino' || t.name === 'para') pintaPara();
     });
     elemento.addEventListener('click', ev => {
       const b = ev.target.closest('button');
       if (!b) return;
+      if (b.id === 'avParaBtn') { const m = q(elemento, '#avPara'); m.hidden = !m.hidden; b.setAttribute('aria-expanded', String(!m.hidden)); return; }
+      if (b.id === 'avAjustes') { const m = q(elemento, '#avMaisCampos'); m.hidden = !m.hidden; b.classList.toggle('on', !m.hidden); b.setAttribute('aria-expanded', String(!m.hidden)); return; }
+      if (b.dataset.avFtipo != null) { estado.filtro.tipo = b.dataset.avFtipo; pintaFiltros(); carrega(true); return; }
+      if (b.hasAttribute('data-av-fretirados')) { estado.filtro.retirados = !estado.filtro.retirados; pintaFiltros(); carrega(true); return; }
+      if (b.dataset.avFagente) { estado.filtro.agente = estado.filtro.agente === b.dataset.avFagente ? '' : b.dataset.avFagente; pintaFiltros(); carrega(true); return; }
+      if (b.dataset.avMenu) { estado.menuAberto = String(estado.menuAberto) === b.dataset.avMenu ? null : b.dataset.avMenu; pintaLista(); return; }
       if (b.dataset.avTutorial) tour(b.dataset.avTutorial);
-      else if (b.dataset.avRetirar) { estado.abertoRetirar = b.dataset.avRetirar; pintaLista(); const i = q(elemento, '.av-retirada input'); if (i) i.focus(); }
+      else if (b.dataset.avRetirar) { estado.abertoRetirar = b.dataset.avRetirar; estado.menuAberto = null; pintaLista(); const i = q(elemento, '.av-retirada input'); if (i) i.focus(); }
       else if (b.dataset.avCancela) { estado.abertoRetirar = null; pintaLista(); }
       else if (b.hasAttribute('data-av-recarrega')) carrega(true);
     });
@@ -515,6 +556,11 @@
       const botao = f.querySelector('button[type=submit]');
       botao.disabled = true;
       retira(f.dataset.avRetirada, f.motivo.value.trim());
+    });
+    // o menu "para quem" fecha ao tocar fora dele
+    document.addEventListener('click', ev => {
+      const m = q(elemento, '#avPara');
+      if (m && !m.hidden && !ev.target.closest('.av-dest')) { m.hidden = true; q(elemento, '#avParaBtn').setAttribute('aria-expanded', 'false'); }
     });
     const tic = () => { if (document.visibilityState === 'visible' && raizEl.isConnected) carrega(); };
     clearInterval(espia);

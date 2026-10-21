@@ -391,6 +391,10 @@
 .vazio .vz-av{width:clamp(128px,26vh,224px);height:clamp(128px,26vh,224px);border-radius:50%;overflow:hidden;display:flex;align-items:center;justify-content:center;
   font-size:88px;font-weight:600;color:#fff;margin-bottom:20px;box-shadow:0 0 0 4px var(--dg-fundo),0 0 0 5px var(--dg-borda)}
 .vazio .vz-av img{width:100%;height:100%;object-fit:cover}
+/* movimento suave do avatar da conversa vazia (21/10/2026, pedido do dono): flutua uns pixels e respira */
+.vazio .vz-av{animation:vz-flutua 5s ease-in-out infinite;will-change:transform}
+@keyframes vz-flutua{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-6px) scale(1.015)}}
+@media (prefers-reduced-motion:reduce){.vazio .vz-av{animation:none}}
 /* tela baixa (iPhone SE e afins): a foto diminui para a conversa vazia caber sem rolar */
 @media (max-height:760px){.vazio .vz-av{width:120px;height:120px;font-size:48px;margin-bottom:14px}}
 .vazio b{display:block;font-size:22px;font-weight:650;letter-spacing:-.01em;color:var(--dg-texto);margin-bottom:6px}

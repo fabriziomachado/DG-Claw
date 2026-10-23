@@ -12,26 +12,19 @@
 .barra-args{font-size:12.5px;color:var(--muted)}
 .barra-desc{font-size:13px;line-height:1.35;color:var(--muted);margin-top:1px}
 .barra-item.off .barra-nome,.barra-item.off .barra-desc{opacity:.5}
-.barra-motivo{font-size:12.5px;line-height:1.35;margin-top:2px;color:#a8281c}
+.barra-motivo{font-size:12.5px;line-height:1.35;margin-top:2px;color:var(--dg-erro-texto)}
 .barra-msg{padding:12px 14px;font-size:13.5px;line-height:1.4;color:var(--muted);overflow-wrap:anywhere}
-.barra-msg.erro{color:#a8281c}
+.barra-msg.erro{color:var(--dg-erro-texto)}
+/* 22/10/2026: cores do tema (antes amarelo e vermelho fixos, com cópia para o escuro) */
 .barra-aviso{margin:2px 8px 4px;padding:8px 10px;border-radius:10px;font-size:13px;line-height:1.4;
-  background:#fff8db;color:#3b2f00;border:1px solid #aa7900;overflow-wrap:anywhere}
-html[data-tema="escuro"] .barra-motivo,html[data-tema="escuro"] .barra-msg.erro{color:#ffb3aa}
-html[data-tema="escuro"] .barra-aviso{background:#3c341b;color:#fff3c8;border-color:#e5bd4c}
-@media(prefers-color-scheme:dark){
-  html:not([data-tema="claro"]) .barra-motivo,html:not([data-tema="claro"]) .barra-msg.erro{color:#ffb3aa}
-  html:not([data-tema="claro"]) .barra-aviso{background:#3c341b;color:#fff3c8;border-color:#e5bd4c}
-}
+  background:var(--dg-pedido-fundo);color:var(--dg-texto);border:1px solid var(--dg-pedido-borda);overflow-wrap:anywhere}
 
 /* Resultado de um comando (o que o terminal respondeu a /context, /cost...): bloco fechado do lado do agente */
 .row.comando{display:block;max-width:880px;margin:2px auto;padding:0 12px;box-sizing:border-box}
 .row.comando details{font-size:13px;color:var(--muted)}
 .row.comando summary{display:flex;align-items:center;gap:8px;min-height:32px;padding:4px 0;cursor:pointer;line-height:1.35;list-style-position:inside}
 .row.comando summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
-.cmd-saida{margin:4px 0;padding:8px 10px;border-radius:8px;background:rgba(127,127,127,.12);color:var(--txt);
+.cmd-saida{margin:4px 0;padding:8px 10px;border-radius:8px;background:var(--dg-superficie-2);color:var(--txt);
   font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;max-width:100%;
   box-sizing:border-box;overflow:hidden}
-.cmd-saida.erro{color:#a8281c}
-html[data-tema="escuro"] .cmd-saida.erro{color:#ffb3aa}
-@media(prefers-color-scheme:dark){html:not([data-tema="claro"]) .cmd-saida.erro{color:#ffb3aa}}
+.cmd-saida.erro{color:var(--dg-erro-texto)}

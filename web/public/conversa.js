@@ -3911,6 +3911,9 @@ menuMais.hidden = true;
 menuMais.innerHTML =
   '<button type="button" role="menuitem" data-mais="anexar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4L15 7"/></svg>' +
   '<span><b>Anexar arquivo</b><small>Fotos, vídeos, áudios, PDFs</small></span></button>' +
+  // 23/10/2026 (opção A do dono): o Histórico sai da fileira de filtros do topo e vem para cá
+  '<button type="button" role="menuitem" data-mais="historico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>' +
+  '<span><b>Conversas anteriores</b><small>Histórico e busca</small></span></button>' +
   '<div class="mm-sep"></div>' +
   '<button type="button" role="menuitem" data-mais="nova"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h8"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>' +
   '<span><b>Nova conversa</b><small>Guarda esta no Histórico</small></span></button>';
@@ -3939,6 +3942,12 @@ menuMais.onclick = (ev) => {
   const b = ev.target.closest('[data-mais]');
   if (!b) return;
   if (b.dataset.mais === 'anexar') { menuMaisAbre(false); destravarAudio(); inputArquivo.click(); return; }
+  if (b.dataset.mais === 'historico') {
+    menuMaisAbre(false);
+    if (window.DGHistorico) window.DGHistorico.abre({ id: AGENTE.id, nome: AGENTE.nome || 'o agente', soArquivadas: EH_ADMIN });
+    else mostraErro('O Histórico não carregou. Recarregue a página.');
+    return;
+  }
   if (!itemNova.classList.contains('confirma')) { novaPronta(true); return; }
   menuMaisAbre(false);
   enviarTexto('/clear');
@@ -6548,7 +6557,9 @@ function desenhaAlertas() {
   const c = contagensFiltro();
   // o Histórico fica sempre à mão (no Admin, só com as conversas arquivadas)
   const temHist = !!window.DGHistorico;
-  filtrosEl.hidden = !(temHist || c.nv || c.temEntregas || filtro !== 'tudo');
+  // 23/10/2026 (opção A do dono): a fileira sai do topo; pedidos e entregas ficam marcados na conversa e na
+  // Caixa de entrada, e o Histórico foi para o menu do ➕. O código fica, só não aparece.
+  filtrosEl.hidden = true;
   const chip = (k, rot, n, cls) => `<button type="button" class="filtro${filtro === k ? ' on' : ''}${cls ? ' ' + cls : ''}" data-filtro="${k}" aria-pressed="${filtro === k}">` +
     `${rot}${n ? ` <b>${n}</b>` : ''}</button>`;
   filtrosEl.innerHTML = chip('tudo', 'Tudo', 0) + chip('nao-vistas', 'Não vistas', c.nv) +

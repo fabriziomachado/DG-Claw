@@ -14,7 +14,9 @@
 # pro proximo batimento.
 #
 # So injeta SE houver motivo:
-#   (a) a secao "Quero Falar com o <dono> Sobre" tem linha real (nao comentario/placeholder), ou
+#   (a) a secao "Quero Falar com o <dono> Sobre" tem linha real (nao comentario/placeholder) E mudou
+#       desde o ultimo poke (22/10/2026: a mesma lista acordava o agente de novo e de novo, ~14x/dia,
+#       quando ele decidia nao avisar e deixava a linha la), ou
 #   (b) a working-memory esta velha (>8h sem rebuild).
 #
 # Uso:  bash heartbeat.sh <.dgclaw/config.sh>
@@ -78,6 +80,16 @@ if [ -f "$WM" ]; then
     BLOCK=$(awk '/^## Quero Falar com o/{f=1;next} /^## /{f=0} f' "$WM" | grep -vE '^\s*(<!--|$)' | grep -vE '^\s*-\s*\(' )
     [ -n "$BLOCK" ] && HAS_NEWS=1
 fi
+# a mesma lista do ultimo poke nao e novidade: o agente ja olhou e decidiu
+LISTA_SHA_ARQ="$DGCLAW_WORKSPACE/.dgclaw/heartbeat-lista.sha"
+LISTA_SHA=""
+if [ "$HAS_NEWS" = "1" ]; then
+    LISTA_SHA=$(printf '%s' "$BLOCK" | sha256sum | cut -d' ' -f1)
+    if [ "$LISTA_SHA" = "$(cat "$LISTA_SHA_ARQ" 2>/dev/null)" ]; then
+        HAS_NEWS=0
+        echo "[$(date '+%F %T')] heartbeat: a lista 'Quero Falar' e a mesma do ultimo poke, nao acordo o agente por ela" >> "$LOG"
+    fi
+fi
 
 # --- 3. working-memory velha? (>8h) ---
 STALE=0
@@ -122,7 +134,8 @@ echo "[$(date '+%F %T')] heartbeat: injetando poke (news=$HAS_NEWS stale=$STALE)
 inject_session "$SLUG" heartbeat <<< "$PROMPT" >> "$LOG" 2>&1
 RC=$?
 case "$RC" in
-    0) echo "[$(date '+%F %T')] heartbeat: poke injetado (rc=0)" >> "$LOG" ;;
+    0) echo "[$(date '+%F %T')] heartbeat: poke injetado (rc=0)" >> "$LOG"
+       [ -n "$LISTA_SHA" ] && printf '%s\n' "$LISTA_SHA" > "$LISTA_SHA_ARQ" ;;
     2)
         # A sessao caiu entre a checagem do passo 1.5 e a injecao: mesmo tratamento de morta.
         MSG="a sessão do agente caiu às $(date '+%H:%M') na hora de injetar o batimento. O que fazer: ligar o agente e conferir de novo no Pulso"

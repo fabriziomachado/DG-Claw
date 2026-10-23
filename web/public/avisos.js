@@ -523,6 +523,7 @@
     elemento.innerHTML = tela();
     carregou = false;
     q(elemento, '#avTipo').innerHTML = opcoesTipo(null, false);
+    if (window.DGSeletorAgente) window.DGSeletorAgente.opcoes(q(elemento, '#avTipo'), { titulo: 'Tipo do aviso' });
     pintaAgentes(); pintaFiltros(); carregaFotos();
     q(elemento, '#avTexto').addEventListener('input', contador);
     q(elemento, '#avForm').addEventListener('submit', posta);

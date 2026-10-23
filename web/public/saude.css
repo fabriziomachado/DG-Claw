@@ -117,3 +117,8 @@ a.ss-li:hover{background:var(--dg-superficie-2)}
 .ss-tk-lin .ss-tk-barra{margin-left:0}
 .ss-tk-lin b{text-align:right;font-size:13px;font-weight:600;color:var(--dg-texto);font-variant-numeric:tabular-nums}
 .ss-tk-barra i.s{opacity:.55}
+
+/* "Perguntar à memória" com o seletor de agente do Board (seletor-agente.js, 22/10/2026): o menu sai do cartão */
+.ss-grupo-mem{overflow:visible}
+.ss-busca .sa-pilula{min-height:28px;padding:2px 8px 2px 2px;border:0;background:var(--dg-superficie-2);font-size:12.5px}
+.ss-busca .sa-av{width:22px!important;height:22px!important}

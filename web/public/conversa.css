@@ -1162,3 +1162,21 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 .pa-gira{display:block;width:14px;height:14px;border-radius:50%;border:2px solid var(--dg-borda);border-top-color:var(--dg-texto-2);animation:paGira .8s linear infinite}
 @keyframes paGira{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.pa-gira{animation:none}}
+
+/* ── Menu do ➕ (22/10/2026): Anexar arquivo e Nova conversa, acima do botão ── */
+.linha1{position:relative}
+#btnAnexo.ativo{background:var(--dg-superficie-2)}
+#menuMais{position:absolute;left:0;bottom:calc(100% + 8px);z-index:45;width:244px;max-width:calc(100vw - 32px);
+          background:var(--dg-superficie);border:1px solid var(--dg-borda);border-radius:16px;
+          box-shadow:var(--dg-sombra);padding:6px;box-sizing:border-box}
+#menuMais[hidden]{display:none}
+#menuMais button{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:10px 12px;border:0;
+                 border-radius:10px;background:transparent;color:var(--dg-texto);font:inherit;text-align:left;cursor:pointer}
+#menuMais button:hover,#menuMais button.confirma{background:var(--dg-superficie-2)}
+#menuMais svg{flex:0 0 auto;color:var(--dg-texto-2)}
+#menuMais span{display:flex;flex-direction:column;min-width:0}
+#menuMais b{font-weight:500;font-size:15px}
+#menuMais small{font-size:12.5px;line-height:1.3;color:var(--dg-texto-3)}
+#menuMais button.confirma small{color:var(--dg-texto-2)}
+.mm-sep{height:1px;background:var(--dg-borda);margin:4px 8px}
+

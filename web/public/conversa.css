@@ -862,7 +862,8 @@ header #btnTutorial{font-size:14px}
 .acoes{align-items:center}
 .acoes .hora{display:inline-block;margin:0 0 0 6px}
 .acoes.so-hora .hora{margin-left:4px}
-header #btnMesa,header #btnLembretes,header #btnTutorial,header #btnSigilo{display:none!important}
+/* o envelope "marcar como não lida" da original (23/10/2026) também sai: no S2 Bot a troca de agente é pelas fotos */
+header #btnMesa,header #btnLembretes,header #btnTutorial,header #btnSigilo,header #btnNaoLida{display:none!important}
 
 /* a fileira de agentes do cabeçalho fica em fileira.css (a mesma em todas as telas) */
 /* antes de saber quem é o agente, o cabeçalho não mostra o avatar e o nome padrão (piscava "DG Claw") */

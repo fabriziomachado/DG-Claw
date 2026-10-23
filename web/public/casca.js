@@ -71,10 +71,13 @@
     '<div data-tour="gm-conversa"><button type="button" class="ml-tab ativo" id="gmIrConversa" aria-current="page"><span class="ml-ico" aria-hidden="true">◔</span>Conversa</button></div>' +
     '<div data-tour="gm-mesa"><a class="ml-tab" href="/mesa"><span class="ml-ico" aria-hidden="true">▦</span>Board</a></div>' +
     '<div id="mlPainel" data-tour="gm-painel" hidden></div></nav>' +
+    '<section class="ml-config" id="mlUso" aria-label="Uso das assinaturas"><details id="mlUsoDet"><summary class="ml-tab"><span class="ml-ico" aria-hidden="true">◔</span>Uso das assinaturas</summary><div class="ml-uso" id="mlUsoLista" aria-live="polite"></div></details></section>' +
     '<section class="ml-config" id="mlConfig" data-tour="gm-config" aria-label="Configurações"><h3>Configurações</h3>' +
     '<button type="button" class="ml-tab" id="mlInstalar"><span class="ml-ico" aria-hidden="true">⤓</span><span class="ml-tx">Instalar o app<small id="mlInstalarSub"></small></span></button>' +
     '<div class="ml-tema" id="mlTema" role="radiogroup" aria-label="Tema"><span class="ml-ico" aria-hidden="true">◐</span><span class="ml-tema-rot">Tema</span><span class="ml-tema-opcoes"><button type="button" role="radio" data-tema-op="auto">Automático</button><button type="button" role="radio" data-tema-op="claro">Claro</button><button type="button" role="radio" data-tema-op="escuro">Escuro</button></span></div>' +
     '<p class="ml-ajuda" id="mlInstalarAjuda" role="status" hidden></p></section>' +
+    '<section class="ml-config" id="mlSessao" data-tour="gm-reiniciar" aria-label="Sessão do agente" hidden><h3>Sessão</h3>' +
+    '<button type="button" class="ml-tab" id="gmReiniciar" title="Reinicia o processo do agente quando ele trava. A conversa continua de onde estava."><span class="ml-ico" aria-hidden="true">↻</span>Reiniciar sessão</button></section>' +
     '<div class="pe"><div class="conta"><form method="post" action="/sair" id="formSair"><button type="submit" class="sair">Sair</button></form></div></div>' +
     '</aside>';
 
@@ -283,6 +286,15 @@
     ponto.remove();
   }
 
+  /* A faixa de "nova versão" aparece em todas as telas que usam a casca (a Conversa a carrega no próprio HTML). */
+  function carregaFaixaAtualizacao() {
+    if (raiz.DGAtualizacaoFaixa) return;
+    const s = document.createElement('script');
+    s.src = '/atualizacao-faixa.js';
+    s.onerror = () => console.warn('casca: a faixa de nova versão (/atualizacao-faixa.js) não carregou; as telas seguem sem ela.');
+    document.head.appendChild(s);
+  }
+
   function monta(opcoes) {
     const o = opcoes || {};
     est.pagina = o.pagina || '';
@@ -294,6 +306,7 @@
     document.body.insertAdjacentHTML('afterbegin', MARCACAO_CABECALHO + MARCACAO_MENU);
     document.documentElement.classList.remove('casca-espera');
     pintaTitulo();
+    carregaFaixaAtualizacao();
     $('btnMenu').onclick = () => abreMenu(true);
     $('btnFechaMenu').onclick = () => abreMenu(false);
     $('overlayMenu').onclick = () => abreMenu(false);

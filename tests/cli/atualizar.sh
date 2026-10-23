@@ -115,6 +115,7 @@ cp "$ETC/agentes.json" "$TMP/agentes-antes.json"
 echo '# Admin (Claude) v2: leia docs/ATUALIZAR.md' >"$TRAB/templates/admin/CLAUDE.md"
 echo '# Admin (Codex) v2: leia docs/ATUALIZAR.md' >"$TRAB/templates/admin/AGENTS.md"
 echo 'novidade' >"$TRAB/NOVIDADE.md"
+echo '# v2' >>"$TRAB/lib/firewall.sh"
 git -C "$TRAB" add -A; git -C "$TRAB" commit -q -m v2; git -C "$TRAB" push -q origin main
 COMMIT_V2="$(git -C "$TRAB" rev-parse HEAD)"
 
@@ -145,12 +146,29 @@ afirma "a alteracao do aluno continua no clone" grep -q 'mexi aqui' "$CLONE/READ
 nega "simular nao agenda reinicio" grep -q '^systemd-run' "$STUB_LOG"
 fotografar >"$TMP/depois.txt"
 igual "arquivos do aluno intactos" "" "$(diff "$TMP/antes.txt" "$TMP/depois.txt")"
+afirma "simular com novidade mostra o relatorio O que muda" grep -q 'O QUE MUDA NA ATUALIZACAO' "$TMP/o2.txt"
+afirma "simular avisa que a de verdade vai exigir --ok-do-dono" grep -q 'vai exigir --ok-do-dono' "$TMP/o2.txt"
 git -C "$CLONE" checkout -q README.md
+
+echo "o que muda: sem o ok do dono a atualizacao de verdade nao segue"
+: >"$STUB_LOG"
+dgclaw atualizar >"$TMP/om1.txt" 2>&1; rc=$?
+nega "com novidade e sem --ok-do-dono sai com erro" test "$rc" -eq 0
+afirma "diz que ainda nao tem o ok do dono" grep -q 'eu ainda nao tenho o ok do dono' "$TMP/om1.txt"
+nega "nao criou backup" test -e "$BACKUPS"
+nega "nao mexeu em container" grep -q '^podman \(stop\|rm\|build\|create\)' "$STUB_LOG"
+igual "o clone continua no commit antigo" "$COMMIT_V1" "$(git -C "$CLONE" rev-parse HEAD)"
+REL="$(sed -n 's/.*O relatorio esta em \(.*o-que-muda\.txt\)\..*/\1/p' "$TMP/om1.txt" | head -n 1)"
+afirma "a saida traz o caminho do relatorio" test -n "$REL"
+afirma "o arquivo do relatorio existe" test -s "$REL"
+afirma "o relatorio lista o commit novo (v2)" grep -q ' v2$' "$REL"
+afirma "lib/firewall.sh aparece em Pontos de atencao" bash -c "sed -n '/Pontos de atencao/,\$p' '$REL' | grep -q 'lib/firewall.sh: .*rede e isolamento'"
+afirma "o relatorio termina com a instrucao do ok" grep -q -- 'sudo dgclaw atualizar --ok-do-dono --segundo-plano' "$REL"
 
 echo "atualizar de verdade"
 echo imagem-v2 >"$STUB_ESTADO/imagem-id"   # a imagem "mudou": os containers velhos precisam ser recriados
 : >"$STUB_LOG"
-dgclaw atualizar >"$TMP/o3.txt" 2>&1; rc=$?
+dgclaw atualizar --ok-do-dono >"$TMP/o3.txt" 2>&1; rc=$?
 igual "atualizar sai com 0" "0" "$rc"
 [ "$rc" -eq 0 ] || sed 's/^/      | /' "$TMP/o3.txt" | tail -n 30
 afirma "diz que concluiu" grep -q 'Atualizacao concluida' "$TMP/o3.txt"
@@ -229,6 +247,7 @@ afirma "diz que ja estava na versao mais nova" grep -q 'ja estava na versao mais
 igual "nenhum container recriado de novo (a imagem e a mesma)" "0" "$(grep -c '^podman rm ' "$STUB_LOG")"
 fotografar >"$TMP/depois.txt"
 igual "arquivos do aluno intactos" "" "$(diff "$TMP/antes.txt" "$TMP/depois.txt")"
+afirma "sem novidade, sem --ok-do-dono, diz que nao ha nada novo" grep -q 'nada novo para instalar' "$TMP/o4.txt"
 igual "dois backups agora" "2" "$(find "$BACKUPS" -mindepth 1 -maxdepth 1 -type d | wc -l)"
 
 echo "voltar"
@@ -253,33 +272,96 @@ afirma "um dos backups tem o motivo antes-de-voltar" grep -rqx 'motivo=antes-de-
 afirma "reconstruiu a imagem ao voltar" grep -q '^podman build ' "$STUB_LOG"
 nega "backup inexistente e recusado" dgclaw atualizar --voltar "$TMP/nao-existe"
 
-echo "a conferencia pega um instalador que apaga uma chave"
+echo "a conferencia pega um instalador que apaga uma chave e a atualizacao volta sozinha"
 git -C "$CLONE" switch -q main
 # shellcheck disable=SC2016 # o $@ e o $DG_ETC vao literais para dentro do install.sh sabotado
-sed -i 's|^main "\$@"$|main "$@"\nsed -i "/^GROQ_API_KEY=/d" "$DG_ETC/web.env"|' "$TRAB/install.sh"
+sed -i 's|^main "\$@"$|main "$@"\n[ "${ENSAIO:-0}" = 1 ] \|\| sed -i "/^GROQ_API_KEY=/d" "$DG_ETC/web.env"|' "$TRAB/install.sh"
 git -C "$TRAB" add -A; git -C "$TRAB" commit -q -m v3-sabotado; git -C "$TRAB" push -q origin main
 echo 'sujeira do aluno' >"$CLONE/anotacao.txt"
+COMMIT_INSTALADO_ANTES="$(grep '^DGCLAW_COMMIT=' "$ETC/dgclaw.env")"
+WEB_ANTES="$(sha256sum <"$ETC/web.env")"
+NBACKUPS_ANTES="$(find "$BACKUPS" -mindepth 1 -maxdepth 1 -type d | wc -l)"
 : >"$STUB_LOG"
-dgclaw atualizar --forcar-local >"$TMP/o7.txt" 2>&1; rc=$?
-igual "a atualizacao que apaga uma chave termina com erro" "1" "$rc"
+# O dono precisa ver o relatorio da versao que vai ser instalada (a de agora e outra que a do relatorio anterior).
+dgclaw atualizar --forcar-local --simular >/dev/null 2>&1
+dgclaw atualizar --forcar-local --ok-do-dono >"$TMP/o7.txt" 2>&1; rc=$?
+igual "a atualizacao que apaga uma chave termina com erro (1)" "1" "$rc"
 afirma "aponta a chave que sumiu" grep -q "FALHOU.*'GROQ_API_KEY'" "$TMP/o7.txt"
-afirma "mostra como voltar" grep -q -- '--voltar' "$TMP/o7.txt"
-nega "com problema, nao reinicia o Admin" grep -q '^systemd-run' "$STUB_LOG"
+afirma "diz em portugues que a atualizacao foi desfeita sozinha" grep -q 'foi desfeita sozinha' "$TMP/o7.txt"
+afirma "diz o que deu errado, o que foi desfeito, o backup e o que fazer" bash -c "grep -q 'O que deu errado: a conferencia de configuracao' '$TMP/o7.txt' && grep -q 'O que foi desfeito' '$TMP/o7.txt' && grep -q 'O DG Claw esta de volta na versao de antes. O backup que usei esta em $BACKUPS/' '$TMP/o7.txt' && grep -q 'O que fazer agora' '$TMP/o7.txt'"
+afirma "a chave voltou: web.env igual ao de antes" bash -c "[ \"\$(sha256sum <'$ETC/web.env')\" = '$WEB_ANTES' ]"
+afirma "as linhas do aluno continuam" linhas_do_aluno_ok
+igual "o dgclaw.env voltou a anotar o commit de antes" "$COMMIT_INSTALADO_ANTES" "$(grep '^DGCLAW_COMMIT=' "$ETC/dgclaw.env")"
+afirma "o clone esta numa branch dgclaw-volta-*" bash -c "git -C '$CLONE' rev-parse --abbrev-ref HEAD | grep -q '^dgclaw-volta-'"
+igual "dois backups novos: o da atualizacao e o do estado de antes de voltar" "$((NBACKUPS_ANTES + 2))" "$(find "$BACKUPS" -mindepth 1 -maxdepth 1 -type d | wc -l)"
+ult="$(grep -n '^systemd-run' "$STUB_LOG" | tail -n 1 | cut -d: -f1)"; bld="$(grep -n '^podman build' "$STUB_LOG" | tail -n 1 | cut -d: -f1)"
+afirma "o Admin so e reiniciado no fim, de forma desacoplada (depois do build)" test "${ult:-0}" -gt "${bld:-1}"
+nega "o Admin nunca e reiniciado direto" grep -q '^systemctl restart dgclaw-admin' "$STUB_LOG"
 nega "o valor da chave nunca aparece na saida" grep -q 'gsk_chave_da_marta' "$TMP/o7.txt"
 afirma "--forcar-local guardou a sujeira do aluno no stash" bash -c "git -C '$CLONE' stash list | grep -q 'dgclaw-atualizar-'"
 nega "a anotacao saiu do clone para o stash, mas nao foi perdida" test -e "$CLONE/anotacao.txt"
 afirma "a anotacao esta no stash" bash -c "git -C '$CLONE' stash show -u -p stash@{0} | grep -q 'sujeira do aluno'"
 
+echo "--sem-voltar-sozinho: a conferencia reprova e o comando para, como antes"
+git -C "$CLONE" switch -q main
+: >"$STUB_LOG"
+dgclaw atualizar --sem-voltar-sozinho --simular >/dev/null 2>&1   # o dono ve o relatorio desta versao antes
+dgclaw atualizar --sem-voltar-sozinho --ok-do-dono >"$TMP/o7b.txt" 2>&1; rc=$?
+igual "termina com erro (1)" "1" "$rc"
+afirma "aponta a chave que sumiu" grep -q "FALHOU.*'GROQ_API_KEY'" "$TMP/o7b.txt"
+afirma "mostra como voltar" grep -q -- '--voltar' "$TMP/o7b.txt"
+nega "nao diz que desfez sozinho" grep -q 'foi desfeita sozinha' "$TMP/o7b.txt"
+nega "com problema, nao reinicia o Admin" grep -q '^systemd-run' "$STUB_LOG"
+nega "a chave continua apagada (nada foi desfeito)" grep -q '^GROQ_API_KEY=' "$ETC/web.env"
+nega "o valor da chave nunca aparece na saida" grep -q 'gsk_chave_da_marta' "$TMP/o7b.txt"
+
+echo "o instalador novo falha: volta sozinho e o web.env fica identico"
+# O instalador sabotado mexe no web.env e sai com erro (codigo 9) antes de instalar qualquer coisa.
+git -C "$TRAB" revert --no-edit HEAD >/dev/null 2>&1; git -C "$TRAB" push -q origin main
+git -C "$CLONE" switch -q main
+# O ultimo instalador que rodou foi o sabotado: instala o bom de novo, para que "a versao de antes" seja boa.
+dgclaw atualizar --simular >/dev/null 2>&1
+dgclaw atualizar --ok-do-dono >"$TMP/o7bom.txt" 2>&1 || sed 's/^/      | /' "$TMP/o7bom.txt" | tail -n 20
+printf 'GROQ_API_KEY=gsk_chave_da_marta\n' >>"$ETC/web.env"
+# shellcheck disable=SC2016
+sed -i 's|^main "\$@"$|[[ " $*" == *" --ensaio"* ]] \|\| { echo LIXO >"$DG_ETC/web.env"; exit 9; }\nmain "$@"|' "$TRAB/install.sh"
+git -C "$TRAB" add -A; git -C "$TRAB" commit -q -m v4-quebrado; git -C "$TRAB" push -q origin main
+WEB_ANTES="$(sort "$ETC/web.env" | sha256sum)"
+fotografar >"$TMP/antes-i.txt"
+: >"$STUB_LOG"
+dgclaw atualizar --simular >/dev/null 2>&1
+dgclaw atualizar --ok-do-dono >"$TMP/o7c.txt" 2>&1; rc=$?
+igual "termina com erro (1)" "1" "$rc"
+afirma "diz que o instalador novo terminou com erro" grep -q 'o instalador (install.sh) da versao nova terminou com erro' "$TMP/o7c.txt"
+afirma "diz que foi desfeita sozinha" grep -q 'foi desfeita sozinha' "$TMP/o7c.txt"
+# O instalador de antes pode reescrever as linhas em outra ordem; o que importa e que sejam as mesmas.
+afirma "o web.env ficou com exatamente as mesmas linhas de antes" bash -c "[ \"\$(sort '$ETC/web.env' | sha256sum)\" = '$WEB_ANTES' ]"
+nega "o web.env nao ficou com o lixo do instalador quebrado" grep -qx LIXO "$ETC/web.env"
+fotografar >"$TMP/depois-i.txt"
+igual "arquivos do aluno intactos" "" "$(diff "$TMP/antes-i.txt" "$TMP/depois-i.txt")"
+echo "o instalador novo falha, mas com --sem-voltar-sozinho o comando so para"
+git -C "$CLONE" switch -q main
+echo LIXO-ANTES >>"$ETC/web.env"
+WEB_ANTES="$(sha256sum <"$ETC/web.env")"
+dgclaw atualizar --sem-voltar-sozinho --simular >/dev/null 2>&1
+dgclaw atualizar --sem-voltar-sozinho --ok-do-dono >"$TMP/o7d.txt" 2>&1; rc=$?
+igual "termina com erro (1)" "1" "$rc"
+nega "nao desfez sozinho" grep -q 'foi desfeita sozinha' "$TMP/o7d.txt"
+afirma "diz como voltar a mao" grep -q 'sudo dgclaw atualizar --voltar' "$TMP/o7d.txt"
+nega "o web.env ficou como o instalador quebrado deixou (sem rollback)" bash -c "[ \"\$(sha256sum <'$ETC/web.env')\" = '$WEB_ANTES' ]"
+# Volta ao instalador bom e restaura o web.env para o que o resto do teste espera.
+git -C "$TRAB" revert --no-edit HEAD >/dev/null 2>&1; git -C "$TRAB" push -q origin main
+tar -xzOf "$B1/config.tar.gz" etc/dgclaw/web.env >"$ETC/web.env"
+git -C "$CLONE" switch -q main
 
 echo "um agente que nao recria: a atualizacao diz INCOMPLETA e nao reinicia o Admin"
-# Volta ao instalador bom (reverte a sabotagem) e devolve a chave que ela apagou.
-git -C "$TRAB" revert --no-edit HEAD >/dev/null 2>&1; git -C "$TRAB" push -q origin main
-printf 'GROQ_API_KEY=gsk_chave_da_marta\n' >>"$ETC/web.env"
+# O instalador bom ja voltou (revertido acima); a chave tambem.
 echo imagem-v4 >"$STUB_ESTADO/imagem-id"
 echo sempre >"$STUB_ESTADO/stop-trava-dgclaw-ana"   # o stop da Ana devolve e o container fica em 'stopping'
 touch "$STUB_ESTADO/mounts-volume"                     # com volume do podman o 'rm -f' e proibido: a Ana nao recria
 : >"$STUB_LOG"
-DGCLAW_TEMPO_PARADA=2 dgclaw atualizar --forcar-local >"$TMP/o8.txt" 2>&1; rc=$?
+dgclaw atualizar --forcar-local --simular >/dev/null 2>&1
+DGCLAW_TEMPO_PARADA=2 dgclaw atualizar --forcar-local --ok-do-dono >"$TMP/o8.txt" 2>&1; rc=$?
 [ "$rc" -ne 0 ] || sed 's/^/      | /' "$TMP/o8.txt" | tail -n 30
 nega "sai com codigo diferente de 0" test "$rc" -eq 0
 afirma "diz INCOMPLETA" grep -q 'Atualizacao INCOMPLETA' "$TMP/o8.txt"
@@ -291,6 +373,9 @@ afirma "explica por que o Admin nao reinicia" grep -q 'NAO vou reiniciar o Admin
 nega "nao agenda o reinicio do Admin" grep -q '^systemd-run' "$STUB_LOG"
 afirma "o resumo INCOMPLETA tambem foi gravado" grep -rq 'Atualizacao INCOMPLETA' "$RAIZ/var/log/dgclaw"
 afirma "o container do Beto foi trocado" grep -q '^podman create .*--name dgclaw-beto ' "$STUB_LOG"
+nega "agente que nao sobe NAO faz a atualizacao voltar sozinha" grep -q 'foi desfeita sozinha' "$TMP/o8.txt"
+afirma "explica que nao desfez e manda recriar o agente com --forcar" grep -q 'NAO desfiz a atualizacao.*dgclaw agente recriar <slug> --forcar' "$TMP/o8.txt"
+nega "o clone nao foi levado a uma branch dgclaw-volta por causa do agente" bash -c "git -C '$CLONE' rev-parse --abbrev-ref HEAD | grep -q '^dgclaw-volta-'"
 fotografar >"$TMP/depois.txt"
 igual "os arquivos do aluno continuam intactos" "" "$(diff "$TMP/antes.txt" "$TMP/depois.txt")"
 
@@ -309,7 +394,8 @@ COMMIT_NOVO="$(git -C "$CLONE" rev-parse HEAD)"
 afirma "o clone ja esta no commit novo" test "$COMMIT_NOVO" != "$COMMIT_ANTES"
 sed -i '/^DGCLAW_COMMIT=/d; s/^DGCLAW_VERSAO=.*/DGCLAW_VERSAO=v1-'"${COMMIT_ANTES:0:12}"'/' "$ETC/dgclaw.env"
 : >"$STUB_LOG"
-dgclaw atualizar --sem-baixar >"$TMP/o10.txt" 2>&1; rc=$?
+dgclaw atualizar --sem-baixar --simular >/dev/null 2>&1
+dgclaw atualizar --sem-baixar --ok-do-dono >"$TMP/o10.txt" 2>&1; rc=$?
 igual "atualizar --sem-baixar sai com 0" "0" "$rc"
 [ "$rc" -eq 0 ] || sed 's/^/      | /' "$TMP/o10.txt" | tail -n 30
 afirma "algum manifesto grava o commit antigo certo" grep -rqx "commit=$COMMIT_ANTES" "$BACKUPS"
@@ -319,7 +405,11 @@ afirma "avisa que o clone ja estava em outro commit" grep -q 'o clone ja estava 
 
 echo "sem DGCLAW_COMMIT nem hash na versao: usa o HEAD e avisa"
 sed -i '/^DGCLAW_COMMIT=/d; s/^DGCLAW_VERSAO=.*/DGCLAW_VERSAO=desconhecida/' "$ETC/dgclaw.env"
-dgclaw atualizar --sem-baixar >"$TMP/o11.txt" 2>&1; rc=$?
+# Sem saber o que esta instalado, o dono tem que dar o ok (nao ha como provar que nao muda nada).
+dgclaw atualizar --sem-baixar >"$TMP/o11a.txt" 2>&1; rc=$?
+nega "sem commit instalado e sem --ok-do-dono, para" test "$rc" -eq 0
+afirma "diz que nao sabe qual versao esta instalada" grep -q 'nao sei qual versao esta instalada' "$TMP/o11a.txt"
+dgclaw atualizar --sem-baixar --ok-do-dono >"$TMP/o11.txt" 2>&1; rc=$?
 igual "sai com 0" "0" "$rc"
 afirma "avisa que usou o HEAD do clone" grep -q 'uso o HEAD do clone' "$TMP/o11.txt"
 

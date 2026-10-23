@@ -17,7 +17,7 @@
 // dos dois: ele os chama. Assim o painel, os crons de vida e os self-crons da persona
 // enxergam exatamente a mesma sessão, e um conserto vale para os três.
 //
-// Precedente em produção: o `dg-telegram` (Flask :4045) serve a thread da Isa assim
+// Precedente em produção: o `dg-telegram` (Flask :4045) serve a thread da agente de referência assim
 // desde 01/08/2026.
 
 const { execFile, execFileSync } = require('child_process');
@@ -593,6 +593,7 @@ function buildConversa(CONFIG, serverDir) {
         body: '{}',
         signal: AbortSignal.timeout(30000),
       });
+      // Resposta que não é JSON: corpo nulo, e o motivo abaixo cai no código HTTP.
       const corpo = await r.json().catch(() => null);
       if (!r.ok || !corpo || corpo.success === false) {
         return {
@@ -637,6 +638,7 @@ function buildConversa(CONFIG, serverDir) {
         // é justamente o caso que esta tela existe para atender.
         signal: AbortSignal.timeout(120000),
       });
+      // Resposta que não é JSON: corpo nulo, e o motivo abaixo cai no código HTTP.
       const corpo = await r.json().catch(() => null);
       if (!r.ok || !corpo || corpo.success === false || typeof corpo.text !== 'string') {
         // UM 404 AQUI TEM UM DONO CONHECIDO, e dizer só "respondeu 404" mandaria

@@ -132,9 +132,11 @@ function criarBoasVindas({ config, registro, caixa, push, log, agora }) {
     return r;
   }
 
-  /** Aviso de conversa ou da Mesa. tipo: 'pedido' ou 'entrega'. */
+  /** Aviso de conversa ou da Mesa. tipo: 'pedido', 'entrega' ou 'terminou' (o "fulano terminou" da vigia
+   *  de atenção: no silêncio ele não toca nem entra no resumo, porque a resposta fica na conversa). */
   function avisar(aviso, tipo) {
     const pref = avisos();
+    if (tipo === 'terminou') return noSilencio(pref.silencio, relogio(), tz) ? Promise.resolve({ pulado: 'silêncio' }) : push.enviar(aviso);
     if (tipo === 'pedido' && !pref.pedidos) return Promise.resolve({ pulado: 'pedidos desligados' });
     if (tipo === 'entrega' && !pref.entregas) return Promise.resolve({ pulado: 'entregas desligadas' });
     if (noSilencio(pref.silencio, relogio(), tz)) {

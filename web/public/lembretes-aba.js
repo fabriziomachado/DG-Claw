@@ -98,6 +98,7 @@
     const dias = DIAS.map(([v, t]) => `<label class="lb-dia"><input type="checkbox" value="${v}"><span>${t}</span></label>`).join('');
     return `<div class="av-tela bh lb">
 <p class="lb-aparelho" id="lbAparelho" data-lb-tour="aparelho"></p>
+<div class="lb-prefs" id="lbPrefs" role="group" aria-label="Quando avisar sobre os agentes" hidden><label class="lb-pref"><input type="checkbox" id="prefPrecisa" data-lb-pref="precisa_de_voce" disabled><span>Quando um agente precisar de mim</span></label><label class="lb-pref"><input type="checkbox" id="prefTerminou" data-lb-pref="terminou" disabled><span>Quando um agente terminar uma resposta</span></label></div>
 <p id="lbStatus" class="av-status" role="status" aria-live="polite"></p>
 <form id="lbForm" class="bh-novo av-novo" novalidate data-lb-tour="novo">
 <textarea id="lbTexto" rows="2" maxlength="${MAX_TEXTO}" placeholder="Escreva o lembrete: ligar pro contador"></textarea>
@@ -144,6 +145,26 @@
       (f.ativar && !ajuda ? '<button type="button" class="bh-bt" data-lb-ativar>Ativar</button>' : '') +
       (f.teste ? `<button type="button" class="av-ic" data-lb-teste title="Mandar um aviso de teste" aria-label="Mandar um aviso de teste">${ICO.teste}</button>` : '') +
       (f.desativar ? `<button type="button" class="av-ic" data-lb-desativar title="Desligar os avisos neste aparelho" aria-label="Desligar os avisos neste aparelho">${ICO.semSino}</button>` : '');
+    pintaPrefs(ativo);
+  }
+  /* "Precisa de você" e "terminou" (vigia de atenção, 23/10/2026): valem para todos os aparelhos. Só aparecem
+     com os avisos ativos aqui; os de entrega e pedido seguem nas escolhas das boas-vindas. */
+  async function pintaPrefs(ativo) {
+    const box = q('#lbPrefs'), A = raiz.DGClawAvisos;
+    if (!box) return;
+    if (!ativo || !A || !A.preferencias) { box.hidden = true; return; }
+    let r;
+    try { r = await A.preferencias(); } catch (e) { r = { ok: false, erro: e.message }; }
+    if (!r.ok) { box.hidden = true; status('Não consegui ler as preferências de aviso: ' + r.erro, 'erro'); return; }
+    for (const c of box.querySelectorAll('[data-lb-pref]')) { c.checked = r.preferencias[c.dataset.lbPref] !== false; c.disabled = false; }
+    box.hidden = false;
+  }
+  async function salvaPref(c) {
+    c.disabled = true;
+    let r;
+    try { r = await raiz.DGClawAvisos.salvarPreferencia(c.dataset.lbPref, c.checked); } catch (e) { r = { ok: false, erro: e.message }; }
+    c.disabled = false;
+    if (!r.ok) { c.checked = !c.checked; status('Não consegui guardar a preferência: ' + r.erro, 'erro'); }
   }
   async function acaoAparelho(fazer, ok) {
     try {
@@ -369,6 +390,7 @@
     q('#lbForm').addEventListener('submit', criar);
     el.addEventListener('click', aoClicar);
     el.addEventListener('change', ev => {
+      if (ev.target.dataset && ev.target.dataset.lbPref) { salvaPref(ev.target); return; }
       if (ev.target.name === 'lbAgente') { E.agente = ev.target.value; pintaAgente(); q('#lbAgMenu').hidden = true; q('#lbAgBtn').setAttribute('aria-expanded', 'false'); }
     });
     document.addEventListener('click', ev => {

@@ -38,6 +38,7 @@ if (navigator.standalone === true ||
 <link rel="stylesheet" href="/chat.css">
 <link rel="stylesheet" href="/conversa.css">
 <link rel="stylesheet" href="/fileira.css">
+<link rel="stylesheet" href="/login-expirado.css">
 <link rel="stylesheet" href="/onboarding.css">
 <link rel="stylesheet" href="/menu-lado.css">
 <link rel="stylesheet" href="/campo-cofre.css">
@@ -74,6 +75,7 @@ if (navigator.standalone === true ||
       <a id="btnMesa" class="btn" href="/mesa" data-tour="btn-mesa" title="Abrir o Board" aria-label="Abrir o Board">📋 <span class="lbl">Mesa</span></a>
       <a id="btnSessoes" class="btn" href="#" hidden data-tour="btn-sessoes" title="Sessões de trabalho deste agente" aria-label="Abrir as Sessões deste agente">🖥 <span class="lbl">Sessões</span></a>
       <a id="btnLembretes" class="btn" href="/lembretes" data-tour="btn-lembretes" title="Abrir os lembretes" aria-label="Abrir os lembretes">⏰ <span class="lbl">Lembretes</span></a>
+      <button id="btnNaoLida" class="btn" type="button" data-tour="btn-nao-lida" title="Marcar esta conversa como não lida e voltar à lista de agentes" aria-label="Marcar esta conversa como não lida">✉ <span class="lbl">não lida</span></button>
       <button id="btnLer" class="btn" title="Ler as respostas em voz alta" data-tour="ler">🔊 <span class="lbl">ler</span></button>
       <button id="btnContinua" class="btn" type="button" aria-pressed="false"
               aria-label="Conversa contínua: desligada"
@@ -92,7 +94,8 @@ if (navigator.standalone === true ||
 
 <div id="chat" data-tour="thread"><div class="wrap" id="wrap"></div>
   <section id="loginCartao" class="lc" role="region" aria-label="Conectar a sua conta" tabindex="-1" hidden></section>
-  <section id="permCartao" class="pc" role="alertdialog" aria-live="assertive" aria-label="Permissão pedida pelo agente" tabindex="-1" hidden></section></div>
+  <section id="permCartao" class="pc" role="alertdialog" aria-live="assertive" aria-label="Permissão pedida pelo agente" tabindex="-1" hidden></section>
+  <section id="perguntaCartao" class="pc pq" role="alertdialog" aria-live="polite" aria-label="Pergunta de escolha do agente" tabindex="-1" hidden></section></div>
 
 <aside id="alertasMensagem" data-tour="alertas" aria-label="Entregas e pedidos não vistos" hidden>
   <div id="alertasPilha"></div>
@@ -102,6 +105,24 @@ if (navigator.standalone === true ||
         title="Ir para a mensagem mais nova" hidden>↓<span
         id="fimNovas" class="fimnovas" hidden></span></button>
 
+<div id="faixaReinicio" role="status" aria-live="polite" hidden><span class="rico" aria-hidden="true">↻</span><span class="rtxt"></span></div>
+<dialog id="dlgReinicio" aria-labelledby="dlgReinicioTit" aria-describedby="dlgReinicioTxt">
+  <h2 id="dlgReinicioTit">Reiniciar a sessão?</h2>
+  <p id="dlgReinicioTxt">Isto reinicia o processo do agente quando ele travar. A conversa continua de onde estava.</p>
+  <div class="dacoes"><button type="button" id="dlgReinicioNao">Cancelar</button><button type="button" class="perigo" id="dlgReinicioSim">Reiniciar</button></div>
+</dialog>
+<dialog id="dlgLoginExpirado" class="le" role="dialog" aria-modal="true" aria-labelledby="leTit" aria-describedby="leTxt">
+  <h2 id="leTit"></h2>
+  <p id="leTxt"></p>
+  <div id="leCartao"></div>
+  <p id="leErro" role="alert" hidden></p>
+  <p id="leEstado" role="status" aria-live="polite" hidden></p>
+  <div class="le-acoes">
+    <button type="button" id="lePrimario" class="le-primario"></button>
+    <button type="button" id="leSecundario" class="le-secundario"></button>
+    <button type="button" id="leAgoraNao" class="le-link"></button>
+  </div>
+</dialog>
 <div class="faixa" id="faixaErro"><span class="txt"></span>
   <button class="x" aria-label="Fechar aviso">✕</button></div>
 <div class="faixa" id="faixaAviso"><span class="txt"></span>
@@ -122,6 +143,8 @@ if (navigator.standalone === true ||
     <button id="btnMic" aria-label="Gravar áudio" data-tour="mic"><svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></svg></button>
     <button id="btnEnviar" class="apagado" aria-label="Enviar"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
   </div>
+  <!-- celular: fileira das agentes no lugar do respiro em branco do rodapé; o conversa.js preenche -->
+  <nav id="trocaBaixo" class="troca-baixo" aria-label="Trocar de agente" data-tour="troca-baixo"></nav>
 </div>
 
 <audio id="player" preload="auto" playsinline></audio>
@@ -144,8 +167,10 @@ if (navigator.standalone === true ||
 <script src="/midias-cache.js"></script>
 <script src="/login-cartao.js"></script>
 <script src="/vendor/highlight-11.9.0.min.js"></script>
+<script src="/login-expirado.js"></script>
 <script src="/trilha-tela.js"></script>
 <script src="/rolagem.js"></script>
+<script src="/conversa-puro.js"></script>
 <script src="/tour.js"></script>
 <script src="/menu-lado.js"></script>
 <script src="/casca.js"></script>
@@ -156,6 +181,7 @@ if (navigator.standalone === true ||
 <script src="/barra.js"></script>
 <script src="/sigilo.js"></script>
 <script src="/lembretes-faixa.js"></script>
+<script src="/atualizacao-faixa.js"></script>
 <script src="/foco-tela.js"></script>
 <script src="/dgui.js"></script>
 <script src="/historico.js"></script>

@@ -18,6 +18,19 @@
 
 const $ = id => document.getElementById(id);
 
+/* Regras puras da conversa (conversa-puro.js). Se o arquivo não carregar, a tela segue de pé com
+   versões mínimas que não separam nada: o render não pode quebrar por causa de um arquivo auxiliar. */
+const PURO = window.DGConversaPuro || (() => {
+  console.warn('conversa-puro.js não carregou (a página não encontrou /conversa-puro.js). A conversa abre, mas o áudio transcrito aparece sem o 🎤, os avisos fechados não descansam e o Reiniciar não confirma a volta do agente. Recarregue a página; se persistir, confira se o arquivo existe em web/public.');
+  return {
+    avisoDescansando: () => false,
+    registraFechamento: mapa => mapa || {},
+    separaAudio: texto => ({ audio: false, texto: String(texto == null ? '' : texto) }),
+    textoDaFala: texto => String(texto),
+    avaliaVolta: () => ({ acao: 'indeterminado' }),
+  };
+})();
+
 /* ── Partida: quem é o agente desta página? ───────────────────────────────
    O endereço é /a/<slug>. A lista de agentes vem da API; o agente da página é o
    da lista com esse id. Sem lista ou sem agente, a tela explica o que houve. */
@@ -489,6 +502,11 @@ function atvFrase(est) {
     return { nome: nome + ' sem sinal: falta conectar a conta', acao: '', classe: 'atv-cinza',
              titulo: est.motivo || '' };
   }
+  if (est.alerta === 'login_expirado') {
+    const h = atvHora(est.expirou_em || est.desde);
+    return { nome: nome + ' parado: o login expirou' + (h ? ' às ' + h : ''), acao: '', classe: 'atv-cinza',
+             titulo: est.motivo || '' };
+  }
   if (est.estado === 'sem_sinal') {
     const h = atvHora(est.ultimo_sinal);
     return { nome: nome + ' sem sinal' + (h ? ' desde ' + h : ''), acao: '', classe: 'atv-cinza',
@@ -498,6 +516,9 @@ function atvFrase(est) {
   if (est.alerta === 'permissao') {
     return { nome: nome + ' esperando a sua permissão', acao: est.detalhe ? est.detalhe.split('\n')[0].slice(0, 80) : '',
              classe: 'atv-alerta', titulo: est.detalhe || '' };
+  }
+  if (est.alerta === 'pergunta') {
+    return { nome: nome + ' fez uma pergunta para você', acao: '', classe: 'atv-alerta', titulo: 'O agente abriu uma pergunta de escolha e está parado até ela ser respondida' };
   }
   if (est.alerta === 'ferramenta_longa') {
     return { nome: nome, acao: acaoAmigavel(est.detalhe || est.acao) + ' rodando' + (d ? ' há ' + d : ''), classe: 'atv-alerta',
@@ -671,7 +692,9 @@ function integraAtividade(d) {
   if (telaOciosa()) estadoOcioso();
   else pintaAtividade();
   lcSincroniza();
+  leSincroniza();
   pcSincroniza();
+  pqSincroniza();
   filaSincroniza();
 }
 if (atividadeEl) {
@@ -705,7 +728,7 @@ const LC = window.DGLoginCartao;
 const lcEl = $('loginCartao');
 const lc = { aberto: false, manual: false, iniciado: false, demo: false, dispensado: false, abriuLink: false, vencido: false,
              carregando: false, ocupado: false, dados: null, erro: '', codigo: '', copiado: false,
-             timer: null, conferindo: false, chave: '', fechaTimer: null };
+             timer: null, conferindo: false, chave: '', fechaTimer: null, expirado: false };
 const LOGIN_API = API + '/login';
 
 function lcVisao() {
@@ -881,10 +904,11 @@ function lcFecha(dispensar) {
   clearTimeout(lc.fechaTimer);
   if (dispensar) lc.dispensado = true;
   Object.assign(lc, { aberto: false, manual: false, iniciado: false, demo: false, carregando: false,
-                      ocupado: false, erro: '', codigo: '', copiado: false, abriuLink: false });
+                      ocupado: false, erro: '', codigo: '', copiado: false, abriuLink: false, expirado: false });
   const era = !lcEl.hidden;
   lcDesenha();
   if (era) estadoOcioso();
+  leAoFecharCartao();
 }
 function lcEmAndamento() {
   const e = lc.dados && lc.dados.estado;
@@ -921,10 +945,14 @@ async function lcConfere() {
 function lcConcluiu() {
   if (lc.fechaTimer) return;
   lcPara();
-  // O oi é pedido já: o servidor espera o agente subir (até 60 s) e entrega uma vez só.
-  api(LOGIN_API + '/oi', { method: 'POST', body: {}, timeoutMs: 75000 })
-    .catch(e => mostraAviso('A conta foi conectada, mas não consegui pedir o oi do agente: ' + e.message + '. Escreva um oi na conversa.'));
-  lc.fechaTimer = setTimeout(() => { lc.fechaTimer = null; lcFecha(false); }, 4000);
+  leLoginConcluido();
+  // O oi é pedido já: o servidor espera o agente subir (até 60 s) e entrega uma vez só. Com o login
+  // EXPIRADO não há oi: o runner reinicia a mesma sessão e entrega o recado "login-reconectado".
+  if (!lc.expirado) {
+    api(LOGIN_API + '/oi', { method: 'POST', body: {}, timeoutMs: 75000 })
+      .catch(e => mostraAviso('A conta foi conectada, mas não consegui pedir o oi do agente: ' + e.message + '. Escreva um oi na conversa.'));
+  }
+  lc.fechaTimer = setTimeout(() => { lc.fechaTimer = null; lcFecha(false); }, 1500);
 }
 
 async function lcComeca() {
@@ -980,20 +1008,22 @@ async function lcCopia(texto) {
 }
 
 /* Abre o cartão. `manual`: veio do /login (fica mesmo com a conta conectada). */
-function lcAbre(manual) {
+function lcAbre(manual, semConferir) {
   if (lc.aberto) { if (manual) { lc.manual = true; lc.dispensado = false; } lcDesenha(); return; }
-  Object.assign(lc, { aberto: true, manual: !!manual, iniciado: false, erro: '', codigo: '', carregando: true,
+  Object.assign(lc, { aberto: true, manual: !!manual, iniciado: false, erro: '', codigo: '', carregando: !semConferir,
                       dados: { estado: 'nenhum', provedor: AGENTE.provedor, precisa_login: !manual } });
   lcDesenha();
-  lcConfere();
+  if (!semConferir) lcConfere();
 }
 
 /* Chamado a cada foto de atividade: abre o cartão quando falta conta e o fecha quando a falta some. */
 function lcSincroniza() {
   if (lc.demo) return;
   const est = window.atividadeFoto && window.atividadeFoto.agentes ? window.atividadeFoto.agentes[AGENTE.id] : null;
-  const semLogin = !!est && est.alerta === 'sem_login';
+  const expirado = !!est && est.alerta === 'login_expirado';
+  const semLogin = !!est && (est.alerta === 'sem_login' || expirado);
   if (!semLogin) lc.dispensado = false;
+  if (expirado) lc.expirado = true;
   if (semLogin && !lc.aberto && !lc.dispensado) { lc.vencido = /venceu/.test(est.motivo || ''); lcAbre(false); }
   else if (!semLogin && lc.aberto && !lc.manual && !lc.iniciado) lcFecha(false);
 }
@@ -1006,6 +1036,182 @@ function lcInterceptaLogin(texto) {
 }
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') lcConfere(); });
 
+/* ── Pop-up "Seu login do Claude expirou" ──────────────────────────────────
+   A conta ESTAVA conectada e a credencial morreu (alerta 'login_expirado' da foto de atividade):
+   o agente parou de responder e nada aparecia na conversa. Este <dialog> modal explica o que houve
+   e oferece o caminho: reconectar (o cartão de login, que é levado para dentro do pop-up, em vez
+   de reescrito), reiniciar a sessão (o Reiniciar do menu, com a mesma faixa de acompanhamento) ou
+   "Agora não" (dispensa só ESTE incidente, guardado por agente + instante em sessionStorage; o
+   cartão no fim da conversa continua). Depois do login o runner reinicia a MESMA sessão sozinho: o
+   pop-up só espera o agente voltar. Quando decide e o que diz vem de login-expirado.js (com teste). */
+const LE = window.DGLoginExpirado;
+const leDlg = $('dlgLoginExpirado');
+const le = { aberto: false, fase: 'aviso', est: null, erro: '', timer: null, concluiu: false, origemCartao: null };
+const LE_DISPENSADOS = 'dgclaw-login-expirado-dispensados';
+let reiniciaSessao = null;   // ligado pelo bloco "Reiniciar sessão do agente", mais abaixo
+
+function leEstAtual() {
+  return window.atividadeFoto && window.atividadeFoto.agentes ? window.atividadeFoto.agentes[AGENTE.id] || null : null;
+}
+function leDispensados() {
+  try { return JSON.parse(sessionStorage.getItem(LE_DISPENSADOS) || '{}') || {}; }
+  catch (e) { console.warn('pop-up de login: não consegui ler os incidentes dispensados (' + e.message + '); mostro o pop-up de novo.'); return {}; }
+}
+function leDispensa() {
+  try { sessionStorage.setItem(LE_DISPENSADOS, JSON.stringify(LE.dispensar(leDispensados(), AGENTE.id, le.est || {}))); }
+  catch (e) { console.warn('pop-up de login: não guardei o "Agora não" (' + e.message + '); ele volta se a página recarregar.'); }
+}
+function leTextos() {
+  const est = le.est || leEstAtual() || {};
+  return LE.textos({ nome: AGENTE.nome, provedor: est.provedor || AGENTE.provedor, expirouEm: est.expirou_em, motivo: le.erro });
+}
+
+function leDesenha() {
+  if (!leDlg) return;
+  const t = leTextos(), f = le.fase;
+  $('leTit').textContent = f === 'pronto' ? t.pronto : t.titulo;
+  const txt = $('leTxt');
+  txt.textContent = t.corpo;
+  txt.hidden = f !== 'aviso';
+  $('leCartao').hidden = f !== 'cartao';
+  const estado = $('leEstado');
+  estado.textContent = f === 'reiniciando' ? t.reiniciando : f === 'pronto' ? t.pronto : '';
+  estado.hidden = !estado.textContent;
+  const erro = $('leErro');
+  erro.textContent = f === 'nao_voltou' ? t.naoVoltou : le.erro;
+  erro.hidden = !erro.textContent;
+  const prim = $('lePrimario'), sec = $('leSecundario'), nao = $('leAgoraNao');
+  prim.textContent = t.primario; sec.textContent = t.secundario;
+  prim.hidden = f !== 'aviso';
+  sec.hidden = !(f === 'aviso' || f === 'nao_voltou');
+  nao.hidden = f === 'pronto';
+  nao.textContent = f === 'aviso' || f === 'cartao' ? t.agoraNao : 'Fechar';
+}
+
+function leAbre() {
+  if (!LE || !leDlg || le.aberto) return;
+  le.est = leEstAtual();
+  Object.assign(le, { aberto: true, fase: 'aviso', erro: '', concluiu: false });
+  leDesenha();
+  if (leDlg.showModal) leDlg.showModal(); else leDlg.setAttribute('open', '');
+  try { $('lePrimario').focus({ preventScroll: true }); } catch (e) { console.warn('pop-up de login: não consegui pôr o foco no botão:', e.message); }
+}
+
+function leFecha(dispensar) {
+  if (!le.aberto) return;
+  clearTimeout(le.timer);
+  if (dispensar) leDispensa();
+  leDevolveCartao();
+  le.aberto = false;
+  if (leDlg.close) leDlg.close(); else leDlg.removeAttribute('open');
+}
+
+/* O cartão de login muda de lugar (do fim da conversa para dentro do pop-up) e volta depois. */
+function leLevaCartao() {
+  if (le.origemCartao || !lcEl) return;
+  le.origemCartao = { pai: lcEl.parentNode, depois: lcEl.nextSibling };
+  $('leCartao').appendChild(lcEl);
+}
+function leDevolveCartao() {
+  const o = le.origemCartao;
+  if (!o) return;
+  le.origemCartao = null;
+  o.pai.insertBefore(lcEl, o.depois && o.depois.parentNode === o.pai ? o.depois : null);
+}
+
+async function leReconectar() {
+  le.erro = '';
+  le.fase = 'cartao';
+  le.concluiu = false;
+  leLevaCartao();
+  leDesenha();
+  lc.expirado = true;
+  if (!lc.aberto) lcAbre(false, true);
+  else lcDesenha();
+  await lcComeca();
+}
+
+/* O cartão fechou: ou o login terminou (segue para esperar a volta) ou a pessoa cancelou (volta à pergunta). */
+function leAoFecharCartao() {
+  if (!le.aberto || le.fase !== 'cartao') return;
+  leDevolveCartao();
+  if (le.concluiu) leComecaVolta();
+  else { le.fase = 'aviso'; leDesenha(); try { $('lePrimario').focus({ preventScroll: true }); } catch (e) { /* o botão acabou de ser mostrado */ } }
+}
+function leLoginConcluido() {
+  if (le.aberto && le.fase === 'cartao') le.concluiu = true;
+}
+
+/* Espera o agente voltar a responder. Reaproveita a mesma regra do Reiniciar (avaliaVolta). */
+function leComecaVolta() {
+  clearTimeout(le.timer);
+  le.fase = 'reiniciando'; le.erro = '';
+  leDesenha();
+  const ini = Date.now();
+  const marco = atvAgoraMs() / 1000;
+  let vivas = 0, ultimoAgora = null;
+  const olha = () => {
+    if (!le.aberto || le.fase !== 'reiniciando') return;
+    const v = PURO.avaliaVolta({ marco, ultimoAgora, vivas, foto: window.atividadeFoto, agenteId: AGENTE.id, streamAberto, decorridoMs: Date.now() - ini });
+    vivas = v.vivas; ultimoAgora = v.ultimoAgora;
+    if (v.acao === 'voltou') return lePronto();
+    if (v.acao === 'login_expirado' || v.acao === 'sem_login') return leNaoVoltou(v.motivo || 'A conta continua sem login. Reconecte de novo.');
+    if (v.acao === 'indeterminado') return leNaoVoltou('A tela não consegue confirmar a volta (conversa-puro.js não carregou). Recarregue a página.');
+    if (Date.now() - ini > LE.PRAZO_VOLTA_MS) return leNaoVoltou('');
+    le.timer = setTimeout(olha, 2000);
+  };
+  le.timer = setTimeout(olha, 2000);
+}
+function leNaoVoltou(motivo) {
+  le.fase = 'nao_voltou'; le.erro = motivo;
+  leDesenha();
+  try { $('leSecundario').focus({ preventScroll: true }); } catch (e) { /* botão recém-mostrado */ }
+}
+function lePronto() {
+  le.fase = 'pronto'; le.erro = '';
+  leDesenha();
+  le.timer = setTimeout(() => leFecha(false), LE.FECHA_PRONTO_MS);
+}
+
+function leReiniciar() {
+  if (!reiniciaSessao) {
+    le.erro = 'O botão de reiniciar não carregou nesta página. Recarregue a página ou use o menu da conversa, "Reiniciar a sessão".';
+    leDesenha();
+    return;
+  }
+  leFecha(true);
+  reiniciaSessao();
+}
+
+/* A cada foto de atividade: abre quando o alerta aparece; com o alerta sumido (login feito pelo
+   terminal, ou o runner reiniciou sozinho) passa a esperar o "voltou". */
+function leSincroniza() {
+  if (!LE || !leDlg) return;
+  const est = leEstAtual();
+  if (LE.expirado(est)) le.est = est;
+  const d = LE.decisao({ aberto: le.aberto, fase: le.fase, agenteId: AGENTE.id, est, dispensados: leDispensados() });
+  if (d === 'abrir') leAbre();
+  else if (d === 'aguardar_volta') { leDevolveCartao(); leComecaVolta(); }
+}
+
+/* Mensagem recusada com LOGIN_EXPIRADO: a pessoa acabou de tentar falar, então abre mesmo se dispensou. */
+function leAbreAoRecusar() {
+  if (!LE || !leDlg) { mostraErro('O login da conta expirou, mas o pop-up de reconectar não carregou. Recarregue a página e use o cartão de login.'); return; }
+  const est = leEstAtual();
+  if (le.aberto) return;
+  if (est && LE.expirado(est)) { lc.expirado = true; }
+  leAbre();
+}
+
+if (leDlg && LE) {
+  $('lePrimario').onclick = () => { leReconectar(); };
+  $('leSecundario').onclick = leReiniciar;
+  $('leAgoraNao').onclick = () => leFecha(true);
+  leDlg.addEventListener('cancel', ev => { ev.preventDefault(); leFecha(true); });
+} else {
+  console.warn('pop-up de login expirado: ' + (!LE ? 'login-expirado.js não carregou' : 'falta #dlgLoginExpirado na página') + '. O cartão de login no fim da conversa continua funcionando.');
+}
+
 /* ── Cartão "O agente está esperando a sua permissão" ─────────────────────
    Aparece quando a foto de atividade traz alerta 'permissao' (o runner está em waiting_input).
    Mostra o que o agente quer fazer (o último comando sem resultado no transcript, calculado no
@@ -1013,7 +1219,7 @@ document.addEventListener('visibilitychange', () => { if (document.visibilitySta
    ainda espera. O cartão some sozinho quando o estado sai de waiting_input. */
 const TR = window.DGTrilha;
 const pcEl = $('permCartao');
-const pc = { aberto: false, ocupado: false, decidido: '', erro: '', chave: '' };
+const pc = { aberto: false, ocupado: false, decidido: '', erro: '', chave: '', id: '' };
 
 function pcSincroniza() {
   if (!pcEl || !TR) return;
@@ -1033,6 +1239,8 @@ function pcSincroniza() {
 }
 
 function pcDesenha(pedido, abrindo) {
+  // O id do tool_use que a tela mostra vai junto da decisão: o runner recusa se o pedido de agora for outro.
+  pc.id = (pedido && typeof pedido.id === 'string') ? pedido.id : '';
   const filho = (tag, classe, texto) => {
     const e = document.createElement(tag);
     if (classe) e.className = classe;
@@ -1078,13 +1286,184 @@ async function pcDecide(decisao) {
   pc.ocupado = true; pc.erro = '';
   pcSincroniza();
   try {
-    await api(API + '/permissao', { method: 'POST', body: { decisao }, timeoutMs: 20000 });
+    await api(API + '/permissao', { method: 'POST', body: pc.id ? { decisao, tool_use_id: pc.id } : { decisao }, timeoutMs: 20000 });
     pc.decidido = decisao;
   } catch (e) {
     pc.erro = 'Não consegui enviar a decisão: ' + e.message;
   } finally {
     pc.ocupado = false;
     pcSincroniza();
+  }
+}
+
+/* ── Cartão "O agente fez uma pergunta de escolha" ───────────────────────
+   Aparece quando a foto de atividade traz alerta 'pergunta' (o agente chamou AskUserQuestion e a tela dele espera
+   a resposta). Com `pergunta` na foto desenha as escolhas (única: botões de rádio + "Outra resposta"; múltipla:
+   caixinhas) e manda POST /pergunta com o tool_use_id; o servidor digita as teclas no terminal. Sem `pergunta`
+   (formato que o servidor não conseguiu ler) o cartão só manda a pessoa para o terminal na aba Sessões.
+   As escolhas ficam em `pq` e os eventos mexem no DOM direto: a foto chega a cada poucos segundos e redesenhar
+   apagaria o que a pessoa está digitando. */
+const pqEl = $('perguntaCartao');
+const pq = { aberto: false, ocupado: false, feito: '', erro: '', noTerminal: false, id: '', chave: '', sel: [], texto: [], btnEnvia: null };
+
+function pqReinicia() {
+  Object.assign(pq, { aberto: false, ocupado: false, feito: '', erro: '', id: '', chave: '', sel: [], texto: [], btnEnvia: null });
+  if (pqEl) { pqEl.hidden = true; pqEl.textContent = ''; }
+}
+
+function pqSincroniza() {
+  if (!pqEl) return;
+  const est = window.atividadeFoto && window.atividadeFoto.agentes ? window.atividadeFoto.agentes[AGENTE.id] : null;
+  const pede = !!est && est.alerta === 'pergunta' && streamAberto;
+  if (!pede) { if (pq.aberto) pqReinicia(); return; }
+  const perg = est.pergunta || null;
+  const id = perg ? perg.id : '';
+  if (pq.aberto && pq.id !== id) pqReinicia();   // outra pergunta no lugar da anterior: começa limpo
+  const chave = JSON.stringify([est.desde, id, pq.ocupado, pq.feito, pq.erro, pq.noTerminal]);
+  if (pq.aberto && chave === pq.chave) return;
+  const novo = !pq.aberto;
+  if (novo) {
+    pq.id = id; pq.feito = ''; pq.erro = ''; pq.noTerminal = false;
+    pq.sel = perg ? perg.perguntas.map(q => (q.multipla ? [] : null)) : [];
+    pq.texto = perg ? perg.perguntas.map(() => '') : [];
+  }
+  pq.aberto = true;
+  pq.chave = chave;
+  pqDesenha(perg, novo);
+}
+
+/* Cada pergunta tem uma resposta quando: múltipla com pelo menos uma caixinha; única com opção ou texto. */
+function pqCompleto(perg) {
+  return perg.perguntas.every((q, i) => (q.multipla ? pq.sel[i].length > 0 : (pq.sel[i] != null || pq.texto[i].trim() !== '')));
+}
+
+function pqDesenha(perg, abrindo) {
+  const filho = (tag, classe, texto) => {
+    const e = document.createElement(tag);
+    if (classe) e.className = classe;
+    if (texto != null) e.textContent = texto;
+    return e;
+  };
+  const travado = pq.ocupado || !!pq.feito;
+  pqEl.textContent = '';
+  pqEl.appendChild(filho('strong', 'pc-titulo', AGENTE.nome + ' fez uma pergunta para você'));
+  if (!perg) {
+    pqEl.appendChild(filho('p', 'pc-texto', 'Não consegui ler a pergunta para mostrar as escolhas aqui. Responda pelo terminal do agente, na aba Sessões.'));
+    const sess = $('btnSessoes');
+    if (sess && !sess.hidden && sess.getAttribute('href') && sess.getAttribute('href') !== '#') {
+      const a = filho('a', 'pc-btn pc-nega pq-link', 'Abrir a aba Sessões');
+      a.href = sess.getAttribute('href');
+      pqEl.appendChild(a);
+    }
+    pqEl.hidden = false;
+    pqEl.classList.toggle('entra', !!abrindo);
+    return;
+  }
+  pqEl.appendChild(filho('p', 'pc-texto', 'Ele parou até você responder. Mensagens enviadas pelo chat ficam bloqueadas enquanto isso.'));
+  const atualizaEnvio = () => { if (pq.btnEnvia) pq.btnEnvia.disabled = travado || !pqCompleto(perg); };
+  perg.perguntas.forEach((q, i) => {
+    const caixa = filho('fieldset', 'pq-bloco');
+    caixa.disabled = travado;
+    const leg = filho('legend', 'pq-pergunta');
+    if (q.cabecalho) leg.appendChild(filho('span', 'pq-cabecalho', q.cabecalho));
+    leg.appendChild(document.createTextNode(q.pergunta));
+    caixa.appendChild(leg);
+    const campoTexto = q.multipla ? null : filho('input', 'pq-texto');
+    q.opcoes.forEach((o, k) => {
+      const num = k + 1;
+      const rot = filho('label', 'pq-opcao');
+      const inp = document.createElement('input');
+      inp.type = q.multipla ? 'checkbox' : 'radio';
+      inp.name = 'pq-' + i;
+      inp.checked = q.multipla ? pq.sel[i].includes(num) : pq.sel[i] === num;
+      inp.addEventListener('change', () => {
+        if (q.multipla) {
+          pq.sel[i] = inp.checked ? pq.sel[i].concat(num).sort((a, b) => a - b) : pq.sel[i].filter(x => x !== num);
+        } else {
+          pq.sel[i] = num; pq.texto[i] = ''; campoTexto.value = '';
+        }
+        atualizaEnvio();
+      });
+      rot.appendChild(inp);
+      const txt = filho('span', 'pq-rotulo');
+      txt.appendChild(filho('span', 'pq-nome', o.rotulo));
+      if (o.descricao) txt.appendChild(filho('span', 'pq-desc', o.descricao));
+      rot.appendChild(txt);
+      caixa.appendChild(rot);
+    });
+    if (campoTexto) {
+      campoTexto.type = 'text';
+      campoTexto.maxLength = 2000;
+      campoTexto.placeholder = 'Outra resposta (escreva em uma linha)';
+      campoTexto.setAttribute('aria-label', 'Outra resposta para a pergunta ' + (i + 1));
+      campoTexto.value = pq.texto[i];
+      campoTexto.addEventListener('input', () => {
+        pq.texto[i] = campoTexto.value;
+        if (campoTexto.value.trim()) {
+          pq.sel[i] = null;
+          for (const r of caixa.querySelectorAll('input[type=radio]')) r.checked = false;
+        }
+        atualizaEnvio();
+      });
+      caixa.appendChild(campoTexto);
+    }
+    pqEl.appendChild(caixa);
+  });
+  if (pq.erro) pqEl.appendChild(filho('p', 'pc-erro', pq.erro));
+  if (pq.noTerminal) {
+    const sess = $('btnSessoes');
+    if (sess && !sess.hidden && sess.getAttribute('href') && sess.getAttribute('href') !== '#') {
+      const a = filho('a', 'pc-btn pc-nega pq-link', 'Abrir a aba Sessões');
+      a.href = sess.getAttribute('href');
+      pqEl.appendChild(a);
+    }
+  }
+  const linha = filho('div', 'pc-botoes');
+  const envia = filho('button', 'pc-btn pc-aprova', 'Enviar resposta');
+  envia.type = 'button';
+  envia.addEventListener('click', () => pqEnvia(perg, false));
+  const cancela = filho('button', 'pc-btn pc-nega', 'Cancelar pergunta');
+  cancela.type = 'button';
+  cancela.disabled = travado;
+  cancela.addEventListener('click', () => pqEnvia(perg, true));
+  pq.btnEnvia = envia;
+  linha.appendChild(envia);
+  linha.appendChild(cancela);
+  pqEl.appendChild(linha);
+  atualizaEnvio();
+  const msg = pq.feito === 'cancelada' ? 'Pergunta cancelada. Aguardando o agente continuar…'
+    : pq.feito ? 'Resposta enviada. Aguardando o agente continuar…'
+    : (pq.ocupado ? 'Enviando a sua resposta (leva alguns segundos)…' : '');
+  const vivo = filho('p', 'pc-status', msg);
+  vivo.setAttribute('role', 'status');
+  pqEl.appendChild(vivo);
+  pqEl.hidden = false;
+  pqEl.classList.toggle('entra', !!abrindo);
+}
+
+async function pqEnvia(perg, cancelar) {
+  if (pq.ocupado || pq.feito) return;
+  if (!cancelar && !pqCompleto(perg)) return;
+  const body = cancelar ? { tool_use_id: pq.id, cancelar: true } : {
+    tool_use_id: pq.id,
+    respostas: perg.perguntas.map((q, i) => (q.multipla ? { opcoes: pq.sel[i] }
+      : pq.sel[i] != null ? { opcao: pq.sel[i] } : { texto: pq.texto[i].trim() })),
+  };
+  pq.ocupado = true; pq.erro = ''; pq.noTerminal = false;
+  pqSincroniza();
+  try {
+    // o servidor espera ~350 ms entre as teclas; várias perguntas somam alguns segundos
+    await api(API + '/pergunta', { method: 'POST', body, timeoutMs: 45000 });
+    pq.feito = cancelar ? 'cancelada' : 'respondida';
+  } catch (e) {
+    pq.erro = 'Não consegui ' + (cancelar ? 'cancelar' : 'enviar') + ' a resposta: ' + e.message;
+    // Terminal já mexeu na pergunta: o chat não pode mais responder, só o terminal.
+    pq.noTerminal = e.codigo === 'PERGUNTA_JA_MEXIDA';
+    if (pq.noTerminal && e.dados && e.dados.howToFix) pq.erro += ' ' + e.dados.howToFix;
+  } finally {
+    pq.ocupado = false;
+    pq.chave = '';   // força o redesenho com o resultado
+    pqSincroniza();
   }
 }
 
@@ -1103,12 +1482,13 @@ function filaSincroniza() {
 
 /* O estado de descanso da tela depende do stream: sem ele as mensagens novas
    não chegam sozinhas, e a pessoa precisa ler isso (sem animação nenhuma). */
-const ESTADOS_CONEXAO = ['pronto', 'conectando…', 'reconectando…', 'conferindo agente…', 'agente sem sinal', 'esperando a sua permissão'];
+const ESTADOS_CONEXAO = ['pronto', 'conectando…', 'reconectando…', 'conferindo agente…', 'agente sem sinal', 'esperando a sua permissão', 'esperando a sua resposta'];
 function estadoOcioso() {
   if (!streamAberto) return setEstado(jaConectou ? 'reconectando…' : 'conectando…');
   const est = window.atividadeFoto?.agentes?.[AGENTE.id];
   if (!est) return setEstado('conferindo agente…');
   if (est.alerta === 'permissao') return setEstado('esperando a sua permissão');
+  if (est.alerta === 'pergunta') return setEstado('esperando a sua resposta');
   if (est.estado === 'trabalhando') return setEstado('trabalhando');
   setEstado(est.estado === 'sem_sinal' ? 'agente sem sinal' : 'pronto', est.estado === 'sem_sinal');
 }
@@ -1160,12 +1540,32 @@ function respiroDasFaixas() {
   posicionaSeta();
 }
 const mostraErro = t => faixa(fErro, t);
-const mostraAviso = t => faixa(fAviso, t);
 fErro.querySelector('.x').onclick = () => faixa(fErro, '');
+
+/* Aviso amarelo fechado no ✕ descansa 48 h (a cota de voz voltava toda hora). Passou o prazo
+   e o problema continua, ele volta. Sem localStorage, o aviso só deixa de ser silenciado.
+   Não confundir com fechaAviso, que é outra coisa. */
+const CHAVE_DESCANSO = 'dgclaw:avisos-fechados';
+function avisosFechados() {
+  try { return JSON.parse(localStorage.getItem(CHAVE_DESCANSO) || '{}') || {}; }
+  catch (e) { return {}; }
+}
+function fechaFaixaAviso() {
+  const t = fAviso.querySelector('.txt').textContent;
+  if (t) {
+    try { localStorage.setItem(CHAVE_DESCANSO, JSON.stringify(PURO.registraFechamento(avisosFechados(), t, Date.now()))); }
+    catch (e) { console.warn('aviso: não consegui guardar o fechamento (' + e.message + ')'); }
+  }
+  faixa(fAviso, '');
+}
+const mostraAviso = t => {
+  if (t && PURO.avisoDescansando(avisosFechados(), t, Date.now())) return;
+  faixa(fAviso, t);
+};
 fAviso.querySelector('.x').onclick = () => {
   // fechar o aviso de conversa pesada vale como "Agora não" (senão ele volta na próxima resposta)
   if (fAviso.classList.contains('leve')) { const b = Array.from(fAviso.querySelectorAll('.acoes button')).pop(); if (b) { b.click(); return; } }
-  faixa(fAviso, '');
+  fechaFaixaAviso();
 };
 
 /* Avisos que vêm da thread (ex.: "Nenhum transcript...") valem enquanto o
@@ -1654,6 +2054,14 @@ async function preencheTarefas() {
     wrap.querySelectorAll('.tf-cartao[data-tarefa="' + n + '"]').forEach(el => { el.innerHTML = htmlTarefaCartao(n); });
   }
 }
+/* Aviso do cofre ("[cofre] NOME guardada (final 1a2b)."): a mensagem que o campo de senha manda ao
+   agente depois de guardar. Na tela vira a etiqueta "do cofre" e o texto sem o prefixo; nunca
+   leva o valor da chave, só o nome e o final. */
+function separaDoCofre(txt) {
+  const r = /^\[cofre\] ([\s\S]*)$/.exec(String(txt || ''));
+  return r ? { texto: r[1] } : null;
+}
+
 function htmlCorpo(m) {
   let midia = '';
   if (m.local && m.local.anexos) {
@@ -1664,9 +2072,17 @@ function htmlCorpo(m) {
     // veio marcado como mídia e o arquivo não chegou até aqui: o rótulo explica o que era
     midia = `<span class="midia">${ROTULO_MIDIA[m.kind]} (não baixada)</span>`;
   }
-  const cita = m.cita ? `<div class="cita"${m.cita.id ? ` role="button" tabindex="0" data-ir-msg="${esc(m.cita.id)}" title="Ir até a mensagem citada"` : ''}><b>${ehDono({ origin: m.cita.origin }) ? 'Você' :
-      esc(AGENTE.nome)}</b>${esc(m.cita.texto)}</div>` : '';
+  // a marca de áudio transcrito é para o agente: na tela vira um microfone discreto junto da hora
+  const citaDono = !!m.cita && ehDono({ origin: m.cita.origin });
+  const cita = m.cita ? `<div class="cita"${m.cita.id ? ` role="button" tabindex="0" data-ir-msg="${esc(m.cita.id)}" title="Ir até a mensagem citada"` : ''}><b>${citaDono ? 'Você' :
+      esc(AGENTE.nome)}</b>${esc(citaDono ? PURO.separaAudio(m.cita.texto).texto : m.cita.texto)}</div>` : '';
   let leg = legendaUtil(m);
+  let viaAudio = false;
+  if (leg && ehDono(m)) {
+    const sa = PURO.separaAudio(leg);
+    viaAudio = sa.audio;
+    leg = sa.texto;
+  }
   // tarefa da Mesa citada (19/10/2026, ideia 4): a linha "📋 Tarefa #N da Mesa: ..." vira cartão, e todo
   // link /mesa#tN do texto ganha o cartão embaixo
   const tarefas = [];
@@ -1681,6 +2097,11 @@ function htmlCorpo(m) {
     leg = dv.texto;
     doVisual = `<div class="dovisual">${ICO_VISUAL} do visual${dv.titulo ? ': ' + esc(dv.titulo) : ''}</div>`;
   }
+  const dc = !dv && ehDono(m) ? separaDoCofre(leg) : null;
+  if (dc) {
+    leg = dc.texto;
+    doVisual = `<div class="dovisual">🔑 do cofre</div>`;
+  }
   // [ver a criação] só vira botão em mensagem de quem não é o dono (o texto já sai escapado de paragrafos)
   let htmlLeg = leg ? paragrafos(leg, m.fmt) : '';
   if (htmlLeg && !ehDono(m) && window.DGOnboarding && window.DGOnboarding.marcadorParaBotao) htmlLeg = window.DGOnboarding.marcadorParaBotao(htmlLeg);
@@ -1689,7 +2110,8 @@ function htmlCorpo(m) {
     ? `<span class="reac">${m.reacoes.map(esc).join(' ')}</span>` : '';
   // a hora das mensagens já entregues fica fora do balão (htmlHora); a do pendente segue dentro
   const meta = m.pendente ? metaPendente(m.local) : '';
-  return htmlSelo(m) + cita + midia + cartoesTarefa + corpo + reac + meta;
+  const viaAudioHtml = viaAudio ? '<span class="via-audio" title="Falado e transcrito automaticamente"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span>' : '';
+  return htmlSelo(m) + cita + midia + cartoesTarefa + corpo + reac + viaAudioHtml + meta;
 }
 
 /* Trilha de comandos: o que a pessoa abriu (resumo ou passo) continua aberto quando a lista cresce
@@ -1897,8 +2319,9 @@ wrap.addEventListener('click', async ev => {
       mostraAviso('Não consegui copiar: ' + e.message);
     }
   } else if (b.dataset.ac === 'ouvir') {
+    // a mesma leitura em pedaços do fone: toca esta resposta e segue pelas seguintes
     destravarAudio();
-    falar(texto);
+    ouvirAPartirDe({ id: m.id, texto });
   }
 });
 
@@ -2091,7 +2514,7 @@ function render(opt) {
   // mesma lista de nós na mesma ordem: não encosta no DOM
   const atuais = wrap.children;
   const igual = atuais.length === nos.length && nos.every((el, i) => atuais[i] === el);
-  if (igual) return;
+  if (igual) { pintaFilaLeitura(); return; }
   // Mensagens antigas entrando no topo, mensagem nova no fim, balão refeito: a posição
   // fica por conta do observador de rolagem (no fim acompanha, lendo mais acima não mexe).
   aplicaNos(nos);
@@ -2104,6 +2527,7 @@ function render(opt) {
   respiroDasFaixas();
   guardaCache();
   atualizaSeta();
+  pintaFilaLeitura();   // os balões foram refeitos: o selo da fila volta
 }
 
 /* Põe a lista de nós no #wrap mexendo só no que mudou. O replaceChildren
@@ -2329,8 +2753,95 @@ function fechaBarra(lim) {
   b.el.remove();
   lim.barra = null;
 }
+/* ── Caixa de cofre da peça .dv-cofre (campo-cofre.js) ──────────────────
+   O iframe só PEDE (postMessage 'cofre'). O cartão com o campo de senha é do app, desenhado abaixo do
+   visual (ou na tela cheia) fora do iframe: o valor nunca passa por ele. Uma caixa por visual. */
+const visCofres = new Map();        // id da mídia -> { est, el, relogio }
+const VIS_COFRE_FECHA_MS = 4000;
+
+function alvoDoVisual(est) {
+  return est.win && visuais.get(est.win) === est ? est
+    : Array.from(visEstados).find(e => e.md.id === est.md.id && e.win);
+}
+function recusaCofre(est, id, motivo, msg) {
+  enviaAoVisual(est, { tipo: 'cofre-erro', id, motivo, msg });
+}
+function fechaCofre(mediaId) {
+  const c = visCofres.get(mediaId);
+  if (!c) return;
+  clearTimeout(c.relogio);
+  c.el.remove();
+  visCofres.delete(mediaId);
+}
+function fechaCofreDe(est) {
+  const c = est.md && visCofres.get(est.md.id);
+  if (c && c.est === est) fechaCofre(est.md.id);
+}
+
+function tratarCofre(est, d, id) {
+  // O campo-cofre.js do S2 Bot (slug:NOME no Admin, "usar a de outro agente") ainda não tem a porta da lousa:
+  // sem validaPedido/montar, o visual recebe a recusa e o dono usa o bloco ```dgcofre da conversa.
+  const temLousa = window.campoCofre && typeof window.campoCofre.validaPedido === 'function' && typeof window.campoCofre.montar === 'function';
+  const v = temLousa ? window.campoCofre.validaPedido(d) : null;
+  if (!v) return recusaCofre(est, id, 'indisponivel', 'A caixa de cofre dos visuais ainda não está ligada. Peça ao agente o campo de senha na conversa.');
+  if (v.erro) return recusaCofre(est, id, v.erro.motivo, v.erro.msg);
+  if (document.visibilityState !== 'visible' || (!est.cheia && !est.noViewport)) {
+    return recusaCofre(est, id, 'fora', 'O visual não está à vista agora.');
+  }
+  if (visCofres.has(est.md.id)) return recusaCofre(est, id, 'ocupado', 'Já tem uma caixa de cofre aberta neste visual.');
+  const { nome, rotulo, ajuda } = v.ok;
+  const el = document.createElement('div');
+  el.className = 'viscofre' + (est.cheia ? ' viscofre-cheia' : '');
+  const reg = { est, el, relogio: 0 };
+  visCofres.set(est.md.id, reg);
+  if (est.cheia) visTelaEl.appendChild(el); else est.caixa.after(el);
+  window.campoCofre.montar(el, {
+    envName: nome, rotulo, ajuda,
+    aoGuardar: ({ final }) => {
+      const alvo = alvoDoVisual(est);
+      if (alvo) enviaAoVisual(alvo, { tipo: 'cofre-ok', id, nome });  // sem o final: o visual não é confiável
+      reg.relogio = setTimeout(() => fechaCofre(est.md.id), VIS_COFRE_FECHA_MS);
+    },
+    aoErro: ({ motivo, msg }) => { const alvo = alvoDoVisual(est); if (alvo) recusaCofre(alvo, id, motivo, msg); },
+    aoCancelar: () => {
+      fechaCofre(est.md.id);
+      const alvo = alvoDoVisual(est);
+      if (alvo) recusaCofre(alvo, id, 'cancelado', 'Você cancelou.');
+    },
+  });
+  if (!est.cheia) {
+    // rola só o #chat (scrollIntoView poderia mexer na página inteira no iPhone)
+    const r = el.getBoundingClientRect(), c = chat.getBoundingClientRect();
+    if (r.bottom > c.bottom - 8) { chat.scrollTop += r.bottom - c.bottom + 8; rolagem.captura(); }
+  }
+  enviaAoVisual(est, { tipo: 'cofre-espera', id });
+}
+
+/* O visual pergunta, ao carregar, quais nomes já estão guardados. Resposta: só {guardada: bool} por nome,
+   nunca o final da chave (o visual é código não confiável). Só responde com o visual à vista, no máximo
+   1 vez a cada 3 s e até 20 nomes por pedido; o excesso é ignorado, com um único aviso por visual. */
+const visCofreEstado = new Map();   // id da mídia -> { ultimo, avisou }
+function tratarCofreEstado(est, d) {
+  if (!window.campoCofre || typeof window.campoCofre.freioEstado !== 'function') return;
+  if (document.visibilityState !== 'visible' || (!est.cheia && !est.noViewport)) return;
+  const bruto = Array.isArray(d.nomes) ? d.nomes.filter(n => typeof n === 'string') : [];
+  let reg = visCofreEstado.get(est.md.id);
+  if (!reg) { reg = { ultimo: 0, avisou: false }; visCofreEstado.set(est.md.id, reg); }
+  const f = window.campoCofre.freioEstado(reg, Date.now(), bruto.length);
+  if (!f.ok) {
+    if (f.avisar) console.warn('visual ' + est.md.id + ' (' + est.md.nome + '): pedidos de estado do cofre demais ou rápidos demais; ignorando o excesso (máximo 1 a cada 3 s e 20 nomes).');
+    return;
+  }
+  const v = bruto.filter(n => window.campoCofre.validaPedido({ nome: n }).ok);
+  if (!v.length) return;
+  window.campoCofre.estados(v).then(
+    estados => enviaAoVisual(est, { tipo: 'cofre-estado', estados }),
+    e => console.warn('visual ' + est.md.id + ': não consegui consultar o cofre para o visual:', e && e.message));
+}
+
 /* Balão desmontado ou tela cheia fechada: a barrinha some sem mandar nada. */
 function fechaBarraDe(est) {
+  fechaCofreDe(est);
   const lim = est.md && visLimites.get(est.md.id);
   if (lim && lim.barra && lim.barra.est === est) fechaBarra(lim);
 }
@@ -2463,6 +2974,12 @@ window.addEventListener('message', ev => {
     const id = Number(d.id);
     if (!isFinite(id) || id < 0 || Math.floor(id) !== id) return;
     tratarPergunta(est, d, id);
+  } else if (d.tipo === 'cofre') {
+    const id = Number(d.id);
+    if (!isFinite(id) || id < 0 || Math.floor(id) !== id) return;
+    tratarCofre(est, d, id);
+  } else if (d.tipo === 'cofre-estado?') {
+    tratarCofreEstado(est, d);
   } else if (d.tipo === 'erro') {
     est.caixa.classList.add('on');
     const msg = typeof d.msg === 'string' ? d.msg.slice(0, 400) : 'erro sem mensagem';
@@ -2783,7 +3300,7 @@ $('formSair').addEventListener('submit', async ev => {
   try {
     for (const k of Object.keys(localStorage)) if (k.indexOf('dgclaw:') === 0) localStorage.removeItem(k);
   } catch (e) { console.warn('não consegui limpar o aparelho ao sair:', e.message); }
-  await cacheMidias.limpar();
+  if (cacheMidias) await cacheMidias.limpar();
   ev.target.submit();
 });
 
@@ -2821,7 +3338,11 @@ function ligaStream() {
   mudouStream();
   const abriu = () => {
     religaEspera = 3000;
-    if (!streamAberto) { streamAberto = true; jaConectou = true; mudouStream(); }
+    if (!streamAberto) {
+      const religou = jaConectou;
+      streamAberto = true; jaConectou = true; mudouStream();
+      if (religou) { atualizaNaoLidas(); agendaLido(); }
+    }
   };
   /* Cada evento traz JSON; JSON ruim vira aviso no console com o começo do
      texto, nunca erro mudo. */
@@ -3825,6 +4346,7 @@ window.addEventListener('blur', () => soltaMostra(false));
 
 /* ── Menu lateral (gaveta do ☰) ───────────────────────────────────────────── */
 function abreMenu(abrir) {
+  if (abrir) atualizaNaoLidas();
   menu.classList.toggle('abre', abrir);
   overlayMenu.classList.toggle('abre', abrir);
 }
@@ -3839,7 +4361,163 @@ document.addEventListener('keydown', ev => {
 
 /* Foto, seletor de agentes, páginas do painel e Configurações: tudo no menu-lado.js.
    A lista já veio do boot, então não é buscada de novo. */
-window.DGMenuLado.inicia({ agente: AGENTE, agentes: agentesMenu, fecha: () => abreMenu(false) });
+window.DGMenuLado.inicia({ agente: AGENTE, agentes: agentesMenu, fecha: () => abreMenu(false), marcarNaoLida: (slug, ligar) => marcaNaoLida(slug, ligar) });
+
+/* ── Bolinha de não lidas ────────────────────────────────────────────────────
+   Quem guarda o "visto" é o servidor (por usuário e por agente), então o celular e o computador
+   concordam. Aqui a tela só pede a contagem, pinta e avisa até onde esta conversa foi vista. */
+/* Desde o selo de atenção, a contagem vem de GET /api/v1/estados, que traz por agente também o estado
+   (trabalhando / precisa_de_voce / terminou / ocioso / sem_sinal), o resumo e a marca "não lida". */
+let naoLidas = {};              // slug -> { estado, resumo, nao_lidas, mais, marcada_nao_lida, visto_ep, ultima_ep, marco_novo, erro }
+let naoLidasEmVoo = null;
+function textoBolinha(n) { return n && (n.mais || n.nao_lidas > 99) ? '99+' : String(n.nao_lidas); }
+/* Marca (ligar=true) ou desmarca a conversa de um agente como não lida. O servidor guarda por usuário;
+   a tela repinta com o estado que ele devolver na contagem seguinte. */
+function marcaNaoLida(slug, ligar) {
+  return api('/api/v1/agents/' + encodeURIComponent(slug) + '/nao-lido', ligar ? { method: 'POST', body: {}, timeoutMs: 15000 } : { method: 'DELETE', timeoutMs: 15000 })
+    .then(() => atualizaNaoLidas());
+}
+/* No cabeçalho da conversa aberta: marca e leva a pessoa para fora (abre o menu), porque ficar nesta tela
+   a faria "ler" de novo e o objetivo é voltar a isto depois. A marca só sai quando ela abrir a conversa. */
+const btnNaoLida = $('btnNaoLida');
+if (btnNaoLida) btnNaoLida.onclick = () => {
+  btnNaoLida.disabled = true;
+  marcaNaoLida(AGENTE.id, true)
+    .then(() => { abreMenu(true); })
+    .catch(e => mostraErro('Não consegui marcar a conversa como não lida: ' + e.message))
+    .finally(() => { btnNaoLida.disabled = false; });
+};
+function atualizaNaoLidas() {
+  if (naoLidasEmVoo) return naoLidasEmVoo;
+  naoLidasEmVoo = api('/api/v1/estados', { timeoutMs: 15000 }).then(d => {
+    if (!d || typeof d.agentes !== 'object' || !d.agentes) throw new Error('a resposta não trouxe o campo "agentes"');
+    const novo = {};
+    for (const slug of Object.keys(d.agentes)) {
+      const n = d.agentes[slug];
+      // falha pontual de um agente (nao_lidas null) não apaga a contagem que já tínhamos dele,
+      // mas o estado novo (trabalhando, precisa de você, sem sinal) vale sempre
+      novo[slug] = (n && typeof n.nao_lidas !== 'number' && naoLidas[slug])
+        ? Object.assign({}, naoLidas[slug], { estado: n.estado, motivo: n.motivo, resumo: n.resumo, marcada_nao_lida: n.marcada_nao_lida })
+        : n;
+    }
+    naoLidas = novo;
+    window.DGMenuLado.defineNaoLidas(naoLidas);
+    pintaTrocaBaixo();
+    pintaBolinhaMenu();
+  }).catch(e => {
+    console.warn('não consegui atualizar o estado dos agentes e as não lidas (mantive o que a tela já tinha):', e.message);
+  }).finally(() => { naoLidasEmVoo = null; });
+  return naoLidasEmVoo;
+}
+
+/* Bolinha no ☰ com a soma dos outros agentes: no computador a fileira de avatares não aparece. */
+function pintaBolinhaMenu() {
+  const btn = $('btnMenu');
+  if (!btn) return;
+  const total = window.DGMenuLado.totalNaoLidas(agentesMenu, naoLidas, AGENTE.id);
+  let b = btn.querySelector('.bolinha-menu');
+  const precisam = window.DGMenuLado.totalPrecisam(agentesMenu, naoLidas, AGENTE.id);
+  /* Quem precisa de você ganha o selo âmbar com "!" (vale mais que a bolinha vermelha de não lidas). */
+  btn.classList.toggle('precisa', precisam > 0);
+  let partes = [];
+  if (precisam) partes.push(precisam + (precisam === 1 ? ' agente precisa de você' : ' agentes precisam de você'));
+  if (total) partes.push(total + (total === 1 ? ' mensagem não lida' : ' mensagens não lidas') + ' em outros agentes');
+  if (!total && !precisam) { if (b) b.remove(); btn.setAttribute('aria-label', 'Abrir o menu'); return; }
+  if (!b) { b = document.createElement('span'); b.className = 'bolinha-menu'; b.setAttribute('aria-hidden', 'true'); btn.appendChild(b); }
+  b.textContent = precisam ? '!' : '';
+  btn.setAttribute('aria-label', 'Abrir o menu, ' + partes.join(', '));
+}
+
+let epLidoEnviado = 0, lidoTimer = null;
+/* Só conta como lida a conversa que a pessoa está vendo no fim: rolar lá em cima relendo o passado
+   não pode marcar como lidas as respostas novas que ainda estão abaixo. */
+const pertoDoFim = () => distanciaDoFim() < 160;
+function agendaLido() {
+  if (document.visibilityState !== 'visible' || !msgs.length || !pertoDoFim()) return;
+  const ep = maiorEp();
+  if (!(ep > epLidoEnviado)) return;
+  clearTimeout(lidoTimer);
+  lidoTimer = setTimeout(() => {
+    lidoTimer = null;
+    if (document.visibilityState !== 'visible' || !pertoDoFim()) return;
+    const alvo = maiorEp();
+    if (!(alvo > epLidoEnviado)) return;
+    api(API + '/lido', { method: 'POST', body: { ep: alvo }, timeoutMs: 15000 })
+      .then(() => { epLidoEnviado = Math.max(epLidoEnviado, alvo); })
+      .catch(e => console.warn('não consegui avisar o servidor que a conversa foi lida (tento de novo na próxima mensagem):', e.message));
+  }, 1000);
+}
+/* "Abri a conversa": só isto limpa a marca "não lida" (o lido automático da rolagem não limpa, senão desfaria
+   a marca na hora). Uma vez por carregamento da página, quando ela está visível. */
+let abriuAvisado = false;
+function avisaAbriu() {
+  if (abriuAvisado || document.visibilityState !== 'visible') return;
+  abriuAvisado = true;
+  api(API + '/lido', { method: 'POST', body: { abriu: true }, timeoutMs: 15000 })
+    .catch(e => { abriuAvisado = false; console.warn('não consegui avisar o servidor que abri a conversa (a marca de não lida pode continuar):', e.message); });
+}
+/* "Estou vendo": a cada 20 s com a aba visível. O servidor deixa de mandar aviso no celular de uma conversa
+   que a pessoa está olhando agora. */
+function avisaVendo() {
+  if (document.visibilityState !== 'visible') return;
+  api(API + '/vendo', { method: 'POST', body: {}, timeoutMs: 10000 })
+    .catch(e => console.warn('não consegui avisar que estou vendo esta conversa (o celular pode avisar à toa):', e.message));
+}
+avisaAbriu(); avisaVendo();
+setInterval(avisaVendo, 20000);
+ouvintesChegada.push(agendaLido);
+// voltar a rolar até o fim reavalia (o debounce de agendaLido junta a rolagem toda)
+chat.addEventListener('scroll', agendaLido, { passive: true });
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  avisaAbriu(); avisaVendo();
+  agendaLido();
+  atualizaNaoLidas();
+});
+// quem fica parado nesta conversa também vê chegar mensagem e mudança de estado em outro agente:
+// a cada 10 s com a aba visível, a cada 60 s escondida
+let ultimoEstados = 0;
+setInterval(() => {
+  const agora = Date.now();
+  if (document.visibilityState !== 'visible' && agora - ultimoEstados < 60000) return;
+  ultimoEstados = agora;
+  atualizaNaoLidas();
+}, 10000);
+atualizaNaoLidas();
+
+/* Celular: a mesma lista do menu vira uma fileira de avatares embaixo, com a agente atual
+   destacada. O link é o mesmo do menu (/a/<id>). Com uma agente só, a fileira fica vazia e o CSS a esconde. */
+function pintaTrocaBaixo() {
+  const baixo = $('trocaBaixo');
+  if (!baixo) return;
+  document.body.classList.toggle('com-troca', agentesMenu.length >= 2);
+  if (agentesMenu.length < 2) { baixo.innerHTML = ''; return; }
+  baixo.innerHTML = agentesMenu.map(a => {
+    const atual = a.id === AGENTE.id;
+    const foto = a.avatar_img || (/^https:\/\//i.test(a.avatar || '') ? a.avatar : '');
+    const av = foto ? `<img src="${esc(foto)}" alt="">` : esc(a.avatar || (a.nome || '?').slice(0, 1));
+    const rot = a.nome + (a.subtitulo ? ', ' + a.subtitulo : '');
+    const selo = window.DGMenuLado.seloDe(naoLidas[a.id], atual);
+    const aviso = selo ? ', ' + selo.rotulo : '';
+    const marcaSelo = !selo ? ''
+      : selo.tipo === 'precisa' ? '<span class="selo-aten" aria-hidden="true">!</span>'
+      : selo.tipo === 'nao_lido' ? `<span class="bolinha-nl" aria-hidden="true">${textoBolinha(naoLidas[a.id])}</span>`
+      : selo.tipo === 'marcada' ? '<span class="bolinha-nl ponto" aria-hidden="true"></span>'
+      : '<span class="selo-trab" aria-hidden="true"></span>';
+    return `<a href="/a/${encodeURIComponent(a.id)}" title="${esc(rot)}" ` +
+      (atual ? `class="atual" aria-current="page" style="--cor-troca:${esc(a.cor || '#2f9e5e')}" ` : '') +
+      `aria-label="Abrir a conversa com ${esc(rot + aviso)}"><div class="av" style="background:${esc(a.cor || '#2f9e5e')}">${av}</div>` +
+      `${marcaSelo}</a>`;
+  }).join('');
+  centralizaTrocaBaixo();
+}
+// sem scrollIntoView: ele rolaria a página toda
+function centralizaTrocaBaixo() {
+  const baixo = $('trocaBaixo'), atual = baixo && baixo.querySelector('.atual');
+  if (atual && baixo.clientWidth) baixo.scrollLeft = atual.offsetLeft - (baixo.clientWidth - atual.offsetWidth) / 2;
+}
+pintaTrocaBaixo();
+window.addEventListener('resize', centralizaTrocaBaixo);
 // ?texto=... chega do painel (ex.: "editar" numa rotina): o pedido já vem escrito no campo, sem
 // enviar sozinho, e o parâmetro sai da barra para não reaparecer ao recarregar.
 try {
@@ -4035,6 +4713,8 @@ async function comecaGravar() {
   setEstado('pedindo o microfone…');
   let stream;
   pedindoMic = true;
+  // a leitura em curso é pausada (não cancelada) e a fila espera a gravação acabar
+  pausaPelaGravacao();
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   } catch (e) {
@@ -4052,6 +4732,7 @@ async function comecaGravar() {
     return;
   } finally {
     pedindoMic = false;
+    if (!stream) filaRetoma();    // o microfone não abriu: a leitura volta
   }
   const g = { stream: stream, rec: null, pedacos: [], mime: mime, inicio: 0, parado: false,
               erro: null, blob: null, aoParar: null };
@@ -4062,6 +4743,7 @@ async function comecaGravar() {
     soltaMicrofone(g);
     mostraErro('Não consegui iniciar a gravação (' + e.message + ').');
     setEstado('erro no microfone', true);
+    filaRetoma();
     return;
   }
   g.rec = r;
@@ -4111,6 +4793,7 @@ async function comecaGravar() {
     pintaMic();
     mostraErro('Não consegui começar a gravar (' + e.message + ').');
     setEstado('erro no microfone', true);
+    filaRetoma();
   }
 }
 
@@ -4146,6 +4829,7 @@ async function paraEEnvia(direto) {
   const blob = await paraGravacao();
   gravando = false;
   pintaMic();
+  filaRetoma();    // na hora, sem esperar a transcrição
   if (!blob || blob.size < 1024) {
     mostraErro('A gravação saiu vazia (' + (blob ? blob.size : 0) + ' bytes). ' +
                'Toque no microfone, espere aparecer "gravando", fale, e toque de novo.');
@@ -4162,9 +4846,11 @@ async function cancelaGravacao() {
   micAbrindo = false;
   pintaMic();
   estadoOcioso();
+  filaRetoma();
 }
 
 btnMic.onclick = () => {
+  destravarAudio();
   if (transcrevendo) return;
   if (gravando) paraEEnvia(false); else comecaGravar();
 };
@@ -4248,7 +4934,8 @@ async function entregaTranscricao(texto, manda) {
     enviarComAnexos();
     return;
   }
-  await enviarTexto(texto);
+  // envio direto sem revisão: o agente fica sabendo que pode haver erro de transcrição
+  await enviarTexto(PURO.textoDaFala(texto, true));
 }
 
 /* Botões dentro de uma faixa. A faixa() limpa os botões a cada texto novo,
@@ -4376,6 +5063,7 @@ async function mandaTexto(pend, semEsperar) {
   const corpo = pend.anexos ? { text: pend.texto, anexos: pend.anexos.map(a => a.id) }
                             : { text: pend.texto };
   corpo.cliente_id = pend.cid;
+  if (lerRespostas) corpo.voz = true;   // o agente sabe que a resposta vai ser ouvida e responde curto
   try {
     d = await api(API + '/send', { method: 'POST', body: corpo,
                                    timeoutMs: pend.anexos ? 120000 : 75000 });
@@ -4392,7 +5080,35 @@ async function mandaTexto(pend, semEsperar) {
       avisaEntrega(pend, false, motivo);
       return false;
     }
+    if (e.codigo === 'PERGUNTA_PENDENTE') {
+      // O agente espera a resposta de uma pergunta de escolha e a mensagem NÃO foi enviada: o texto volta ao campo
+      // (antes de qualquer coisa que a pessoa já tenha digitado) e o erro diz o que fazer.
+      const quando = pendentes.includes(pend) && pend.tentativa === tentativa;
+      if (quando && !pend.anexos) {
+        descartar(pend);
+        const novo = entrada.value.trim();
+        entrada.value = novo ? pend.texto + '\n' + entrada.value : pend.texto;
+        ajustaCampo();
+      } else if (quando) {
+        marcaFalhou(pend, e.message, 'Não consegui entregar a mensagem: ');
+      }
+      const how = e.dados && e.dados.howToFix ? ' ' + e.dados.howToFix : '';
+      mostraErro(e.message + how);
+      avisaEntrega(pend, false, e.message);
+      return false;
+    }
+    if (e.codigo === 'LOGIN_EXPIRADO' && !pend.anexos) {
+      // O texto não se perde: sai do balão de erro e volta ao campo (se a pessoa já não escreveu outra coisa).
+      if (pendentes.includes(pend) && pend.tentativa === tentativa) {
+        descartar(pend);
+        if (!entrada.value.trim()) { entrada.value = pend.texto; ajustaCampo(); }
+      }
+      leAbreAoRecusar();
+      avisaEntrega(pend, false, e.message);
+      return false;
+    }
     falhouTentativa(pend, tentativa, 'Não consegui entregar a mensagem: ', e.message);
+    if (e.codigo === 'LOGIN_EXPIRADO') leAbreAoRecusar();
     avisaEntrega(pend, false, e.message);
     return false;
   } finally {
@@ -4510,28 +5226,15 @@ async function esperaPeloWait(since, limite) {
 
 /* Resposta = qualquer fala nova do agente depois do envio. */
 const ehResposta = (m, since) => ehAgente(m) && m.ep > since;
+/* Só a conversa normal (origin 'agente') entra na fila de voz automática. A rotina também
+   conta como resposta para a espera, mas só toca em voz se a pessoa apertar o 🎧 do balão. */
+const ehRespostaFalavel = (m, since) => !!m && m.origin === 'agente' && m.ep > since;
 
 /* Depois da pergunta por voz, por 5 minutos, toda resposta nova dele também é
    lida (ele costuma mandar "vou fazer" e, um tempo depois, o resultado). */
 const ESCUTA_MS = 5 * 60000;
 let escuta = null;            // { since, ate }
 const faladas = new Set();
-let filaFala = Promise.resolve();
-
-function falaNovas() {
-  if (!escuta || !lerRespostas || Date.now() > escuta.ate) return;
-  // visual (vis-*.html) é desenho: não tem o que ler em voz alta
-  const novas = msgs.filter(m => ehResposta(m, escuta.since) && !faladas.has(m.id) &&
-                              !ehVisual(m.media));
-  if (!novas.length) return;
-  for (const m of novas) faladas.add(m.id);
-  filaFala = filaFala.then(async () => {
-    if (gravando) return;
-    await falar(novas.map(m => legendaUtil(m) || m.text).join('\n\n'));
-  });
-}
-ouvintesChegada.push(() => { if (!esperando) falaNovas(); });
-
 /* Conversa pesada (22/10/2026, pedido do dono): cada mensagem manda de novo a conversa inteira ao
    modelo. Passou de CONTEXTO_PESADO tokens na última resposta, uma faixa discreta oferece começar
    limpo (/clear); a memória do agente fica. "Agora não" vale para esta resposta: a faixa só volta
@@ -4585,6 +5288,241 @@ function alinhaFaixaLeve() {
 window.addEventListener('resize', alinhaFaixaLeve);
 ouvintesChegada.push(confereContexto);
 
+/* ── Fila de leitura ──────────────────────────────────────────────────────
+   Regra do Danilo (21/10/2026): resposta nova NUNCA derruba a que ele está
+   ouvindo. Ela entra no fim da fila e é lida depois, uma por vez. Com o
+   microfone aberto nada toca; a leitura em curso é pausada e guardada
+   (`retomadaLeitura`), e quando a gravação termina ela continua de onde parou,
+   seguida do resto da fila. O 🎧 de um balão pula pra ele e segue dali.
+   Parada pedida pela pessoa (cancelaFala) descarta tudo, e `corteFala` registra
+   isso para o fim da fila não reabrir o microfone depois de um "parar".
+   Este bloco só decide a ordem. Quem fala de verdade vem de fora, por estas
+   dependências (o teste em test/voz-fila-leitura.test.js injeta versões de mentira):
+     gravando, pedindoMic, gravacao (via microfoneOcupado), esperando, transcrevendo,
+     msgs, continua, pararPedido, mostraAviso, estadoOcioso, comecaGravar,
+     pintaFilaLeitura, posicaoDoPlayer(), pararSomAtual(),
+     tocarMensagemNaFila(item, desde) -> Promise que resolve quando acaba, OU quando
+     pararSomAtual() a interrompe, OU com `false` se o aparelho NÃO tocou o som. */
+const LIMITE_REINICIO = 0.20;   // pausada antes de 20% do 1º pedaço: recomeça do início
+const filaLeitura = [];         // pendentes, em ordem de chegada: { id, texto, desde? }
+let tocandoAgora = null;        // { id, texto, parte, tempo, duracao }
+let retomadaLeitura = null;     // a que a gravação pausou: { id, texto, parte, tempo, duracao }
+let drenoAtivo = false;
+let geracaoFila = 0;            // sobe a cada pausa, parada ou pulo: o dreno antigo se aposenta sozinho
+// Sobe a cada parada pedida pela pessoa. É separado de faloGeracao, que cada mensagem
+// sobe ao começar a tocar.
+let corteFala = 0;
+// O 🎧 não reabre o microfone no fim (ouvir de novo não é a vez da pessoa falar). Uma
+// resposta nova do agente chegando devolve o fluxo normal da conversa contínua.
+let fimSemMic = false;
+/* `filaFala` é a promessa do dreno em curso (ou uma já resolvida, se não há
+   dreno). esperaResposta faz `await filaFala` para só soltar a tela quando a
+   leitura acabou. Com o microfone aberto NÃO há dreno, então a promessa já
+   está resolvida e o await nunca fica pendurado esperando a gravação. */
+let filaFala = Promise.resolve();
+
+const filaTemTrabalho = () => !!(retomadaLeitura || filaLeitura.length);
+const mesmoId = (a, b) => String(a) === String(b);
+
+/* De onde recomeçar a mensagem pausada: do início se mal tinha começado
+   (menos de 20% do primeiro pedaço), senão do pedaço e do segundo em que parou. */
+function decideInicio(r) {
+  const ratio = r.duracao > 0 ? r.tempo / r.duracao : (r.tempo > 0 ? 1 : 0);
+  if ((r.parte || 0) === 0 && ratio < LIMITE_REINICIO) return { parte: 0, tempo: 0 };
+  return { parte: r.parte || 0, tempo: r.tempo || 0 };
+}
+
+function enfileiraFala(item) {
+  if (!item || !item.id || !item.texto) {
+    console.warn('fila de leitura: mensagem sem id ou sem texto, ignorada:', item);
+    return false;
+  }
+  const jaTem = (tocandoAgora && mesmoId(tocandoAgora.id, item.id)) ||
+                (retomadaLeitura && mesmoId(retomadaLeitura.id, item.id)) ||
+                filaLeitura.some(p => mesmoId(p.id, item.id));
+  if (jaTem) return false;
+  filaLeitura.push({ id: item.id, texto: item.texto });
+  fimSemMic = false;
+  pintaFilaLeitura();
+  iniciaDreno();
+  return true;
+}
+
+function iniciaDreno() {
+  if (drenoAtivo || microfoneOcupado() || !filaTemTrabalho()) return;
+  drenoAtivo = true;
+  filaFala = drena(++geracaoFila, corteFala);
+}
+
+async function drena(g, corte) {
+  const minha = () => g === geracaoFila;
+  while (minha() && !microfoneOcupado()) {
+    let item, desde;
+    if (retomadaLeitura) {
+      item = retomadaLeitura;
+      desde = decideInicio(item);
+      retomadaLeitura = null;
+    } else if (filaLeitura.length) {
+      item = filaLeitura.shift();
+      desde = item.desde || { parte: 0, tempo: 0 };
+    } else break;
+    tocandoAgora = { id: item.id, texto: item.texto, parte: desde.parte, tempo: desde.tempo, duracao: 0 };
+    pintaFilaLeitura();
+    let resultado;
+    try {
+      resultado = await tocarMensagemNaFila(tocandoAgora, desde);
+    } catch (e) {
+      console.warn('fila de leitura: a leitura da mensagem ' + item.id + ' falhou:', e);
+      mostraAviso('Não consegui ler uma resposta em voz alta (' + e.message +
+                  '). O texto está na tela. Toque no 🎧 do balão para tentar de novo.');
+    }
+    if (!minha()) return;          // pausaram, pararam ou pularam: o novo dreno cuida do resto
+    if (resultado === false) {
+      // o aparelho não tocou (o aviso com o motivo já saiu): tentar as outras só
+      // gastaria cota de voz à toa. Para a fila inteira; o texto segue na tela.
+      pararTudoFila();
+      estadoOcioso();
+      return;
+    }
+    tocandoAgora = null;
+  }
+  if (!minha()) return;
+  drenoAtivo = false;
+  pintaFilaLeitura();
+  const semMic = fimSemMic;
+  fimSemMic = false;
+  // fim da fila inteira: só agora a conversa contínua reabre o microfone.
+  // Se a pergunta dele ainda está sendo transcrita ou esperando resposta, não
+  // reabre: a leitura da resposta (esperaResposta) é que fecha esse ciclo.
+  if (!microfoneOcupado() && !filaTemTrabalho() && continua && !pararPedido &&
+      corte === corteFala && !semMic && !esperando && !transcrevendo) {
+    mostraAviso('');
+    await comecaGravar();
+  }
+}
+
+/* O microfone vai abrir: o que estava tocando é pausado e guardado. Se não há
+   nada tocando nem dreno em curso, não mexe em nada (nem no estado da tela).
+   `pos` só é passado quando o player não reflete o pedaço atual (ainda não tocou). */
+function pausaPelaGravacao(pos) {
+  if (!tocandoAgora && !drenoAtivo) return;
+  if (tocandoAgora) {
+    // `tocando` só fica true entre o play() e o fim do pedaço: antes disso o player ainda
+    // guarda a posição da mensagem ANTERIOR e usá-la pularia o começo desta
+    pos = pos || (tocandoAgora.tocando ? posicaoDoPlayer() : { tempo: 0, duracao: 0 });
+    retomadaLeitura = { id: tocandoAgora.id, texto: tocandoAgora.texto,
+                        parte: tocandoAgora.parte || 0, tempo: pos.tempo, duracao: pos.duracao };
+    tocandoAgora = null;
+  }
+  geracaoFila++;
+  drenoAtivo = false;
+  pararSomAtual();
+  pintaFilaLeitura();
+}
+
+/* A gravação acabou (enviou, cancelou, saiu vazia, deu erro): retoma na hora,
+   sem esperar a transcrição. */
+function filaRetoma() {
+  iniciaDreno();
+}
+
+/* 🎧: toca esta e depois as que vêm depois dela na conversa. O que estava
+   tocando é descartado (ele pediu). Pendente mais antigo que a escolhida é
+   descartado (ele pulou); mais novo fica. */
+function ouvirAPartirDe(item) {
+  if (microfoneOcupado()) {
+    mostraAviso('Termine a gravação antes de ouvir de novo: o som entraria no áudio que você está gravando.');
+    return false;
+  }
+  const pos = id => msgs.findIndex(x => mesmoId(x.id, id));
+  const alvo = pos(item.id);
+  // posição desconhecida (-1): na dúvida mantém, melhor repetir do que perder
+  const depois = p => alvo < 0 || pos(p.id) < 0 || pos(p.id) > alvo;
+  const mantidos = filaLeitura.filter(p => !mesmoId(p.id, item.id) && depois(p));
+  if (retomadaLeitura && !mesmoId(retomadaLeitura.id, item.id) && depois(retomadaLeitura)) {
+    mantidos.unshift({ id: retomadaLeitura.id, texto: retomadaLeitura.texto,
+                       desde: decideInicio(retomadaLeitura) });
+  }
+  geracaoFila++;
+  drenoAtivo = false;
+  tocandoAgora = null;
+  retomadaLeitura = null;
+  pararSomAtual();
+  filaLeitura.length = 0;
+  filaLeitura.push({ id: item.id, texto: item.texto }, ...mantidos);
+  fimSemMic = true;
+  pintaFilaLeitura();
+  iniciaDreno();
+  return true;
+}
+
+/* Parar de falar, pedido pela pessoa: para a atual E esvazia tudo. */
+function pararTudoFila() {
+  geracaoFila++;
+  drenoAtivo = false;
+  tocandoAgora = null;
+  retomadaLeitura = null;
+  filaLeitura.length = 0;
+  fimSemMic = false;
+  pararSomAtual();
+  pintaFilaLeitura();
+}
+
+/* Retrato do estado, pro selo dos balões e pro teste. */
+function estadoFilaLeitura() {
+  return { tocando: tocandoAgora ? tocandoAgora.id : null,
+           pausada: retomadaLeitura ? retomadaLeitura.id : null,
+           fila: filaLeitura.map(p => p.id) };
+}
+/* ── fim da fila de leitura ── */
+
+/* Selo no balão: "tocando agora", "na fila (n)" ou "continua quando você enviar". */
+function pintaFilaLeitura() {
+  if (typeof wrap === 'undefined' || !wrap.querySelectorAll) return;
+  const e = estadoFilaLeitura();
+  for (const row of wrap.querySelectorAll('.row.fila-tocando, .row.fila-espera, .row.fila-pausada')) {
+    row.classList.remove('fila-tocando', 'fila-espera', 'fila-pausada');
+  }
+  for (const s of wrap.querySelectorAll('.selo-fila')) s.remove();
+  const marca = (id, classe, texto) => {
+    if (id == null) return;
+    const row = wrap.querySelector('.row[data-msg="' + CSS.escape(String(id)) + '"]');
+    const bub = row && row.querySelector('.bub');
+    if (!bub) return;
+    row.classList.add(classe);
+    const s = document.createElement('span');
+    s.className = 'selo-fila';
+    s.textContent = texto;
+    bub.appendChild(s);
+  };
+  marca(e.tocando, 'fila-tocando', '🔊 tocando agora');
+  marca(e.pausada, 'fila-pausada', '⏸ continua quando você enviar');
+  e.fila.forEach((id, i) => marca(id, 'fila-espera', '⏳ na fila (' + (i + 1) + ')'));
+}
+
+function falaNovas() {
+  if (!escuta || !lerRespostas || Date.now() > escuta.ate) return;
+  // visual (vis-*.html) é desenho: não tem o que ler em voz alta. Rotina não entra
+  // sozinha na fila: só toca se a pessoa apertar o 🎧.
+  const novas = msgs.filter(m => ehRespostaFalavel(m, escuta.since) && !faladas.has(m.id) &&
+                              !ehVisual(m.media));
+  if (!novas.length) return;
+  for (const m of novas) {
+    faladas.add(m.id);
+    enfileiraFala({ id: m.id, texto: legendaUtil(m) || m.text });
+  }
+}
+
+ouvintesChegada.push(() => { if (!esperando) falaNovas(); });
+
+/* Pergunta nova: antes de trocar a janela de escuta, enfileira o que já chegou
+   na antiga (inclusive durante a gravação), senão uma resposta que veio entre
+   as duas perguntas ficaria sem ser lida. */
+function armaEscuta(since) {
+  falaNovas();
+  escuta = { since: since, ate: Date.now() + ESCUTA_MS };
+}
+
 async function esperaResposta(since) {
   // Sem "parar de esperar" nem "esperando…" no topo (18/10/2026, pedido do dono): a linha de
   // andamento perto do campo já mostra o agente trabalhando. A espera segue por baixo, só para ler
@@ -4624,12 +5562,11 @@ async function esperaResposta(since) {
     estadoOcioso();   // ainda trabalhando: a linha de andamento já diz isso, sem aviso de demora
     if (lerRespostas) escuta = { since: since, ate: Date.now() + ESCUTA_MS };
   } else if (!respostas.length) {
-    setEstado('sem resposta ainda');
-    mostraAviso('A ' + AGENTE.nome + ' não respondeu em 3 minutos. A mensagem foi ' +
-                'entregue: a resposta aparece aqui sozinha quando ela mandar.');
-    if (lerRespostas) escuta = { since: since, ate: Date.now() + ESCUTA_MS };
+    // sem faixa de propósito: a resposta chega sozinha pelo stream, e a escuta continua
+    estadoOcioso();
+    if (lerRespostas) armaEscuta(since);
   } else if (lerRespostas) {
-    escuta = { since: since, ate: Date.now() + ESCUTA_MS };
+    armaEscuta(since);
     falaNovas();
     await filaFala;
   } else {
@@ -4639,91 +5576,220 @@ async function esperaResposta(since) {
 
 btnParar.onclick = () => {
   pararPedido = true;
-  if (falando) pararFala();
+  escuta = null;                     // parar também encerra a escuta automática
+  cancelaFala();
   btnParar.textContent = 'parando…';
 };
 
 /* ── Falar a resposta ─────────────────────────────────────────────────────── */
+let faloGeracao = 0;      // sobe a cada parada ou fala nova: a leitura antiga morre sozinha
+let faloAbort = null;     // cancela o pedido de voz em voo
+let fimToque = null;      // resolve o pedaço que está tocando (parar não deixa a fila pendurada)
+const vozCache = new Map();   // texto -> { partes, blobs[] }: ouvir de novo sem gerar de novo
+const VOZ_CACHE_MAX = 12;
+
+/* Parada pedida pela pessoa: além de calar o que toca, descarta o que espera na fila. */
+function cancelaFala() {
+  corteFala++;
+  pararFala();
+}
+
+/* Parar de falar, pedido pela pessoa: para a atual e esvazia a fila inteira. */
 function pararFala() {
-  try {
-    player.pause();
-  } catch (e) {
-    console.warn('pararFala: player.pause() falhou:', e.message);
-  }
-  falando = false;
-  btnParar.style.display = 'none';
+  pararTudoFila();
   estadoOcioso();
 }
 
-async function falar(texto) {
-  setEstado('preparando a voz…');
-  let blob;
+/* Só silencia o que está no ar; a fila decide o que fazer depois. Usada ao começar
+   a gravar (a leitura pausa, não é cancelada) e dentro da própria fila. */
+function pararSomAtual() {
+  faloGeracao++;
+  if (faloAbort) { faloAbort.abort(); faloAbort = null; }
   try {
-    const r = await fetch('/api/v1/tts', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agent_id: AGENTE.id, text: texto }),
-    });
-    if (r.status === 401) {
-      location.href = '/login?next=' + encodeURIComponent(AQUI);
-      return;
+    player.pause();
+  } catch (e) {
+    console.warn('pararSomAtual: player.pause() falhou:', e.message);
+  }
+  if (fimToque) fimToque();
+  falando = false;
+  btnParar.style.display = 'none';
+}
+
+/* Onde o player está (para retomar depois de uma pausa). duration é NaN antes do
+   metadata carregar: vira 0, e a regra dos 20% trata 0 como "recomeça". */
+function posicaoDoPlayer() {
+  const d = player.duration;
+  return { tempo: player.currentTime || 0, duracao: Number.isFinite(d) ? d : 0 };
+}
+
+/* Um pedaço da voz. O servidor fatia o texto (parágrafo, frase) e devolve o pedaço `i`,
+   com o total em X-TTS-Partes. Pedaço já gerado fica na memória: o blob é solto junto com
+   o texto mais antigo quando o cache enche, e a URL de cada toque é revogada ao fim dele. */
+async function pegaPedacoVoz(texto, i, sinal) {
+  let c = vozCache.get(texto);
+  if (c && c.blobs[i]) return { blob: c.blobs[i], partes: c.partes };
+  const r = await fetch('/api/v1/tts', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: sinal,
+    body: JSON.stringify({ agent_id: AGENTE.id, text: texto, parte: i }),
+  });
+  if (r.status === 401) {
+    location.href = '/login?next=' + encodeURIComponent(AQUI);
+    throw new Error('sessão expirada');
+  }
+  if (!r.ok) {
+    let motivo = 'a API respondeu ' + r.status;
+    try { const d = await r.json(); if (d && d.erro) motivo = d.erro; }
+    catch (e) { console.warn('tts: a resposta de erro não veio em JSON:', e.message); }
+    throw new Error(motivo);
+  }
+  const partes = parseInt(r.headers.get('X-TTS-Partes') || '1', 10) || 1;
+  const blob = await r.blob();
+  if (!c) {
+    c = { partes, blobs: [] };
+    vozCache.set(texto, c);
+    if (vozCache.size > VOZ_CACHE_MAX) vozCache.delete(vozCache.keys().next().value);
+  }
+  c.blobs[i] = blob;
+  return { blob, partes };
+}
+
+/* Resolve true se o pedaço tocou até o fim (ou foi parado) e false se o aparelho não tocou. */
+function tocaPedaco(blob, inicio) {
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(blob);
+    let pronto = false;
+    const fim = (tocou = true) => {
+      if (pronto) return;
+      pronto = true;
+      fimToque = null;
+      URL.revokeObjectURL(url);
+      resolve(tocou);
+    };
+    fimToque = fim;
+    player.onended = fim;
+    player.onerror = () => {
+      mostraAviso('O iPhone não tocou o áudio da resposta. O texto está na tela.');
+      fim(false);
+    };
+    player.src = url;
+    // o iOS ignora currentTime antes do metadata: posiciona só depois dele
+    if (inicio > 0) {
+      player.addEventListener('loadedmetadata', () => {
+        try {
+          player.currentTime = inicio;
+        } catch (e) {
+          console.warn('retomada: não consegui posicionar o áudio em ' + inicio +
+                       's (' + e.message + '); o pedaço começa do início.');
+        }
+      }, { once: true });
     }
-    if (!r.ok) {
-      let motivo = 'a API respondeu ' + r.status;
-      try { const d = await r.json(); if (d && d.erro) motivo = d.erro; }
-      catch (e) { console.warn('tts: a resposta de erro não veio em JSON:', e.message); }
+    const p = player.play();
+    if (p && p.catch) {
+      p.catch(e => {
+        mostraAviso('O iPhone bloqueou o som (' + e.message + '). Toque no ' +
+                    'microfone uma vez para liberar o áudio e tente de novo.');
+        fim(false);
+      });
+    }
+  });
+}
+
+/* Pedaço já gerado, sem esperar nada: a retomada depois da gravação chama
+   player.play() colada no toque, sem await no caminho (o iPhone exige). */
+function pedacoEmCache(texto, i) {
+  const c = vozCache.get(texto);
+  return c && c.blobs[i] ? { blob: c.blobs[i], partes: c.partes } : null;
+}
+
+/* Microfone abrindo ou gravando: tocar agora faria o alto-falante entrar na gravação, e a fala
+   do agente voltaria a ele como se fosse da pessoa. */
+function microfoneOcupado() {
+  return !!(gravando || pedindoMic || gravacao);
+}
+
+/* Toca UMA mensagem, a partir do pedaço `desde.parte` e do segundo `desde.tempo`, sem
+   interromper ninguém (quem decide a ordem é a fila). Lê a resposta INTEIRA: toca o pedaço
+   inicial assim que chega e já pede o seguinte enquanto ele toca. `item.parte` acompanha o
+   pedaço em curso (a pausa da gravação lê). Resolve false se o aparelho NÃO tocou. */
+async function tocarMensagemNaFila(item, desde) {
+  const texto = item.texto;
+  const minha = ++faloGeracao;
+  const viva = () => minha === faloGeracao;
+  const ctl = new AbortController();
+  faloAbort = ctl;
+  let i = desde.parte || 0;
+  let atual = pedacoEmCache(texto, i);
+  if (!atual) {
+    setEstado('preparando a voz…');
+    try {
+      atual = await pegaPedacoVoz(texto, i, ctl.signal);
+    } catch (e) {
+      if (!viva()) return;
       // a resposta JÁ está na tela: isto é aviso, não é falha do ciclo
-      mostraAviso(motivo);
+      mostraAviso(e.name === 'TypeError' ? 'A resposta está na tela, mas não consegui gerar a voz: ' + e.message : e.message);
       setEstado('resposta só em texto');
       return;
     }
-    if (r.headers.get('X-TTS-Cortado') === '1') {
-      mostraAviso('A resposta é longa: a voz leu os primeiros 1200 caracteres. ' +
-                  'O texto completo está na tela.');
-    }
-    blob = await r.blob();
-  } catch (e) {
-    mostraAviso('A resposta está na tela, mas não consegui gerar a voz: ' + e.message);
-    setEstado('resposta só em texto');
-    return;
+    if (!viva()) return;
   }
 
   falando = true;
   btnParar.style.display = '';
   btnParar.textContent = 'parar de falar';
   setEstado('falando…');
-  const url = URL.createObjectURL(blob);
-  await new Promise(resolve => {
-    let pronto = false;
-    const fim = () => {
-      if (pronto) return;
-      pronto = true;
-      URL.revokeObjectURL(url);
-      resolve();
-    };
-    player.onended = fim;
-    player.onerror = () => {
-      mostraAviso('O iPhone não tocou o áudio da resposta. O texto está na tela.');
-      fim();
-    };
-    player.src = url;
-    const p = player.play();
-    if (p && p.catch) {
-      p.catch(e => {
-        mostraAviso('O iPhone bloqueou o som (' + e.message + '). Toque no ' +
-                    'microfone uma vez para liberar o áudio e tente de novo.');
-        fim();
-      });
+  const total = atual.partes;
+  let inicio = desde.tempo || 0;
+  for (; i < total && viva(); i++) {
+    item.parte = i;
+    // pré-gera o próximo enquanto o atual toca
+    const proximo = i + 1 < total ? pegaPedacoVoz(texto, i + 1, ctl.signal) : null;
+    if (proximo) proximo.catch(() => {});   // o erro é tratado quando a vez dele chega
+    if (microfoneOcupado()) {
+      // o microfone abriu enquanto a voz era gerada: guarda este pedaço para a retomada
+      pausaPelaGravacao({ tempo: inicio, duracao: 0 });
+      return;
     }
-  });
+    // aparelho que não toca não gasta mais cota: avisa a fila, que para e cancela o próximo já pedido
+    item.tocando = true;
+    const tocou = await tocaPedaco(atual.blob, inicio);
+    item.tocando = false;
+    if (!tocou) {
+      if (!viva()) return;
+      pararSomAtual();
+      return false;
+    }
+    inicio = 0;
+    if (!viva() || !proximo) break;
+    try {
+      atual = await proximo;
+    } catch (e) {
+      if (!viva()) return;
+      mostraAviso('A voz parou no pedaço ' + (i + 2) + ' de ' + total + ': ' + e.message +
+                  ' O texto completo está na tela.');
+      break;
+    }
+  }
+  if (!viva()) return;               // pararam ou pausaram: quem fez isso arrumou a tela
+  faloAbort = null;
   falando = false;
   btnParar.style.display = 'none';
-  if (pararPedido) { estadoOcioso(); return; }
   estadoOcioso();
-  if (continua) {
-    mostraAviso('');
-    await comecaGravar();
-  }
 }
+
+/* Fone no balão: pula para esta mensagem e segue dali pelas seguintes. */
+wrap.addEventListener('click', ev => {
+  const bt = ev.target.closest ? ev.target.closest('button[data-fone]') : null;
+  if (!bt) return;
+  const m = msgs.find(x => String(x.id) === bt.getAttribute('data-fone'));
+  const texto = m && legendaUtil(m);
+  if (!texto) {
+    mostraAviso('Não achei o texto desta mensagem para ler de novo. Recarregue a conversa.');
+    return;
+  }
+  destravarAudio();
+  // pula para esta mensagem e segue pelas seguintes; recusa com o microfone aberto
+  ouvirAPartirDe({ id: m.id, texto: texto });
+});
 
 /* ── Modo texto e toggles ─────────────────────────────────────────────────── */
 /* Responder citando (19/10/2026, ideia 2): o botão ↩ das respostas, ou deslizar qualquer mensagem
@@ -5096,6 +6162,7 @@ entrada.addEventListener('keydown', ev => {
 });
 
 function pintaLer() {
+  document.body.classList.toggle('ler-on', lerRespostas);   // mostra os fones dos balões
   btnLer.classList.toggle('on', lerRespostas);
   btnLer.title = lerRespostas ? 'Ler respostas em voz alta: ligado'
                               : 'Ler respostas em voz alta: desligado';
@@ -5104,7 +6171,13 @@ function pintaLer() {
   btnLer.innerHTML = (lerRespostas ? '🔊' : '🔇') +
     ' <span class="lbl">' + (lerRespostas ? 'ler: sim' : 'ler: não') + '</span>';
 }
-btnLer.onclick = () => { destravarAudio(); lerRespostas = !lerRespostas; pintaLer(); };
+btnLer.onclick = () => {
+  destravarAudio();
+  lerRespostas = !lerRespostas;
+  // desligou a leitura: o que ainda esperava na fila não pode falar depois
+  if (!lerRespostas && (falando || tocandoAgora || retomadaLeitura || filaLeitura.length)) pararFala();
+  pintaLer();
+};
 
 function pintaContinua() {
   btnContinua.classList.toggle('on', continua);
@@ -5213,6 +6286,10 @@ function passosTutorial() {
       oque: 'O ➕ serve para mandar fotos, vídeos, áudios e PDFs para o agente, e para começar uma conversa nova.',
       como: 'Toque nele e escolha Anexar arquivo (até 10 por mensagem), ou cole uma imagem direto no campo. Cada arquivo sobe em segundo plano e a mensagem sai quando todos estiverem prontos. Nova conversa pede um segundo toque e guarda a conversa de agora no Histórico.',
       porque: 'Muita coisa é mais fácil de mostrar do que de explicar: um print de erro, um documento, uma foto.' },
+    { alvo: document.querySelector('.dgcofre') ? '.dgcofre' : '#chat', titulo: 'A caixa de cofre',
+      oque: 'Quando ' + nome + ' precisa de uma senha ou chave de um serviço (OpenAI, Hostinger, Groq...), ele mostra aqui um cartão com um campo de senha, em vez de pedir para você colar a chave na conversa.',
+      como: 'Cole a chave no campo e toque em Salvar no cofre. O valor vai direto para o cofre de ' + nome + ' e não entra na conversa nem chega a ele; só o nome e o final da chave são avisados. Salvar reinicia ' + nome + ' para a chave valer, e a conversa continua de onde parou. O olho mostra o que você colou, e o Esc limpa o campo.',
+      porque: 'Tudo o que passa pela conversa fica guardado no histórico. Aqui a chave nunca passa por ele, e você pode trocar a chave quando quiser: o cartão avisa se já existe uma guardada.' },
   ];
   if (caps.microfone) {
     passos.push({ alvo: '#btnMic', titulo: 'O microfone',
@@ -5238,6 +6315,12 @@ function passosTutorial() {
     oque: 'No celular, o botão ☰ abre o menu do agente. No computador ele não aparece, porque o menu já fica fixo à esquerda.',
     como: 'Toque nele quando quiser trocar de agente, abrir uma página do painel ou sair. Toque fora do menu, no ✕ ou na tecla Esc para fechar.',
     porque: 'Mantém a tela da conversa limpa: o que não é conversa fica guardado no menu.' });
+  if ($('trocaBaixo') && $('trocaBaixo').offsetParent !== null) {
+    passos.push({ alvo: '#trocaBaixo', antes: fechaM, titulo: 'A fileira de agentes',
+      oque: 'Um avatar por agente, logo abaixo da barra de escrever. A conversa em que você está fica com um anel na cor dela.',
+      como: 'Toque no avatar de outro agente para abrir a conversa com ele. Arraste para o lado se não couberem todos. Ela some enquanto o teclado está aberto.',
+      porque: 'Trocar de agente com o polegar, sem abrir o menu ☰.' });
+  }
   if (!EH_ADMIN) {
     passos.push({ alvo: '#mlPainel', antes: abreM, titulo: 'As páginas do painel de ' + nome,
       oque: 'Status, Memória, Operações, Custos e as outras páginas que mostram como ' + nome + ' está, o que ele guarda e quanto gasta.',
@@ -5250,6 +6333,12 @@ function passosTutorial() {
       como: 'No Android e no computador, com Chrome ou Edge, o toque abre o pedido de instalação do navegador. No iPhone e no iPad, o item mostra o caminho: Compartilhar e depois Adicionar à Tela de Início. O item some sozinho quando o app já está instalado.',
       porque: 'O app instalado abre sem a barra do navegador e fica a um toque, como qualquer outro aplicativo.' });
   }
+  if ($('mlSessao') && !$('mlSessao').hidden) {
+    passos.push({ alvo: '#mlSessao', antes: abreM, titulo: 'Reiniciar a sessão',
+      oque: 'O botão que reinicia o processo de ' + nome + ' quando ele trava, sem você abrir terminal.',
+      como: 'Pede a sua confirmação, reinicia e mostra uma faixa no topo até ele voltar. A conversa continua de onde estava, porque o agente retoma a mesma sessão.',
+      porque: 'Quando o agente para de responder, reiniciar costuma resolver, e aqui é um toque.' });
+  }
   passos.push({ alvo: '#loginCartao', titulo: 'Conectar a sua conta',
     antes: () => {
       if (lc.aberto) return;
@@ -5259,8 +6348,8 @@ function passosTutorial() {
     },
     depois: () => { if (lc.demo) lcFecha(false); },
     oque: 'Um cartão que aparece no fim da conversa quando ' + nome + ' ainda não tem a sua conta do Claude ou do Codex conectada. O que você vê agora é só um exemplo.',
-    como: 'Toque em Conectar, abra a página de login, entre com a sua conta e, no Claude, cole aqui o código que ela mostrar no fim. A tela confere sozinha e avisa quando terminar. Para abrir o cartão a qualquer hora, escreva /login no campo de mensagem e envie: nada vai para o agente.',
-    porque: 'Sem conta conectada o agente não consegue responder. Assim você resolve aqui mesmo, sem abrir terminal.' });
+    como: 'Toque em Conectar, abra a página de login, entre com a sua conta e, no Claude, cole aqui o código que ela mostrar no fim. A tela confere sozinha e avisa quando terminar. Para abrir o cartão a qualquer hora, escreva /login no campo de mensagem e envie: nada vai para o agente. Se a conta JÁ estava conectada e o login expirou, a tela abre na frente um aviso "Seu login do Claude expirou" com os botões Reconectar conta, Reiniciar a sessão e Agora não; depois do login, ' + nome + ' volta sozinho, na mesma conversa.',
+    porque: 'Sem conta conectada o agente não consegue responder. Assim você resolve aqui mesmo, sem abrir terminal, e o que você mandou durante a queda não se perde: o campo guarda o texto e ' + nome + ' responde o que ficou pendente.' });
   if ($('btnSessoes') && !$('btnSessoes').hidden) {
     passos.push({ alvo: '#btnSessoes', titulo: 'O botão Sessões',
       oque: 'Um atalho para as sessões de trabalho de ' + nome + ': os cards que andam em paralelo com esta conversa. Uma bolinha vermelha avisa quando alguma espera uma decisão sua.',
@@ -5277,6 +6366,10 @@ function passosTutorial() {
     oque: 'Um atalho para o Board, onde ficam o seu dia e as tarefas de todos os agentes.',
     como: 'Toque nele e o Board abre na mesma janela. Lá você acompanha o que está pendente e o que já foi feito.',
     porque: 'Você confere o andamento do trabalho sem sair procurando no menu.' });
+  passos.push({ alvo: '#btnNaoLida', titulo: 'Os selos dos agentes e o "não lida"',
+    oque: 'Cada agente do menu e da fileira de avatares ganha um selo: pontinhos verdes quando está trabalhando, bolinha vermelha quando terminou e você ainda não leu, e um "!" laranja quando ele precisa de você (pede permissão, fez uma pergunta ou perdeu o login). Este botão marca a conversa de ' + nome + ' como não lida.',
+    como: 'O selo vem do estado que o runner de cada agente informa, atualizado a cada 10 segundos com a tela aberta. A bolinha conta as respostas depois da última que você viu. Quem pede a sua atenção também pode mandar um aviso ao celular (ligue em "Ativar avisos neste aparelho"). Ao tocar em "não lida", o menu abre e a bolinha fica até você abrir a conversa de novo; nos outros agentes, use o ⋯ ou segure o dedo no nome.',
+    porque: 'Com vários agentes trabalhando, você vê de relance quem espera por você e deixa para depois uma resposta que não quer ler agora, sem perder o fio.' });
   passos.push({ alvo: '#btnLembretes', titulo: 'O botão Lembretes',
     oque: 'Um atalho para a tela de lembretes.',
     como: 'Toque nele e a lista abre na mesma janela. Lá você cria, confirma e apaga lembretes.',
@@ -5320,8 +6413,17 @@ $('gmTutorial').onclick = iniciaTutorial;
 /* Acervo: a lista local aparece antes da revalidação da rede. */
 const acPainel = $('acervoPainel'), acLista = $('acervoLista');
 let acAba = 'midias';
-const cacheMidias = DGMidias.criar({ conta: caps.conta, agente: AGENTE.id, base: API,
-  mudou: aba => { if (aba === acAba) pintaAcervo(); } });
+// O HTML pode vir do cache do app de antes de uma atualização, sem o módulo de mídias: isso
+// nunca pode derrubar a conversa inteira. Sem o módulo, só o acervo avisa para recarregar.
+const cacheMidias = typeof DGMidias !== 'undefined'
+  ? DGMidias.criar({ conta: caps.conta, agente: AGENTE.id, base: API,
+    mudou: aba => { if (aba === acAba) pintaAcervo(); } })
+  : null;
+const ACERVO_SEM_MODULO = 'A página foi atualizada. Recarregue.';
+function dadosAcervo(aba) {
+  return cacheMidias ? cacheMidias.estado(aba)
+    : { itens: [], carregou: true, carregando: false, proximo: null, erro: ACERVO_SEM_MODULO };
+}
 const ICO_AC = (() => {
   const s = (d, t = 16) => `<svg viewBox="0 0 24 24" width="${t}" height="${t}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
   return { link: s('<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>', 18),
@@ -5331,8 +6433,8 @@ const ICO_AC = (() => {
 })();
 function pintaAcervo() {
   if (acPainel.hidden) return;
-  const d = cacheMidias.estado(acAba);
-  $('acervoEstado').textContent = d.erro ? 'Não consegui atualizar: ' + d.erro :
+  const d = dadosAcervo(acAba);
+  $('acervoEstado').textContent = !cacheMidias ? ACERVO_SEM_MODULO : d.erro ? 'Não consegui atualizar: ' + d.erro :
     (!d.carregou ? 'Carregando os itens recentes…' : d.itens.length + (d.itens.length === 1 ? ' item' : ' itens') + (d.carregando ? ' · atualizando…' : '')) +
     (d.avisoCache ? ' · ' + d.avisoCache : '');
   let html = acAba === 'midias' ? '<div class="acgrade">' : '<div class="aclista">';
@@ -5353,17 +6455,17 @@ function pintaAcervo() {
     html += `<div class="acitem">${corpo}<button class="acir" data-origem="${esc(it.msg_id)}" title="Ir para a mensagem" aria-label="Ir para a mensagem">${ir}</button></div>`;
   }
   html += '</div>';
-  if (d.erro) html += '<button class="acmais" data-tentar>Atualizar novamente</button>';
+  if (d.erro && cacheMidias) html += '<button class="acmais" data-tentar>Atualizar novamente</button>';
   if (d.proximo) html += `<button class="acmais" data-mais ${d.carregando ? 'disabled' : ''}>${d.carregando ? 'Carregando…' : 'Carregar anteriores'}</button>`;
-  else if (d.carregou && !d.itens.length) html += '<p>Nada deste tipo na conversa ainda.</p>';
+  else if (cacheMidias && d.carregou && !d.itens.length) html += '<p>Nada deste tipo na conversa ainda.</p>';
   acLista.innerHTML = html;
 }
 function abreAcervo(aba = acAba) {
   acAba = aba; acPainel.hidden = false;
   for (const b of acPainel.querySelectorAll('[data-aba]')) b.setAttribute('aria-selected', String(b.dataset.aba === aba));
-  pintaAcervo(); cacheMidias.abrir(aba);
+  pintaAcervo(); if (cacheMidias) cacheMidias.abrir(aba);
 }
-function fechaAcervo() { acPainel.hidden = true; cacheMidias.fechar(); }
+function fechaAcervo() { acPainel.hidden = true; if (cacheMidias) cacheMidias.fechar(); }
 $('who').addEventListener('click', () => abreAcervo());
 $('who').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abreAcervo(); } });
 $('av').addEventListener('click', () => abreAcervo());
@@ -5371,9 +6473,10 @@ $('acervoFechar').onclick = fechaAcervo;
 document.addEventListener('keydown', e => { if (e.key === 'Escape') fechaAcervo(); });
 acPainel.querySelector('nav').onclick = e => { const b = e.target.closest('[data-aba]'); if (b) { acLista.scrollTop = 0; abreAcervo(b.dataset.aba); } };
 acLista.addEventListener('scroll', () => {
-  if (acLista.scrollHeight - acLista.scrollTop - acLista.clientHeight < 250) cacheMidias.mais(acAba);
+  if (cacheMidias && acLista.scrollHeight - acLista.scrollTop - acLista.clientHeight < 250) cacheMidias.mais(acAba);
 }, { passive: true });
 acLista.onclick = async e => {
+  if (!cacheMidias) return;
   if (e.target.closest('[data-mais]')) return cacheMidias.mais(acAba);
   if (e.target.closest('[data-tentar]')) return cacheMidias.abrir(acAba);
   const md = e.target.closest('[data-midia]'); if (md) return abreLightbox(md.dataset.midia);
@@ -5397,7 +6500,7 @@ function passoAcervo() {
 $('acervoAjuda').onclick = () => window.DGTour.inicia({ passos: [passoAcervo()] });
 document.addEventListener('click', async e => {
   const a = e.target.closest('a[href="/sair"]'); if (!a) return;
-  e.preventDefault(); await cacheMidias.limpar(); location.href = a.href;
+  e.preventDefault(); if (cacheMidias) await cacheMidias.limpar(); location.href = a.href;
 });
 
 /* ── Partida ──────────────────────────────────────────────────────────────── */
@@ -5636,6 +6739,106 @@ async function consultaAlertas() {
 consultaAlertas(); setInterval(consultaAlertas, 10000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) consultaAlertas(); });
 window.addEventListener('resize', posicionaAlertas);
+
+/* ── Reiniciar sessão do agente ─────────────────────────────────────────────
+   O item #gmReiniciar mora no menu (casca.js) e nasce escondido: só a Conversa o mostra.
+   Fluxo: diálogo de confirmação, POST /reiniciar (o runner refaz o processo e retoma a MESMA
+   conversa), faixa no topo e acompanhamento pela foto de atividade que o stream já traz.
+   "De volta" = o agente deixou de estar sem sinal por 2 leituras seguidas. Teto de 150 s. */
+(function () {
+  const faixaR = $('faixaReinicio'), dlg = $('dlgReinicio'), item = $('gmReiniciar');
+  if (!faixaR || !dlg || !item) { console.warn('reinício: faltam elementos na página (faixa, diálogo ou item do menu); o botão não foi ligado.'); return; }
+  const URL_REINICIO = API + '/reiniciar';
+  const txt = faixaR.querySelector('.rtxt'), ico = faixaR.querySelector('.rico');
+  let tempo = null, sumir = null, emCurso = false;
+  item.closest('section').hidden = false;
+
+  function mostra(tipo, texto, acoes) {
+    clearTimeout(sumir);
+    faixaR.className = tipo;
+    faixaR.hidden = false;
+    ico.textContent = tipo === 'ok' ? '✓' : tipo === 'erro' ? '!' : '↻';
+    txt.textContent = texto;
+    faixaR.querySelectorAll('.racoes').forEach(e => e.remove());
+    if (acoes && acoes.length) {
+      const caixa = document.createElement('div');
+      caixa.className = 'racoes';
+      for (const a of acoes) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.textContent = a.rotulo; b.onclick = a.fn;
+        caixa.appendChild(b);
+      }
+      faixaR.appendChild(caixa);
+    }
+  }
+  const esconde = () => { clearTimeout(sumir); clearTimeout(tempo); faixaR.hidden = true; faixaR.className = ''; };
+  const falha = causa => mostra('erro', 'Não consegui reiniciar a sessão de ' + AGENTE.nome + ': ' + causa, [
+    { rotulo: 'Fechar', fn: esconde }, { rotulo: 'Tentar de novo', fn: dispara }]);
+
+  function acompanha(textoInicial) {
+    clearTimeout(tempo);
+    const ini = Date.now();
+    // Só vale retrato do servidor posterior ao pedido: a foto que já estava na tela pode ser antiga
+    // e ainda mostrar o agente "vivo" (ou "sem login") de antes do reinício.
+    const marco = atvAgoraMs() / 1000;
+    let vivas = 0, ultimoAgora = null;
+    mostra('rodando', textoInicial || 'Reiniciando a sessão de ' + AGENTE.nome + '…');
+    const volta = () => {
+      const v = PURO.avaliaVolta({ marco, ultimoAgora, vivas, foto: window.atividadeFoto, agenteId: AGENTE.id, streamAberto, decorridoMs: Date.now() - ini });
+      vivas = v.vivas; ultimoAgora = v.ultimoAgora;
+      if (v.acao === 'indeterminado') {
+        emCurso = false;
+        mostra('ok', 'Pedi o reinício da sessão de ' + AGENTE.nome + ', mas não consigo confirmar quando ele volta (o arquivo conversa-puro.js não carregou). Recarregue a página para conferir.');
+        sumir = setTimeout(esconde, 12000);
+        return;
+      }
+      if (v.acao === 'sem_login' || v.acao === 'login_expirado') {
+        emCurso = false;
+        return falha('o agente voltou, mas está sem a conta do Claude/Codex conectada. ' + (v.motivo || 'Conecte a conta pelo cartão que aparece na conversa.'));
+      }
+      if (v.acao === 'voltou') {
+        emCurso = false;
+        mostra('ok', AGENTE.nome + ' voltou. A conversa continua daqui, de onde estava.');
+        sumir = setTimeout(esconde, 8000);
+        return;
+      }
+      if (Date.now() - ini > 150000) {
+        emCurso = false;
+        return falha('passaram 150 s e o agente não voltou a responder. Peça ao Admin para conferir o serviço dele (dgclaw status).');
+      }
+      tempo = setTimeout(volta, 2000);
+    };
+    tempo = setTimeout(volta, 2000);
+  }
+
+  async function dispara() {
+    if (emCurso) return;
+    emCurso = true;
+    mostra('rodando', 'Reiniciando a sessão de ' + AGENTE.nome + '…');
+    try {
+      await api(URL_REINICIO, { method: 'POST', body: {}, timeoutMs: 40000 });
+    } catch (e) {
+      // 504: o pedido pode ter chegado ao runner. Oferecer "Tentar de novo" já reiniciaria duas vezes,
+      // então a faixa mostra o aviso e passa a acompanhar até o agente responder.
+      if (e.status === 504) return acompanha(e.message);
+      emCurso = false;
+      return falha(e.message);
+    }
+    acompanha();
+  }
+
+  function abreDialogo() {
+    abreMenu(false);
+    if (emCurso) return;
+    if (dlg.showModal) dlg.showModal(); else dlg.setAttribute('open', '');
+    $('dlgReinicioNao').focus();
+  }
+  const fechaDialogo = () => { if (dlg.close) dlg.close(); else dlg.removeAttribute('open'); };
+  $('dlgReinicioNao').onclick = fechaDialogo;
+  $('dlgReinicioSim').onclick = () => { fechaDialogo(); dispara(); };
+  item.onclick = abreDialogo;
+  reiniciaSessao = dispara;   // o pop-up de login expirado usa o mesmo reinício e a mesma faixa
+})();
 
 }   // fim de iniciaTela
 

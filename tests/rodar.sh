@@ -16,6 +16,9 @@
 #  10. mcp              scripts/dgchat-mcp/test-server.mjs: a bancada do servidor MCP do DG Chat
 #  11. novidades        tests/novidades: o gancho do aviso de novidades depois de atualizar
 #  12. monitor         tests/monitor: o dgclaw-monitor (modo monitor) e o dgclaw-card abrir --monitor, com runner falso
+#  13. changelog        tests/changelog: o CHANGELOG fala com a pessoa, sem frase dirigida ao modelo
+#  14. revisao          tests/revisao-adversarial: o scripts/revisao-adversarial.sh num repositorio falso
+#  15. aviso-atualizacao tests/aviso-atualizacao: a checagem de versao nova contra um GitHub e um Admin falsos
 #
 # Nada aqui encosta no sistema de verdade: nao cria container, rede nem unidade.
 #
@@ -117,7 +120,8 @@ testes_shellcheck() {
     (
         cd "$REPO" || exit 1
         arquivos=(install.sh bin/dgclaw lib/*.sh tests/rodar.sh tests/cli/*.sh tests/cli/stubs/*
-                  tests/instalador/*.sh tests/novidades/*.sh tests/monitor/*.sh scripts/cofre-nomes.sh scripts/test-cofre-nomes.sh)
+                  tests/instalador/*.sh tests/novidades/*.sh tests/changelog/*.sh tests/monitor/*.sh tests/aviso-atualizacao/*.sh scripts/cofre-nomes.sh scripts/test-cofre-nomes.sh
+                  scripts/revisao-adversarial.sh tests/revisao-adversarial/*.sh)
         "$sc" -x "${arquivos[@]}"
     )
 }
@@ -142,9 +146,12 @@ parte monitor bash "$REPO/tests/monitor/rodar.sh"
 parte runner testes_runner
 parte cofre testes_cofre
 parte shellcheck testes_shellcheck
+parte revisao bash "$REPO/tests/revisao-adversarial/rodar.sh"
 parte whatsapp node --test "$REPO/canais/whatsapp/test/"
 parte mcp node "$REPO/scripts/dgchat-mcp/test-server.mjs"
 parte novidades bash "$REPO/tests/novidades/rodar.sh"
+parte changelog bash "$REPO/tests/changelog/rodar.sh"
+parte aviso-atualizacao bash "$REPO/tests/aviso-atualizacao/rodar.sh"
 
 printf '\n'
 [ "${#PULADOS[@]}" -eq 0 ] || printf 'Pulado: %s\n' "${PULADOS[@]}"

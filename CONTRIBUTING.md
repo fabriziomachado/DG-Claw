@@ -60,15 +60,40 @@ ficar vermelho, a causa está no log do job que falhou.
 
 ## Padrão de commit
 
-O histórico do projeto segue um padrão simples:
+Os commits seguem o [Conventional Commits](https://www.conventionalcommits.org/pt-br/v1.0.0/),
+escritos em português:
 
-- Mensagem curta, em português, começando em minúscula, dizendo o que mudou.
-- Prefixo com a área quando ajuda a localizar: `runner:`, `painel:`, `agente criar:`, `cofre:`,
-  `docs/SEGURANCA.md:`. Exemplo real: `runner: autenticacao.ts (Bearer do RUNNER_TOKEN_FILE, livres so
-  GET /api/saude e POST /api/agent-hook) e teste`.
+```
+tipo(escopo opcional): descrição curta
+```
+
+- **Tipos:** `feat` (funcionalidade nova), `fix` (correção), `docs` (só documentação),
+  `refactor` (muda o código sem mudar o comportamento), `test` (testes), `ci` (workflows e
+  automação do GitHub), `chore` (manutenção que não cabe nos outros) e `perf` (desempenho).
+- **Escopo** é opcional e diz a área: `runner`, `painel`, `web`, `cli`, `cofre`, `instalador`.
+- **Descrição** no presente ou no imperativo, em português, começando em minúscula, sem ponto
+  final e dizendo o que a mudança faz.
 - Um commit por entrega. Se a mudança tem duas partes que se explicam sozinhas, são dois commits.
 - Quando houver coautoria (por exemplo, trabalho feito com um assistente de IA), a última linha é um
-  `Co-Authored-By: Nome <e-mail>`.
+  `Co-Authored-By: Nome <e-mail>`, depois de uma linha em branco.
+
+Exemplos:
+
+```
+feat(painel): mostra a cobertura de testes na aba Saúde
+fix(runner): recusa token com quebra de linha no meio
+docs: explica como restaurar um backup
+refactor(web): separa a leitura do cofre em função própria
+test(cli): cobre o dgclaw atualizar com a raiz falsa
+ci: fixa as actions pelo SHA do commit
+chore: remove nomes pessoais de comentários
+perf(web): lê a lista de conversas uma vez só
+```
+
+A `main` é protegida: ninguém grava nela direto. Toda mudança entra por pull request, com os checks
+do CI verdes. O merge é do tipo squash, então o **título do pull request vira a mensagem do commit
+na `main`** e precisa seguir o padrão acima. Os commits da sua branch podem ser livres, mas o título
+do PR não.
 
 ## Abrir uma issue
 
@@ -93,6 +118,22 @@ que você não quer expor.
    pull request.
 4. Descreva o que mudou e por quê. Se mexeu em tela do painel, diga como conferir (veja a regra
    abaixo).
+5. Espere a revisão adversarial de segurança (próxima seção). O merge só acontece com ela limpa e
+   com o ok de quem mantém o projeto.
+
+## Revisão adversarial de segurança (obrigatória)
+
+Todo pull request, inclusive os só de documentação, passa por uma revisão adversarial feita pelo
+Codex (o agente de código da OpenAI) antes do merge. Ele lê a mudança procurando como quebrá-la:
+injeção de comando ou de prompt, segredo em argumento, log ou resposta, permissão errada, rota sem
+autenticação, path traversal, execução de coisa baixada, XSS no painel e dado sensível no
+repositório. Cada ponto que ele aponta é corrigido ou recusado com justificativa escrita, e a revisão
+roda de novo até sair limpa. O resultado fica registrado no corpo do PR, na seção "Revisão
+adversarial (Codex)".
+
+Você não precisa ter o Codex: quem mantém roda a revisão e comenta no PR. Se tiver, o roteiro e o
+comando estão em [docs/REVISAO-ADVERSARIAL.md](docs/REVISAO-ADVERSARIAL.md), e rodar antes de abrir o
+PR acelera tudo.
 
 ## Regra do painel: nada nasce mudo
 

@@ -84,16 +84,24 @@ API (todas com sessão; erros sempre `{ok:false, erro:"motivo em português"}`):
 | `GET /api/v1/agents/:id/messages?limit&before&after` | Thread: `{ok, msgs, avisos, mais_antigas, before, limit}`. Padrão: as 60 mais novas. |
 | `GET /api/v1/agents/:id/stream?since` | SSE: `ola`, `msgs {novas, sumidas, avisos}` (id = maior `ep`; respeita `Last-Event-ID`), `atividade`. `: ping` a cada 15 s, fecha em 50 min. |
 | `GET /api/v1/agents/:id/wait?since&timeout` | Reserva do SSE (long-poll de até 28 s). |
-| `POST /api/v1/agents/:id/send` | `{text, anexos?, cliente_id?}`; idempotente por `cliente_id`. |
+| `GET /api/v1/uso`, `GET /api/v1/uso/docs.md` | Uso da assinatura de cada agente (janela de 5 horas e semanal), lido do runner de cada um em paralelo: `{ok, agentes:{<slug>:{uso, motivo?}\|{uso:null, erro}}}`. Janela não medida é `null`, nunca 0; janela com horário passado vem `vencida:true`. Um agente que falha não derruba os outros. Docs em `docs/USO-DA-ASSINATURA.md`. |
+| `GET /api/v1/nao-lidas` | Bolinha de não lidas: `{ok, agentes: {<slug>: {nao_lidas, mais?, visto_ep, ultima_ep, marco_novo?, erro?}}}`. Conta só mensagens do agente (sem avisos de sistema) com `ep` maior que o `visto_ep` guardado no servidor para o usuário da sessão. Teto 99 (com `mais: true`). Agente sem marco ganha um na hora, com `marco_novo: true` e contagem 0. Conversa que não respondeu em 1,5 s vem com `nao_lidas: null` e `erro` (nunca 0) e sem marco. |
+| `POST /api/v1/agents/:id/lido` | `{ep}`: marca a conversa como lida até esse `ep` e devolve `{ok, visto_ep}`. O marco só avança (um `ep` menor não recua). `ep` inválido: 400. Estado em `<dados>/nao-lidas.json` (permissão 600). |
+| `GET /api/v1/estados` | Estado de atenção de cada agente: `{ok, agentes:{<slug>:{estado, motivo, resumo, nao_lidas, marcada_nao_lida, ...}}}`, com `estado` em `trabalhando`, `precisa_de_voce`, `terminou`, `ocioso` ou `sem_sinal`. O `resumo` nunca leva comando nem segredo. O Admin também consulta pela caixa. Docs em `GET /api/v1/estados/docs.md` (fonte: `docs/ESTADO-DOS-AGENTES.md`). |
+| `POST`/`DELETE /api/v1/agents/:id/nao-lido` | Liga/desliga "Marcar como não lida". A marca só sai quando a pessoa abre a conversa (`POST .../lido` com `{ep, abriu:true}`) ou com o `DELETE`; o lido automático da rolagem não limpa. |
+| `POST /api/v1/agents/:id/vendo` | Sinal leve (a cada 20 s, aba visível): quem está olhando a conversa não recebe aviso no celular dela. |
+| `GET`/`POST /api/v1/push/preferencias` | `{precisa_de_voce, terminou}` (padrão ligado): quais avisos dos agentes chegam ao aparelho. Ver `docs/AVISOS-NO-APARELHO.md`. |
+| `POST /api/v1/agents/:id/send` | `{text, anexos?, cliente_id?, voz?}`; idempotente por `cliente_id`. `voz: true` (só o booleano) põe `voz="1"` no envelope: a resposta vai ser ouvida e o agente responde curto, falado, sem tabela nem URL. Ver `docs/CONVERSA.md`. |
 | `POST /api/v1/agents/:id/upload` | Multipart (`file`, `enviar`, `legenda`, `cliente_id`). |
 | `GET`/`POST`/`DELETE /api/v1/agents/:id/login`, `POST .../login/codigo`, `POST .../login/oi` | Login assistido do Claude/Codex pela conversa (repasse ao runner) e o primeiro oi. Docs em `GET /api/v1/login/docs.md` (fonte: `docs/LOGIN-NA-CONVERSA.md`). |
 | `GET /api/v1/media/:id` e `/thumb` | Arquivo registrado, com `Range`. `?baixar=1` força o download. HTML, SVG, XML e JS abertos direto saem com CSP `sandbox` e `nosniff`. |
 | `GET` e `HEAD /api/v1/media/:id/visual?tema=claro` (ou `escuro`) | Documento do visual (`vis-*.html` do agente, com a base `dgvis` na frente), com CSP `sandbox allow-scripts` no cabeçalho. Erro vem como página HTML com o motivo (404, 410, 413, 415, 500). Ver `docs/VISUAIS.md`. |
 | `POST /api/v1/transcribe` | Multipart com `audio`. Resposta `{ok, text}`. |
-| `POST /api/v1/tts` | `{agent_id, text}`; responde o áudio (`audio/mpeg`). `X-TTS-Cortado: 1` quando o texto foi cortado. |
+| `POST /api/v1/tts` | `{agent_id, text, parte?}`; responde o áudio (`audio/mpeg`) de um pedaço do texto (até 40 pedaços; `parte` fora do intervalo dá 400). Cabeçalhos `X-TTS-Partes`, `X-TTS-Parte` e `X-TTS-Chars`. Ver `docs/CONVERSA.md`. |
 | `GET /api/v1/tts/cota` | Uso da cota de voz. |
 | `POST /api/v1/sigilo` | `{textos:[...]}` (até 600). Aponta os trechos sensíveis de cada texto para o modo escondido: `{trechos, avisos, analisados, modelo, so_regex}`. `GET /api/v1/sigilo/estado` diz o modelo ativo; docs em `GET /api/v1/sigilo/docs.md`. Ver `docs/MODO-ESCONDIDO.md`. |
 | `GET /api/v1/eu` | `{ok, usuario}`. |
+| `GET /api/v1/cofre/docs.md` | Como o agente pede uma chave ao dono pela conversa (bloco `dgcofre` ou peça `dv-cofre`), o aviso `[cofre] NOME guardada (final xxxx).` e as garantias. Fonte: `docs/COFRE-NA-CONVERSA.md`. A caixa grava pela rota do cofre do agente (`POST /p/<agente>/api/cofre`). |
 | `GET`/`PUT`/`DELETE /api/v1/foco/:agente`, `POST .../itens`, `PATCH`/`DELETE .../itens/:id`, `GET .../eventos?desde_id`, `GET /api/v1/foco/docs.md` | Modo foco: lista curta por agente que o agente monta e o dono tica na tela; evento `foco` no stream. Docs em `docs/MODO-FOCO.md`. |
 | `GET`/`POST`/`PATCH`/`DELETE /api/v1/tarefas[/:id]` | Mesa de tarefas dos agentes (criar, atualizar, concluir, cancelar). Contrato completo em `docs/MESA.md` (também em `GET /api/v1/tarefas/docs.md`). |
 | `ANY /p/<slug>/*` | Proxy do painel do agente. |
@@ -108,7 +116,7 @@ API (todas com sessão; erros sempre `{ok:false, erro:"motivo em português"}`):
 
 **Envio:** o texto vira `<dgchat from="pessoa" chat="<chat_id>" msg="<id>" ts="<iso>">texto</dgchat>` (com `</dgchat>` escapado no corpo) e segue para `POST <runner>/api/agents/<agente_id>/input` com `{text, submit:true, injectWhenIdle:true}`. No Admin, texto que começa com `/` (`/compact`, `/clear`) vai cru, sem envelope. Anexos entram no texto como linhas `[anexo: <caminho visto de dentro>]`.
 
-**Atividade:** `GET <runner>/api/agents/<agente_id>` (cache de 2 s). `working` vira `trabalhando` (ação = ferramenta atual ou `pensando`), `waiting_input` vira `alerta:"permissao"`, `idle` vira `ocioso`, e runner fora do ar (ou status desconhecido) vira `sem_sinal` com o motivo.
+**Atividade:** `GET <runner>/api/agents/<agente_id>` (cache de 2 s). `working` vira `trabalhando` (ação = ferramenta atual ou `pensando`), `waiting_input` vira `alerta:"permissao"` (ou `alerta:"pergunta"` quando o runner informa `motivo: "pergunta"`, a pergunta de escolha do Claude), `idle` vira `ocioso`, e runner fora do ar (ou status desconhecido) vira `sem_sinal` com o motivo.
 
 **Rótulo do provedor:** `rotulo_provedor` vem de `GET <runner>/api/provedor` (campo `rotulo`), com cache de 60 s por agente e espera máxima de 1,5 s. Se a rota não existir, falhar ou demorar, vale a reserva montada do registro (`provedor, modelo`), com uma linha de log dizendo o motivo.
 
@@ -119,7 +127,7 @@ Na v1 o painel roda dentro do container e não pode guardar chave (o agente a le
 | Rota | Faz |
 |---|---|
 | `GET /p/<slug>/api/cofre` | Estado: chaves (só os 4 últimos caracteres), provedores, onde fica a chave. |
-| `POST` ou `PUT /p/<slug>/api/cofre` | `{envName, valor, provedor, aplicar}`. Guarda; com `aplicar:true` também reinicia. Se o reinício falhar, a chave continua guardada e a resposta traz `guardado` e `aplicado:{ok:false}`. |
+| `POST` ou `PUT /p/<slug>/api/cofre` | `{envName, valor, provedor, aplicar}`. Guarda; com `aplicar:true` também reinicia; com `avisar:true` (só a caixa da conversa manda) o servidor também entrega ao agente, em segundo plano, `[cofre] NOME guardada (final xxxx).` e a resposta traz `aviso` e `aviso_agendado:true`. Se o reinício falhar, a chave continua guardada e a resposta traz `guardado` e `aplicado:{ok:false}`. |
 | `DELETE /p/<slug>/api/cofre?envName=X` | Revoga (tira do cofre e data o registro). |
 | `POST /p/<slug>/api/cofre/aplicar` | Reinicia o agente: `podman exec <container> systemctl restart dgclaw-runner`, porque o runner só lê o cofre quando parte. |
 | `POST /p/<slug>/api/provedor` | O Web assume quando o modo de pagar usa chave ou token: guarda a chave, manda a escolha ao runner (`reiniciar:false`) e reinicia. A chave nunca vai ao painel nem ao runner. Modo de assinatura (sem variável) segue para o painel com o corpo intacto (sem o campo `chave`, se veio um). |

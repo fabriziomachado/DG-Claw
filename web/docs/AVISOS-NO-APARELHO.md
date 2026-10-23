@@ -2,11 +2,13 @@
 
 O DG Claw Web manda avisos para o celular e o computador do dono mesmo com a tela
 fechada. É o Web Push padrão (VAPID + `aes128gcm`, RFC 8291 e 8292), feito só com
-`node:crypto`, sem biblioteca nova. Quem usa hoje: os [lembretes](LEMBRETES.md), a Mesa, o foco
+`node:crypto`, sem biblioteca nova. Quem usa hoje: os [lembretes](LEMBRETES.md), a Mesa, o Foco, o
+[vigia de atenção dos agentes](ESTADO-DOS-AGENTES.md) ("Fulano precisa de você" e "Fulano terminou")
 e a **vigia de alertas** (`lib/vigia-alertas.js`, 19/10/2026): toda mensagem de agente marcada
 `[PEDIDO]` ou `[ENTREGA]` vira aviso ("<agente> precisa da sua decisão" / "<agente>: entrega pronta"),
-com o número de alertas não vistos no ícone do app. Qualquer frente pode usar (veja "Para quem
-constrói uma frente nova").
+com o número de alertas não vistos no ícone do app. O "terminou" pula a resposta que já é `[PEDIDO]`
+ou `[ENTREGA]`, para não chegar aviso dobrado, e todos passam pelo silêncio à noite das boas-vindas.
+Qualquer frente pode usar (veja "Para quem constrói uma frente nova").
 
 **iPhone:** a Apple recusa o aviso (403 `BadJwtToken`) quando o contato do VAPID é falso, como o
 padrão `mailto:dgclaw@localhost`. Ponha o endereço do painel em `DGCLAW_PUSH_SUB` no
@@ -30,6 +32,8 @@ Todas com a sessão do login. Escritas exigem `Origin` do próprio Web, como o r
 | `POST /api/v1/push/inscricoes/confere` | `{"endpoint":"..."}` devolve `{"ok":true,"inscrito":true,"id":"ins_..."}` |
 | `POST /api/v1/push/inscricoes/remover` | `{"endpoint":"..."}` ou `{"id":"ins_..."}`. 404 se não existe |
 | `POST /api/v1/push/teste` | manda um aviso de teste. Com `{"endpoint":"..."}` só para esse aparelho; sem corpo, para todos. 409 se não há aparelho inscrito, 502 se o serviço de push recusou (com o status e o motivo) |
+| `GET /api/v1/push/preferencias` | `{"ok":true,"preferencias":{"precisa_de_voce":true,"terminou":true}}`: quais avisos dos agentes o dono quer (padrão: os dois) |
+| `POST /api/v1/push/preferencias` | `{"terminou":false}`: muda um ou os dois. Outro campo ou valor que não seja `true`/`false`: 400 com o motivo. Guardado em `push/preferencias.json` (600) |
 | `GET /api/v1/push/docs.md` | este documento |
 
 O endpoint da inscrição só é aceito se for `https://` num serviço de push conhecido

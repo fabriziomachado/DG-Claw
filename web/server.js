@@ -31,6 +31,7 @@ const { criarMencoes } = require('./lib/mencoes');
 const { criarFeedback } = require('./lib/feedback');
 const { criarAlertas } = require('./lib/alertas');
 const { criarVigiaAlertas } = require('./lib/vigia-alertas');
+const { criarBoasVindas } = require('./lib/boas-vindas');
 const { criarCaixaEntrada } = require('./lib/caixa-entrada');
 const { criarSaudeServidor } = require('./lib/saude-servidor');
 const { criarFoco } = require('./lib/foco');
@@ -109,13 +110,16 @@ function criarServidor(opcoes) {
   const push = criarPush({ dataDir: config.dataDir, log, agora: opcoes.agora, enviarHttp: opcoes.enviarPush });
   try { push.garantirChaves(); } catch (e) { log('erro', e.message); }
   const lembretes = criarLembretes({ config, registro, runner, push, log, agora: opcoes.agora });
-  vigiaAlertas = criarVigiaAlertas({ registro, conversa, alertas, push, log, agora: opcoes.agora });
+  // Boas-vindas: perfil do dono para os agentes e as escolhas de aviso (inclusive o silêncio à noite)
+  const boasVindas = criarBoasVindas({ config, registro, caixa, push, log, agora: opcoes.agora });
+  if (!opcoes.semVigiaAlertas) boasVindas.iniciar();
+  vigiaAlertas = criarVigiaAlertas({ registro, conversa, alertas, push, avisar: boasVindas.avisar, log, agora: opcoes.agora });
   if (!opcoes.semVigiaAlertas) vigiaAlertas.iniciar();
   caixa.permitir('/api/v1/lembretes');
   // Modo foco: o agente chega pela caixa (dgclaw-api), o retrato vai para a casa dele e o PUT do agente avisa o celular.
   const foco = criarFoco({ dir: path.join(config.dataDir, 'foco'), tz: config.tz, log, registro, gravaRetrato: opcoes.gravaRetrato || caixa.gravaRetrato, push: opcoes.push || push, quemChamou: opcoes.quemChamou || quemChamou });
   caixa.permitir('/api/v1/foco');
-  const mesa = criarMesa({ arquivo: path.join(config.dataDir, 'mesa', 'tarefas.json'), registro, runner, log, agora: opcoes.agora, tz: config.tz, avisarDono: (aviso) => push.enviar(aviso) });
+  const mesa = criarMesa({ arquivo: path.join(config.dataDir, 'mesa', 'tarefas.json'), registro, runner, log, agora: opcoes.agora, tz: config.tz, avisarDono: (aviso) => boasVindas.avisar(aviso, 'pedido') });
   // O agente fala com a Mesa pelo dgclaw-mesa, que passa pela caixa: a rota precisa estar liberada.
   caixa.permitir('/api/v1/tarefas');
   const avisos = criarAvisos({ config, registro, runner, caixa, log, agora: opcoes.agora });
@@ -484,6 +488,9 @@ function criarServidor(opcoes) {
     }
     if (p === '/api/v1/avisos' || p.startsWith('/api/v1/avisos/')) {
       if (await avisos.tratar(req, res, url, sessao)) return undefined;
+    }
+    if (p === '/api/v1/boas-vindas' || p.startsWith('/api/v1/boas-vindas/')) {
+      if (await boasVindas.tratar(req, res, url, sessao)) return undefined;
     }
     if (p === '/api/v1/integracoes' || p.startsWith('/api/v1/integracoes/')) {
       if (await integracoes.tratar(req, res, url, sessao)) return undefined;
@@ -1028,7 +1035,7 @@ function criarServidor(opcoes) {
         });
       });
     },
-    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); vigiaAlertas.parar(); limites.parar(); avisos.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
+    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); vigiaAlertas.parar(); boasVindas.parar(); limites.parar(); avisos.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
   };
 }
 

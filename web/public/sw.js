@@ -13,6 +13,7 @@ const ESTATICOS = [
   '/barra.js', '/barra.css',
   '/sigilo.js', '/sigilo.css',
   '/avisos-aparelho.js',
+  '/boas-vindas.js', '/boas-vindas.css', '/vendor/kalam-700-latin.woff2', '/icons/coruja-redonda.webp',
   '/lembretes-faixa.js', '/lembretes.js', '/lembretes.css', '/lembretes-aba.js', '/lembretes-aba.css',
   '/foco-tela.js', '/foco-tela.css',
   '/login.css', '/login.js', '/sem-zoom.css', '/sem-zoom.js',

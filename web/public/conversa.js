@@ -1012,9 +1012,17 @@ function pcDesenha(pedido, abrindo) {
     return e;
   };
   pcEl.textContent = '';
-  pcEl.appendChild(filho('strong', 'pc-titulo', 'O agente está esperando a sua permissão'));
-  pcEl.appendChild(filho('p', 'pc-texto', AGENTE.nome + ' quer fazer isto e parou até você decidir:'));
-  pcEl.appendChild(filho('pre', 'pc-pedido', TR.descricaoPedido(pedido)));
+  // 22/10/2026: no visual novo (paleta do tema, cartão como o de escolha); o ícone é o escudo de traço
+  const cab = filho('div', 'pc-cab');
+  cab.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6z"/><path d="M12 9v4M12 16.5v.01"/></svg>';
+  cab.appendChild(filho('strong', 'pc-titulo', AGENTE.nome + ' pede a sua permissão'));
+  pcEl.appendChild(cab);
+  if (pedido && pedido.titulo) {
+    pcEl.appendChild(filho('p', 'pc-texto', 'Ele parou e só continua depois que você decidir. Quer fazer isto:'));
+    pcEl.appendChild(filho('pre', 'pc-pedido', TR.descricaoPedido(pedido)));
+  } else {
+    pcEl.appendChild(filho('p', 'pc-texto', 'Ele parou e só continua depois que você decidir. Não disse o que quer fazer: se tiver dúvida, negue e pergunte na conversa.'));
+  }
   if (pc.erro) pcEl.appendChild(filho('p', 'pc-erro', pc.erro));
   const linha = filho('div', 'pc-botoes');
   const botao = (texto, classe, decisao) => {
@@ -1024,8 +1032,8 @@ function pcDesenha(pedido, abrindo) {
     b.addEventListener('click', () => pcDecide(decisao));
     return b;
   };
-  linha.appendChild(botao('Aprovar', 'pc-aprova', 'aprovar'));
   linha.appendChild(botao('Negar', 'pc-nega', 'negar'));
+  linha.appendChild(botao('Aprovar', 'pc-aprova', 'aprovar'));
   pcEl.appendChild(linha);
   const msg = pc.decidido ? (pc.decidido === 'aprovar' ? 'Aprovado. Aguardando o agente continuar…' : 'Negado. Aguardando o agente continuar…')
     : (pc.ocupado ? 'Enviando a sua decisão…' : '');

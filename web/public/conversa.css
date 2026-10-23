@@ -1297,3 +1297,7 @@ body:not(.ler-on) .fone{display:none}
 .selo-fila{display:block;margin-top:4px;font-size:12px;line-height:1.3;opacity:.75;overflow-wrap:anywhere}
 .row.fila-tocando .selo-fila{opacity:1;font-weight:600}
 .row.fila-pausada .selo-fila{opacity:.9}
+
+/* a fileira de baixo da original não aparece no S2 Bot (23/10/2026): a barra volta à altura de antes */
+.troca-baixo,.troca-baixo:not(:empty){display:none!important}
+@media (max-width:600px){:root{--barra-h:104px}}

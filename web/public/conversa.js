@@ -4499,6 +4499,13 @@ atualizaNaoLidas();
 function pintaTrocaBaixo() {
   const baixo = $('trocaBaixo');
   if (!baixo) return;
+  // 23/10/2026 (pedido do dono): no S2 Bot a troca é pela fileira do topo; a de baixo some e a bolinha
+  // de não lidas vai para as fotos de cima (pintaNaoLidasTopo). O desenho de baixo fica, sem uso.
+  document.body.classList.remove('com-troca');
+  baixo.innerHTML = '';
+  pintaNaoLidasTopo();
+  return;
+  // eslint-disable-next-line no-unreachable
   document.body.classList.toggle('com-troca', agentesMenu.length >= 2);
   if (agentesMenu.length < 2) { baixo.innerHTML = ''; return; }
   baixo.innerHTML = agentesMenu.map(a => {
@@ -4519,6 +4526,25 @@ function pintaTrocaBaixo() {
       `${marcaSelo}</a>`;
   }).join('');
   centralizaTrocaBaixo();
+}
+/* Não lidas nas fotos do topo: o número vermelho (todas as respostas não vistas, que já incluem
+   entregas e pedidos), um ponto quando a conversa foi marcada, e "!" âmbar quando precisa de você.
+   Com o número vermelho, o número azul de avisos (fil-badge) sai para não haver dois. */
+function pintaNaoLidasTopo() {
+  const nav = $('fileira');
+  if (!nav || !window.DGMenuLado) return;
+  for (const el of nav.querySelectorAll('.fil[data-avt]')) {
+    const id = el.dataset.avt;
+    const selo = window.DGMenuLado.seloDe(naoLidas[id], id === AGENTE.id);
+    let b = el.querySelector('.fil-nl');
+    const tipo = selo && (selo.tipo === 'nao_lido' || selo.tipo === 'marcada' || selo.tipo === 'precisa') ? selo.tipo : '';
+    el.classList.toggle('tem-nl', !!tipo);
+    if (!tipo) { if (b) b.remove(); continue; }
+    if (!b) { b = document.createElement('span'); el.appendChild(b); }
+    b.className = 'fil-nl' + (tipo === 'marcada' ? ' ponto' : tipo === 'precisa' ? ' aten' : '');
+    b.textContent = tipo === 'nao_lido' ? textoBolinha(naoLidas[id]) : tipo === 'precisa' ? '!' : '';
+    b.title = selo.rotulo || '';
+  }
 }
 // sem scrollIntoView: ele rolaria a página toda
 function centralizaTrocaBaixo() {

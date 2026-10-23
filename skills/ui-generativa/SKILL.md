@@ -75,6 +75,7 @@ importante para o menos, e o resto no `detalhe`. Fora do bloco fica só a frase-
   **estes** dados (interpretar, explicar uma anomalia, sugerir ação, comparar com outro período,
   detalhar um item). Viram botões embaixo do painel; um toque manda a pergunta para mim, como se
   ele tivesse digitado. Escreva na voz do dono ("Sugira ações de retenção para os cursos EAD").
+  Se o dono não quiser as sugestões num painel (comum em app fixo), use `"sugestoes": false`.
   Se eu não mandar, a conversa coloca perguntas genéricas no lugar; as minhas, específicas, são melhores.
 - Cada gráfico e tabela já ganha sozinho os botões de baixar (PNG ou CSV), copiar, compartilhar
   e ampliar: não preciso fazer nada para isso.

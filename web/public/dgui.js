@@ -671,7 +671,7 @@
     if (dados && dados.tipo === 'painel' && dados.vivo && RX_VIVO.test(String(dados.vivo.id || '')) && agenteDaTela()) {
       vivoOriginal.set(agenteDaTela() + '/' + dados.vivo.id, dados);
     }
-    const analitico = dados && !Array.isArray(dados) && ['painel', 'grafico', 'gráfico', 'tabela'].includes(dados.tipo);  // escolha não leva sugestões
+    const analitico = dados && !Array.isArray(dados) && ['painel', 'grafico', 'gráfico', 'tabela'].includes(dados.tipo) && dados.sugestoes !== false;  // escolha não leva sugestões; "sugestoes": false desliga
     const sug = analitico ? sugestoes(Array.isArray(dados.sugestoes) && dados.sugestoes.length ? dados.sugestoes : sugestoesPadrao(dados)) : '';
     return `<div class="dgui">${componente(dados, 0)}${sug}</div>`;
   }

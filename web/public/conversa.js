@@ -3776,20 +3776,43 @@ function aoColar(ev) {
 entrada.addEventListener('paste', aoColar);
 document.addEventListener('paste', ev => { if (ev.target !== entrada) aoColar(ev); });
 
+/* Arrastar vale para a tela inteira (thread, campo, topo): antes só a thread
+   aceitava, e soltar no campo fazia o navegador abrir o arquivo no lugar do
+   chat. Enquanto o arquivo está em cima, uma moldura diz "Solte para anexar".
+   O contador segura o dragleave que dispara a cada filho atravessado. */
 const temArquivo = ev => ev.dataTransfer &&
   Array.from(ev.dataTransfer.types || []).includes('Files');
-chat.addEventListener('dragover', ev => {
+const soltaAqui = document.createElement('div');
+soltaAqui.id = 'soltaAqui';
+soltaAqui.hidden = true;
+soltaAqui.innerHTML = '<div><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg><b>Solte para anexar</b></div>';
+document.body.appendChild(soltaAqui);
+let arrastoes = 0;
+const soltaMostra = (sim) => { soltaAqui.hidden = !sim; if (!sim) arrastoes = 0; };
+document.addEventListener('dragenter', ev => {
+  if (!temArquivo(ev)) return;
+  ev.preventDefault();
+  arrastoes++;
+  soltaMostra(true);
+});
+document.addEventListener('dragover', ev => {
   if (!temArquivo(ev)) return;
   ev.preventDefault();
   ev.dataTransfer.dropEffect = 'copy';
 });
-chat.addEventListener('drop', ev => {
+document.addEventListener('dragleave', ev => {
+  if (!temArquivo(ev)) return;
+  if (--arrastoes <= 0) soltaMostra(false);
+});
+document.addEventListener('drop', ev => {
   if (!temArquivo(ev)) return;
   ev.preventDefault();
+  soltaMostra(false);
   const fs = Array.from((ev.dataTransfer.files) || []);
-  if (fs.length) anexaArquivos(fs);
-  else console.warn('drop na thread sem arquivo legível:', ev.dataTransfer.types);
+  if (fs.length) { anexaArquivos(fs); entrada.focus(); }
+  else console.warn('drop sem arquivo legível:', ev.dataTransfer.types);
 });
+window.addEventListener('blur', () => soltaMostra(false));
 
 /* ── Menu lateral (gaveta do ☰) ───────────────────────────────────────────── */
 function abreMenu(abrir) {

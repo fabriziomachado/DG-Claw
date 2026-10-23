@@ -1180,3 +1180,11 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 #menuMais button.confirma small{color:var(--dg-texto-2)}
 .mm-sep{height:1px;background:var(--dg-borda);margin:4px 8px}
 
+/* ── Soltar arquivo em qualquer lugar da conversa (22/10/2026) ── */
+#soltaAqui{position:fixed;inset:10px;z-index:90;pointer-events:none;display:grid;place-items:center;
+           border:2px dashed var(--dg-azul);border-radius:18px;
+           background:color-mix(in srgb,var(--dg-fundo,#000) 72%,transparent)}
+#soltaAqui[hidden]{display:none}
+#soltaAqui div{display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--dg-texto)}
+#soltaAqui svg{color:var(--dg-azul)}
+#soltaAqui b{font-weight:500;font-size:16px}

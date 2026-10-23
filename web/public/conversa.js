@@ -5491,6 +5491,7 @@ filtrosEl.addEventListener('click', async ev => {
    hora, até 3 min. Se ela é antiga, traz as páginas de trás até chegar lá. */
 // "Nova conversa" do Histórico: é o mesmo /clear que o dono pode digitar (o servidor arquiva a anterior)
 window.DGConversaNova = () => enviarTexto('/clear');
+window.DGConversaRetomar = (texto) => enviarTexto(texto);
 window.DGConversaIr = async (epMs, doDono) => {
   const ep = epMs / 1000, JANELA = 3 * 60;   // as mensagens contam em segundos
   const perto = () => {

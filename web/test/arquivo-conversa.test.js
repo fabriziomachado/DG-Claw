@@ -66,3 +66,34 @@ test('o histórico lista e abre as conversas arquivadas', async () => {
   await h.tratar({ method: 'GET' }, res, new URL('http://x/api/v1/historico/ana/busca/1'), { usuario: 'dono' });
   assert.strictEqual(res.status, 404);
 });
+
+test('o título pula comandos e aceita um nome dado pelo dono', async () => {
+  const comClear = [{ id: 'z', ep: 90, origin: 'dono', text: '/clear' }].concat(msgs);
+  assert.strictEqual(trechosArquivados(comClear, [200])[0].titulo, 'Oi, monte o relatório de evasão');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'arq-'));
+  const ac = criarArquivoConversa({ dataDir: dir });
+  ac.cortar('ana', 200);
+  assert.strictEqual(ac.renomear('ana', 999, 'x'), false);
+  assert.strictEqual(ac.renomear('ana', 200, '  Relatório   de evasão '), true);
+  let t = trechosArquivados(msgs, ac.cortes('ana'), criarArquivoConversa({ dataDir: dir }).titulos('ana'));
+  assert.deepStrictEqual([t[0].titulo, t[0].nomeado], ['Relatório de evasão', true]);
+  ac.cortar('ana', 400);
+  assert.deepStrictEqual(criarArquivoConversa({ dataDir: dir }).titulos('ana'), { 200: 'Relatório de evasão' });
+  ac.renomear('ana', 200, '');
+  t = trechosArquivados(msgs, ac.cortes('ana'), ac.titulos('ana'));
+  assert.deepStrictEqual([t[1].titulo, t[1].nomeado], ['Oi, monte o relatório de evasão', false]);
+
+  const registro = { estado: () => ({ ok: true, agentes: [{ slug: 'ana', tipo: 'agente' }] }) };
+  const comFoto = msgs.concat([{ id: 'g', ep: 120, origin: 'dono', text: 'foto.png', media: { id: 'm1', kind: 'photo', nome: 'foto.png', disponivel: true, url: '/api/v1/media/m1', thumb: '/api/v1/media/m1/thumb', path: '/x' } }]);
+  const h = criarHistorico({ registro, log: () => {}, conversa: { thread: async () => ({ msgs: comFoto }) }, arquivoConversa: ac, roda: async () => ({ ok: true, saida: '' }) });
+  const { Readable } = require('node:stream');
+  const req = Object.assign(Readable.from([Buffer.from(JSON.stringify({ titulo: 'Evasão' }))]), { method: 'PUT' });
+  let res = resposta();
+  await h.tratar(req, res, new URL('http://x/api/v1/historico/ana/arquivadas/200'), { usuario: 'dono' });
+  assert.strictEqual(res.corpo.arquivada.titulo, 'Evasão');
+  const foto = res.corpo.msgs.find((m) => m.id === 'g').media;
+  assert.deepStrictEqual(foto, { id: 'm1', kind: 'photo', nome: 'foto.png', disponivel: true, url: '/api/v1/media/m1', thumb: '/api/v1/media/m1/thumb' });
+  res = resposta();
+  await h.tratar({ method: 'PUT' }, res, new URL('http://x/api/v1/historico/ana/memorias'), { usuario: 'dono' });
+  assert.strictEqual(res.status, 405);
+});

@@ -2,6 +2,8 @@
    Duas abas: Conversas (busca nas conversas antigas e nas memórias, pelo índice local do agente)
    e Memórias (os arquivos de memória por grupo, só leitura). Tocar num trecho de conversa leva até
    a mensagem, se ela ainda estiver na conversa (window.DGConversaIr, de conversa.js).
+   22/10/2026: conversa arquivada com imagens, nome editável (lápis) e "Continuar esta conversa"
+   (manda ao agente um resumo do que foi dito, window.DGConversaRetomar); gaveta em tela cheia.
    API: /api/v1/historico/<agente>[/busca|/memorias|/memoria]. */
 (function () {
   'use strict';
@@ -11,12 +13,18 @@
     fechar: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
     voltar: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg>',
     nota: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>',
+    lapis: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>',
+    abrir: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>',
+    fechar2: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>',
+    retomar: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>',
     seta: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>',
   };
   const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  let agente = null, el = null, aba = 'conversas', filtroSo = '', ultimaBusca = '', pedido = 0;
+  let agente = null, el = null, aba = 'conversas', filtroSo = '', ultimaBusca = '', pedido = 0, aberta = null;
+  const CHAVE_CHEIA = 'dg.historico.cheia';
+  const lembra = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } return null; };
 
   async function api(caminho) {
     const r = await fetch('/api/v1/historico/' + encodeURIComponent(agente.id) + caminho, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
@@ -92,6 +100,7 @@
       '<div class="hist-fundo" data-hist-fecha></div>' +
       '<div class="hist-caixa">' +
         '<header class="hist-cab"><div><h2>Histórico</h2><p class="hist-sub" id="histSub">Conferindo o que está guardado…</p></div>' +
+        `<button type="button" class="hist-x hist-cheia" data-hist-cheia aria-label="Abrir em tela cheia" title="Tela cheia">${ICO.abrir}</button>` +
         `<button type="button" class="hist-x" data-hist-fecha aria-label="Fechar o histórico">${ICO.fechar}</button></header>` +
         '<nav class="hist-abas" role="tablist">' +
           '<button type="button" role="tab" data-hist-aba="conversas" aria-selected="true">Conversas</button>' +
@@ -110,9 +119,13 @@
         '<div class="hist-corpo hist-leitor" data-corpo="leitor" hidden></div>' +
       '</div>';
     document.body.appendChild(el);
+    telaCheia(lembra(CHAVE_CHEIA) === '1');
 
     el.addEventListener('click', (ev) => {
       if (ev.target.closest('[data-hist-fecha]')) return fecha();
+      if (ev.target.closest('[data-hist-cheia]')) { telaCheia(!el.classList.contains('cheia')); lembra(CHAVE_CHEIA, el.classList.contains('cheia') ? '1' : '0'); return; }
+      if (ev.target.closest('[data-hist-renomear]')) return renomear();
+      const ret = ev.target.closest('[data-hist-retomar]'); if (ret) return retomar(ret);
       const a = ev.target.closest('[data-hist-aba]'); if (a) return mostraAba(a.dataset.histAba);
       const so = ev.target.closest('[data-so]');
       if (so) {
@@ -135,6 +148,14 @@
     form.addEventListener('submit', (ev) => { ev.preventDefault(); clearTimeout(espera); busca(q.value); q.blur(); });
     q.addEventListener('input', () => { clearTimeout(espera); espera = setTimeout(() => busca(q.value), 450); });
     document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && el && !el.hidden) fecha(); });
+  }
+
+  function telaCheia(sim) {
+    el.classList.toggle('cheia', sim);
+    const b = el.querySelector('[data-hist-cheia]');
+    b.innerHTML = sim ? ICO.fechar2 : ICO.abrir;
+    b.setAttribute('aria-label', sim ? 'Voltar para a gaveta' : 'Abrir em tela cheia');
+    b.title = sim ? 'Sair da tela cheia' : 'Tela cheia';
   }
 
   function mostraAba(qual) {
@@ -172,7 +193,7 @@
     }
     let html = cab + '<ul class="hist-itens">';
     for (const a of arq) {
-      html += `<li><button type="button" class="hist-item arquivada" data-arquivada="${esc(a.id)}">` +
+      html += `<li><button type="button" class="hist-item arquivada${a.nomeado ? ' nomeada' : ''}" data-arquivada="${esc(a.id)}">` +
         `<span class="hist-arq-titulo">${esc(a.titulo)}</span>` +
         `<span class="hist-quem">${esc(periodo(a.de, a.ate))} · ${a.total === 1 ? '1 mensagem' : a.total + ' mensagens'}</span>` +
         (a.previa ? `<span class="hist-previa">${esc(a.previa)}</span>` : '') + '</button></li>';
@@ -192,25 +213,149 @@
     const leitor = el.querySelector('[data-corpo="leitor"]');
     for (const c of el.querySelectorAll('[data-corpo]')) c.hidden = c !== leitor;
     el.querySelector('.hist-abas').hidden = true;
+    aberta = null;
     leitor.innerHTML = `<header class="hist-leitor-cab"><button type="button" class="hist-volta" data-hist-volta aria-label="Voltar">${ICO.voltar}</button>` +
-      '<div><b>Conversa arquivada</b><small>Carregando…</small></div></header><div class="hist-texto hist-conversa"></div>';
+      '<div class="hist-leitor-tit"><b>Conversa arquivada</b><small>Carregando…</small></div>' +
+      `<button type="button" class="hist-x hist-lapis" data-hist-renomear aria-label="Dar outro nome" title="Dar outro nome" hidden>${ICO.lapis}</button></header>` +
+      '<div class="hist-texto hist-conversa"></div>';
     try {
       const d = await api('/arquivadas/' + encodeURIComponent(id));
+      aberta = d;
       leitor.querySelector('b').textContent = d.arquivada.titulo;
       leitor.querySelector('small').textContent = `${periodo(d.arquivada.de, d.arquivada.ate)} · ${d.arquivada.total} mensagens`;
+      leitor.querySelector('[data-hist-renomear]').hidden = false;
       let html = '', dia = '';
       for (const m of d.msgs) {
         const dt = new Date(m.ep * 1000);
         const dd = diaHumano(`${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`);
         if (dd !== dia) { dia = dd; html += `<p class="hist-conv-dia">${esc(dd)}</p>`; }
+        if (m.origin === 'trilha') { html += `<p class="hist-conv-passo">${esc(String(m.text || '').replace(/^rodou:\s*/, ''))}</p>`; continue; }
         const dono = m.origin === 'dono';
-        const anexo = m.media ? `<span class="hist-conv-anexo">${ICO.nota}${esc(m.media.nome || 'arquivo')}</span>` : '';
-        const corpo = String(m.text || '').replace(/^\s*\[(ENTREGA|PEDIDO)\]\s*/i, '').replace(/```dgui[\s\S]*?```/g, '').trim();
-        html += `<div class="hist-conv-msg ${dono ? 'dono' : 'agente'}"><div class="hist-conv-balao">${anexo}${corpo ? mdSimples(corpo) : ''}</div>` +
+        const texto = String(m.text || '').replace(/^\s*\[(ENTREGA|PEDIDO)\]\s*/i, '');
+        const corpo = texto.replace(/```dgui[\s\S]*?```/g, '').trim();
+        const visuais = /```dgui/.test(texto);
+        html += `<div class="hist-conv-msg ${dono ? 'dono' : 'agente'}"><div class="hist-conv-balao">${midia(m.media)}${(corpo || visuais) && !(m.media && corpo === m.media.nome) ? comVisuais(texto) : ''}</div>` +
           `<span class="hist-conv-hora">${dono ? 'Você' : esc(agente.nome)} · ${hhmm(m.ep * 1000)}</span></div>`;
       }
-      leitor.querySelector('.hist-texto').innerHTML = html || '<p class="hist-dica">Sem mensagens de texto nesta conversa.</p>';
+      leitor.querySelector('.hist-texto').innerHTML = (html || '<p class="hist-dica">Sem mensagens de texto nesta conversa.</p>') +
+        (typeof window.DGConversaRetomar === 'function'
+          ? `<div class="hist-retomar"><button type="button" class="hist-nova" data-hist-retomar>${ICO.retomar}Continuar esta conversa</button>` +
+            `<p class="hist-dica">${esc(agente.nome)} recebe um resumo do que foi dito aqui e segue dali. Gasta um pouco do limite.</p></div>`
+          : '');
     } catch (e) { leitor.querySelector('small').textContent = 'Não consegui abrir: ' + e.message; }
+  }
+
+  // texto com os blocos ```dgui desenhados como na conversa (passos, tabela, gráfico); a escolha vira
+  // lista parada, porque tocar numa opção aqui mandaria resposta a uma pergunta já encerrada
+  function comVisuais(txt) {
+    let html = '';
+    for (const p of String(txt).split(/(```dgui[ \t]*\r?\n[\s\S]*?```)/)) {
+      const b = /^```(dgui[ \t]*\r?\n[\s\S]*?)```$/.exec(p);
+      if (!b) { if (p.trim()) html += mdSimples(p.trim()); continue; }
+      let d = null;
+      try { d = JSON.parse(b[1].replace(/^dgui[ \t]*\r?\n/, '')); } catch (_) { /* inválido: o dgui.js mostra o aviso */ }
+      if (d && d.tipo === 'escolha') {
+        const ops = (Array.isArray(d.opcoes) ? d.opcoes : []).map((o) => (o && typeof o === 'object' ? o.texto : o)).filter(Boolean);
+        html += (d.pergunta ? `<p><b>${esc(d.pergunta)}</b></p>` : '') + (ops.length ? `<ul>${ops.map((o) => `<li>${esc(o)}</li>`).join('')}</ul>` : '');
+        continue;
+      }
+      html += (window.dgui && window.dgui.blocoParaHtml(b[1])) || '';
+    }
+    return html;
+  }
+
+  // foto ou vídeo guardado: a miniatura, que abre o original; o resto, ícone com o nome
+  function midia(md) {
+    if (!md) return '';
+    if (md.disponivel && md.url && (md.kind === 'photo' || md.kind === 'image' || md.kind === 'video') && (md.thumb || md.kind !== 'video')) {
+      return `<a class="hist-conv-foto" href="${esc(md.url)}" target="_blank" rel="noopener" aria-label="Abrir ${esc(md.nome || 'a imagem')}">` +
+        `<img loading="lazy" alt="" src="${esc(md.thumb || md.url)}"></a>`;
+    }
+    const nome = `${ICO.nota}${esc(md.nome || 'arquivo')}`;
+    return md.disponivel && md.url
+      ? `<a class="hist-conv-anexo" href="${esc(md.url)}" target="_blank" rel="noopener">${nome}</a>`
+      : `<span class="hist-conv-anexo">${nome}</span>`;
+  }
+
+  // o lápis troca o título por um campo; Enter ou sair do campo grava, Esc desiste, vazio volta ao automático
+  function renomear() {
+    if (!aberta) return;
+    const tit = el.querySelector('.hist-leitor-tit');
+    const b = tit.querySelector('b');
+    if (!b || tit.querySelector('input')) return;
+    const campo = document.createElement('input');
+    campo.type = 'text'; campo.maxLength = 80; campo.className = 'hist-renomeia';
+    campo.value = aberta.arquivada.nomeado ? aberta.arquivada.titulo : '';
+    campo.placeholder = aberta.arquivada.titulo;
+    campo.setAttribute('aria-label', 'Nome da conversa');
+    b.replaceWith(campo);
+    campo.focus(); campo.select();
+    let feito = false;
+    const termina = async (grava) => {
+      if (feito) return; feito = true;
+      const volta = document.createElement('b');
+      volta.textContent = aberta.arquivada.titulo;
+      campo.replaceWith(volta);
+      const novo = campo.value.trim();
+      if (!grava || novo === (aberta.arquivada.nomeado ? aberta.arquivada.titulo : '')) return;
+      volta.textContent = novo || 'Salvando…';
+      try {
+        const r = await fetch('/api/v1/historico/' + encodeURIComponent(agente.id) + '/arquivadas/' + encodeURIComponent(aberta.arquivada.id), {
+          method: 'PUT', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', Accept: 'application/json' }, body: JSON.stringify({ titulo: novo }) });
+        const d = await r.json().catch(() => null);
+        if (!r.ok || !d || !d.ok) throw new Error((d && d.erro) || ('erro ' + r.status));
+        aberta.arquivada = d.arquivada;
+        volta.textContent = d.arquivada.titulo;
+      } catch (e) {
+        volta.textContent = aberta.arquivada.titulo;
+        tit.querySelector('small').textContent = 'Não consegui salvar o nome: ' + e.message;
+      }
+    };
+    campo.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') { ev.preventDefault(); termina(true); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); termina(false); }
+    });
+    campo.addEventListener('blur', () => termina(true));
+  }
+
+  /* Resumo para o agente retomar: o que o dono pediu e o que ele respondeu, sem os passos, cada fala
+     encurtada; se passar do teto, ficam a primeira fala e o fim (o meio vira "…"). Não chama IA nenhuma. */
+  const TETO_FALA = 300, TETO_RESUMO = 3500;
+  function resumoParaRetomar(d) {
+    const falas = d.msgs.filter((m) => m.origin !== 'trilha').map((m) => {
+      let t = String(m.text || '').replace(/```[\s\S]*?```/g, ' ').replace(/^\s*\[(ENTREGA|PEDIDO)\]\s*/i, '').replace(/\s+/g, ' ').trim();
+      if (!t && m.media) t = `[${m.media.nome || 'arquivo'}]`;
+      if (!t || /^\/[a-z][\w-]*$/i.test(t)) return '';
+      if (t.length > TETO_FALA) t = t.slice(0, TETO_FALA - 1).trimEnd() + '…';
+      return `${m.origin === 'dono' ? 'Dono' : agente.nome}: ${t}`;
+    }).filter(Boolean);
+    if (!falas.length) return '';
+    // o começo (o pedido) sempre vai; do fim (onde parou) para trás, até o teto
+    const fim = [];
+    let total = falas[0].length;
+    for (let k = falas.length - 1; k > 0; k--) {
+      if (total + falas[k].length > TETO_RESUMO) break;
+      total += falas[k].length + 1;
+      fim.unshift(falas[k]);
+    }
+    return [falas[0]].concat(fim.length < falas.length - 1 ? ['…'] : [], fim).join('\n');
+  }
+
+  async function retomar(botao) {
+    if (!aberta || typeof window.DGConversaRetomar !== 'function') return;
+    if (botao.dataset.confirma !== '1') {
+      botao.dataset.confirma = '1';
+      botao.lastChild.textContent = 'Toque de novo para continuar';
+      setTimeout(() => { if (botao.isConnected) { botao.dataset.confirma = ''; botao.lastChild.textContent = 'Continuar esta conversa'; } }, 4000);
+      return;
+    }
+    const a = aberta.arquivada;
+    const texto = `Vamos continuar a conversa arquivada "${a.titulo}" (${periodo(a.de, a.ate)}). ` +
+      'Você não lembra dela, então aqui vai o que foi dito. Leia e me diga em uma frase onde paramos e o que falta.\n\n' +
+      resumoParaRetomar(aberta);
+    botao.disabled = true;
+    fecha();
+    await window.DGConversaRetomar(texto);
   }
 
   async function novaConversa(botao) {

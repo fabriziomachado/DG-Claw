@@ -7,6 +7,10 @@
 // A tela, a espera e o stream veem só o que veio depois do último corte (threadVisivel); os trechos
 // entre um corte e outro são as conversas arquivadas. Nada é apagado: transcript, índice de busca,
 // alertas e compartilhados seguem lendo a thread inteira.
+//
+// Títulos (22/10/2026, pedido do dono): o automático pula comandos (/clear, /compact) e usa o primeiro
+// pedido de verdade; o dono pode dar outro nome, gravado em `titulos` no mesmo arquivo (vazio volta ao
+// automático).
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -25,22 +29,25 @@ function resumo(texto, max) {
   return t.length > max ? t.slice(0, max - 1).trimEnd() + '…' : t;
 }
 
+const ehComando = (m) => /^\/[a-z][\w-]*(\s|$)/i.test(String(m.text || '').trim());
+
 /**
- * Os trechos arquivados de uma thread: [{ id, de, ate, total, titulo, previa }], o mais novo primeiro.
- * `id` é o ep do corte que fechou o trecho. Trecho sem mensagem nenhuma não entra.
+ * Os trechos arquivados de uma thread: [{ id, de, ate, total, titulo, previa, nomeado }], o mais novo
+ * primeiro. `id` é o ep do corte que fechou o trecho. Trecho sem mensagem nenhuma não entra.
  */
-function trechosArquivados(msgs, cortes) {
+function trechosArquivados(msgs, cortes, titulos = {}) {
   const lista = [];
   let antes = -Infinity;
   for (const c of cortes) {
     const dentro = msgs.filter((m) => m.ep > antes && m.ep <= c);
     antes = c;
     if (!dentro.length) continue;
-    const doDono = dentro.find((m) => m.origin === 'dono' && resumo(m.text, 4));
+    const doDono = dentro.find((m) => m.origin === 'dono' && !ehComando(m) && resumo(m.text, 4));
     const doAgente = dentro.find((m) => m.origin !== 'dono' && resumo(m.text, 4));
+    const nome = titulos[c] ? resumo(titulos[c], TITULO) : '';
     lista.push({
-      id: c, de: dentro[0].ep, ate: dentro[dentro.length - 1].ep, total: dentro.length,
-      titulo: resumo((doDono || doAgente || dentro[0]).text, TITULO) || 'Conversa sem texto',
+      id: c, de: dentro[0].ep, ate: dentro[dentro.length - 1].ep, total: dentro.length, nomeado: !!nome,
+      titulo: nome || resumo((doDono || doAgente || dentro[0]).text, TITULO) || 'Conversa sem texto',
       previa: doAgente ? resumo(doAgente.text, 140) : '',
     });
   }
@@ -49,21 +56,34 @@ function trechosArquivados(msgs, cortes) {
 
 function criarArquivoConversa({ dataDir, log = () => {} }) {
   const pasta = path.join(dataDir, 'arquivo');
-  const cache = new Map(); // slug -> cortes
+  const cache = new Map(); // slug -> { cortes, titulos }
   const visiveis = new Map(); // slug -> { fonte, corte, msgs }: mesma lista enquanto nada muda
 
   const arquivo = (slug) => path.join(pasta, `${slug}.json`);
-  function cortes(slug) {
+  function dados(slug) {
     if (cache.has(slug)) return cache.get(slug);
-    let c = [];
+    const d = { cortes: [], titulos: {} };
     try {
-      const d = JSON.parse(fs.readFileSync(arquivo(slug), 'utf8'));
-      if (Array.isArray(d.cortes)) c = d.cortes.filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
+      const lido = JSON.parse(fs.readFileSync(arquivo(slug), 'utf8'));
+      if (Array.isArray(lido.cortes)) d.cortes = lido.cortes.filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
+      if (lido.titulos && typeof lido.titulos === 'object') {
+        for (const [k, v] of Object.entries(lido.titulos)) if (typeof v === 'string' && v.trim()) d.titulos[k] = v;
+      }
     } catch (e) {
       if (e.code !== 'ENOENT') log('aviso', `Arquivo de conversas de ${slug} ilegível (${e.message}); sigo sem cortes.`);
     }
-    cache.set(slug, c);
-    return c;
+    cache.set(slug, d);
+    return d;
+  }
+  const cortes = (slug) => dados(slug).cortes;
+  const titulos = (slug) => dados(slug).titulos;
+
+  function grava(slug, d) {
+    fs.mkdirSync(pasta, { recursive: true, mode: 0o700 });
+    const tmp = `${arquivo(slug)}.${process.pid}.tmp`;
+    fs.writeFileSync(tmp, JSON.stringify(d), { mode: 0o600 });
+    fs.renameSync(tmp, arquivo(slug));
+    cache.set(slug, d);
   }
   const ultimoCorte = (slug) => { const c = cortes(slug); return c.length ? c[c.length - 1] : 0; };
 
@@ -72,11 +92,20 @@ function criarArquivoConversa({ dataDir, log = () => {} }) {
     if (c.length && ep <= c[c.length - 1]) return false;
     c.push(ep);
     while (c.length > MAX_CORTES) c.shift();
-    fs.mkdirSync(pasta, { recursive: true, mode: 0o700 });
-    const tmp = `${arquivo(slug)}.${process.pid}.tmp`;
-    fs.writeFileSync(tmp, JSON.stringify({ cortes: c }), { mode: 0o600 });
-    fs.renameSync(tmp, arquivo(slug));
-    cache.set(slug, c);
+    const t = {};
+    for (const [k, v] of Object.entries(titulos(slug))) if (c.includes(Number(k))) t[k] = v;
+    grava(slug, { cortes: c, titulos: t });
+    return true;
+  }
+
+  /** Dá nome a uma conversa arquivada (`id` = ep do corte). Texto vazio volta ao título automático. */
+  function renomear(slug, id, texto) {
+    const d = dados(slug);
+    if (!d.cortes.includes(id)) return false;
+    const t = Object.assign({}, d.titulos);
+    const nome = String(texto || '').replace(/\s+/g, ' ').trim().slice(0, TITULO);
+    if (nome) t[id] = nome; else delete t[id];
+    grava(slug, { cortes: d.cortes, titulos: t });
     return true;
   }
 
@@ -92,7 +121,7 @@ function criarArquivoConversa({ dataDir, log = () => {} }) {
     return Object.assign({}, t, { msgs, corte });
   }
 
-  return { cortes, ultimoCorte, cortar, visivel };
+  return { cortes, titulos, ultimoCorte, cortar, renomear, visivel };
 }
 
 module.exports = { criarArquivoConversa, trechosArquivados, resumo };

@@ -124,3 +124,23 @@ html.hist-aberto,html.hist-aberto body{overflow:hidden}
 .hist-conv-anexo svg{width:15px;height:15px}
 /* o aviso no topo da conversa depois de um /clear */
 .topo.topo-arq button{font:inherit;color:var(--dg-azul-forte);background:none;border:0;padding:0;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+
+/* 22/10/2026: imagens, nome editável, continuar a conversa e tela cheia */
+.hist-conv-foto{display:block;margin-bottom:4px;border-radius:12px;overflow:hidden;max-width:260px;background:var(--dg-superficie-2)}
+.hist-conv-foto img{display:block;width:100%;height:auto;max-height:320px;object-fit:cover}
+a.hist-conv-anexo{text-decoration:none}
+a.hist-conv-anexo:hover{color:var(--dg-texto)}
+.hist-conv-passo{margin:-4px 0;font-size:12px;color:var(--dg-texto-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-leitor-tit{flex:1}
+.hist-leitor-tit b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-lapis[hidden]{display:none}
+.hist-renomeia{font:inherit;font-size:15px;font-weight:600;color:var(--dg-texto);background:var(--dg-superficie);border:1px solid var(--dg-texto-3);
+  border-radius:8px;padding:4px 8px;width:100%;min-width:0;outline:0}
+.hist-retomar{display:flex;flex-direction:column;align-items:center;gap:4px;margin:20px 0 4px;padding-top:16px;border-top:1px solid var(--dg-borda);text-align:center}
+.hist-retomar .hist-nova{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 16px;font-size:13.5px}
+.hist-retomar .hist-dica{margin:0;max-width:320px}
+.hist.cheia .hist-caixa{width:100%;border-left:0}
+.hist.cheia .hist-cab,.hist.cheia .hist-abas,.hist.cheia .hist-busca,.hist.cheia .hist-so,.hist.cheia .hist-lista,.hist.cheia .hist-leitor-cab,.hist.cheia .hist-texto{
+  width:100%;max-width:820px;margin-left:auto;margin-right:auto;box-sizing:border-box}
+.hist.cheia .hist-busca{width:calc(100% - 32px)}
+@media (max-width:600px){.hist-cheia{display:none}}

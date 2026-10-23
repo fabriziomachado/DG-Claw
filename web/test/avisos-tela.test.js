@@ -111,3 +111,10 @@ test('a lista tem os 7 tipos e a página carrega o que precisa', () => {
 test('nenhum travessão nos arquivos da tela', () => {
   for (const f of ['avisos.js', 'avisos.css', 'avisos.html']) assert.doesNotMatch(pub(f), /[—–]/, f);
 });
+
+test('o link colado no texto vira o link do aviso e não conta nas 280 letras', () => {
+  assert.deepEqual(A.separaLink('Relatório pronto: https://x.com/r.pdf.'), { texto: 'Relatório pronto:', link: 'https://x.com/r.pdf' });
+  assert.deepEqual(A.separaLink('veja https://a.b/c e responda'), { texto: 'veja e responda', link: 'https://a.b/c' });
+  assert.deepEqual(A.separaLink('sem link aqui'), { texto: 'sem link aqui', link: '' });
+  assert.deepEqual(A.separaLink('linha 1\nhttps://a.b/c'), { texto: 'linha 1', link: 'https://a.b/c' });
+});

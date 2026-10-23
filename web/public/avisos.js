@@ -23,7 +23,7 @@
   const ROTULO_TIPO = Object.fromEntries(TIPOS);
   const ico = (d, t) => `<svg viewBox="0 0 24 24" width="${t || 16}" height="${t || 16}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
   const ICO = {
-    tipo: ico('<path d="M4 7h16M4 12h10M4 17h7"/>'), aj: ico('<path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/>', 18),
+    tipo: ico('<path d="M4 7h16M4 12h10M4 17h7"/>'),
     enviar: ico('<path d="M12 19V5M6 11l6-6 6 6"/>', 18), dn: ico('<path d="m6 9 6 6 6-6"/>', 13), dia: ico('<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/>'),
     ok: ico('<path d="m5 12 4.5 4.5L19 7"/>', 13), espera: ico('<circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 1.5"/>', 13), falha: ico('<path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17h.01"/>', 13),
     mais: ico('<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>'),
@@ -158,6 +158,18 @@
       `<div class="av-grupo">${g.avisos.map(a => htmlAviso(a, opcoes)).join('')}</div></section>`).join('');
   }
 
+  /* O cartão do dono não tem campo de link (22/10/2026): o primeiro endereço colado no texto vira o link
+     do aviso e sai do texto, então não conta nas 280 letras. Devolve { texto, link }. */
+  function separaLink(bruto) {
+    const t = String(bruto == null ? '' : bruto);
+    const m = /https?:\/\/[^\s<>"]+/i.exec(t);
+    if (!m) return { texto: t, link: '' };
+    const link = m[0].replace(/[.,;:!?)\]]+$/, '');
+    const texto = (t.slice(0, m.index) + t.slice(m.index + link.length))
+      .split(/\r?\n/).map(l => l.replace(/[ \t]{2,}/g, ' ').replace(/\s+([.,;:!?])/g, '$1').replace(/:[.,;!?]+$/, ':').trim()).filter(Boolean).join('\n');
+    return { texto, link };
+  }
+
   /* f = { tipo, para: [slugs] | 'todos', texto, link, assunto }. Devolve { ok, erros:{campo:msg}, dados }. */
   function validaForm(f) {
     const erros = {};
@@ -207,7 +219,7 @@
 
   const puros = {
     TIPOS, esc, rotuloDia, agruparPorDia, hora, paraQuem, resumirEntregas, htmlAviso, htmlLista,
-    validaForm, errosDaApi, queryFiltros, maiorId, linkSeguro,
+    validaForm, separaLink, errosDaApi, queryFiltros, maiorId, linkSeguro,
   };
 
   if (!raiz.document) return puros;
@@ -226,7 +238,7 @@
     postar: [
       { alvo: '[data-av-tour="postar"]', titulo: 'Postar um aviso',
         oque: 'O formulário para você avisar os agentes. O aviso sai com o seu nome ("Você") e não tem limite de frequência.',
-        como: 'Escolha o tipo, para quem vai (todos ou só alguns), escreva até 280 caracteres em até 2 linhas e, se quiser, ponha um link e um assunto.',
+        como: 'Escolha o tipo, para quem vai (todos ou só alguns) e escreva até 280 caracteres em até 2 linhas. Se colar um link no texto, ele vira o link do aviso.',
         porque: 'Quando você decide algo que vale para mais de um agente, postar aqui é mais rápido do que avisar um por um.' },
       { alvo: '[data-av-tour="para"]', titulo: 'Para quem',
         oque: 'Todos ou agentes escolhidos. Avisos para todos ficam disponíveis a cada agente na próxima mensagem dele.',
@@ -234,7 +246,7 @@
         porque: 'O recado direto só existe para aviso endereçado. Se fosse para todos, cada postagem interromperia todos os agentes, e o quadro viraria barulho.' },
       { alvo: '[data-av-tour="texto"]', titulo: 'O texto',
         oque: 'O aviso em si, de até 280 caracteres e 2 linhas.',
-        como: 'O contador mostra quanto falta. O detalhe longo vai em um arquivo ou página, e você põe o endereço no campo de link.',
+        como: 'O contador mostra quanto falta. O detalhe longo vai em um arquivo ou página: cole o endereço no texto, ele não entra na conta.',
         porque: 'O texto é injetado na conversa dos agentes. Curto, ele cabe sem gastar o contexto deles.' },
     ],
     filtros: [
@@ -285,18 +297,15 @@
 <button type="button" class="av-btn" data-av-tutorial="pagina">Tutorial</button></header>
 <p id="avStatus" class="av-status" role="status" aria-live="polite"></p>
 <form id="avForm" class="bh-novo av-novo" novalidate data-av-tour="postar">
-<textarea id="avTexto" name="texto" rows="2" maxlength="400" placeholder="Escreva um aviso para os agentes: a partir de hoje, relatórios saem em PDF" data-av-tour="texto"></textarea>
+<textarea id="avTexto" name="texto" rows="2" maxlength="900" placeholder="Escreva um aviso para os agentes: a partir de hoje, relatórios saem em PDF" data-av-tour="texto"></textarea>
 <p class="av-erro" data-erro="texto" hidden></p>
 <div class="bh-acoes">
 <label class="av-pil">${ICO.tipo}<select id="avTipo" name="tipo" aria-label="Tipo do aviso"></select>${ICO.dn}</label>
 <span class="av-dest" data-av-tour="para"><button type="button" class="av-pil" id="avParaBtn" aria-haspopup="true" aria-expanded="false">para <span id="avParaFotos" class="av-fotos"></span><span id="avParaTx">todos</span>${ICO.dn}</button>
 <div id="avPara" class="av-para-menu" role="group" aria-label="Para quem" hidden></div></span>
-<button type="button" class="av-ic" id="avAjustes" aria-expanded="false" title="Link e assunto" aria-label="Link e assunto">${ICO.aj}</button>
 <span class="av-cont"><span id="avCont">0/${MAX_TEXTO}</span></span>
 <button type="submit" id="avPostar" class="av-go" title="Postar o aviso" aria-label="Postar o aviso">${ICO.enviar}</button></div>
-<div class="av-mais-campos" id="avMaisCampos" hidden>
-<label>Link (opcional)<input id="avLink" name="link" type="url" inputmode="url" autocomplete="off" placeholder="https://"></label><p class="av-erro" data-erro="link" hidden></p>
-<label>Assunto (opcional)<input id="avAssunto" name="assunto" type="text" maxlength="80" autocomplete="off"></label><p class="av-erro" data-erro="assunto" hidden></p></div>
+<p class="av-erro" data-erro="link" hidden></p>
 <p class="av-erro" data-erro="tipo" hidden></p><p class="av-erro" data-erro="para" hidden></p><p class="av-erro" data-erro="geral" hidden></p>
 <p id="avResposta" class="bh-msg av-resposta" role="status" hidden></p>
 </form>
@@ -444,7 +453,8 @@
     const destino = f.querySelector('input[name=destino]:checked');
     const para = destino && destino.value === 'alguns'
       ? Array.from(f.querySelectorAll('input[name=para]:checked')).map(i => i.value) : [];
-    return { tipo: f.tipo.value, para, texto: f.texto.value, link: f.link.value, assunto: f.assunto.value };
+    const { texto, link } = separaLink(f.texto.value);
+    return { tipo: f.tipo.value, para, texto, link };
   }
 
   async function posta(ev) {
@@ -463,7 +473,7 @@
     try {
       const d = await api('POST', '/api/v1/avisos', v.dados);
       const f = q(raizEl, '#avForm');
-      f.texto.value = ''; f.link.value = ''; f.assunto.value = '';
+      f.texto.value = '';
       f.querySelector('input[name=destino][value=todos]').checked = true;
       f.querySelectorAll('input[name=para]').forEach(i => { i.checked = false; });
       pintaPara();
@@ -499,7 +509,7 @@
   }
 
   function contador() {
-    const t = q(raizEl, '#avTexto').value;
+    const t = separaLink(q(raizEl, '#avTexto').value).texto;
     const c = q(raizEl, '#avCont');
     c.textContent = t.length + '/' + MAX_TEXTO;
     c.parentNode.classList.toggle('av-passou', t.length > MAX_TEXTO);
@@ -540,7 +550,6 @@
       const b = ev.target.closest('button');
       if (!b) return;
       if (b.id === 'avParaBtn') { const m = q(elemento, '#avPara'); m.hidden = !m.hidden; b.setAttribute('aria-expanded', String(!m.hidden)); return; }
-      if (b.id === 'avAjustes') { const m = q(elemento, '#avMaisCampos'); m.hidden = !m.hidden; b.classList.toggle('on', !m.hidden); b.setAttribute('aria-expanded', String(!m.hidden)); return; }
       if (b.dataset.avFtipo != null) { estado.filtro.tipo = b.dataset.avFtipo; pintaFiltros(); carrega(true); return; }
       if (b.hasAttribute('data-av-fretirados')) { estado.filtro.retirados = !estado.filtro.retirados; pintaFiltros(); carrega(true); return; }
       if (b.dataset.avFagente) { estado.filtro.agente = estado.filtro.agente === b.dataset.avFagente ? '' : b.dataset.avFagente; pintaFiltros(); carrega(true); return; }

@@ -282,6 +282,34 @@ let religaTimer = null, religaEspera = 3000;
 let avisoThread = null;             // último aviso da THREAD posto na faixa amarela
 const ouvintesChegada = [];         // chamados no fim de cada integra()
 let anexos = [];                    // arquivos colados/arrastados/escolhidos esperando o Enter
+
+/* Rascunho por agente (pedido do dono, 21/10/2026): texto e anexos JÁ SUBIDOS ficam guardados no
+   aparelho, então trocar de agente e voltar não perde nada. Anexo ainda subindo não entra (o
+   arquivo só existe nesta página). Vale 7 dias, chave "dgclaw:" para sair junto no logout. */
+const RASCUNHO_VALE_MS = 7 * 24 * 3600 * 1000;
+let rascunhoTimer = null;
+function chaveRascunho() { return 'dgclaw:' + AGENTE.id + ':rascunho'; }
+function gravaRascunho() {
+  if (rascunhoTimer) { clearTimeout(rascunhoTimer); rascunhoTimer = null; }
+  try {
+    const texto = typeof entrada !== 'undefined' && entrada ? entrada.value : '';
+    const prontos = anexos.filter(a => a.estado === 'pronto' && a.id)
+      .map(a => ({ id: a.id, kind: a.kind, nome: a.nome, path: a.path, bytes: a.bytes, previa: a.previaServidor || null }));
+    if (!texto.trim() && !prontos.length) { localStorage.removeItem(chaveRascunho()); return; }
+    localStorage.setItem(chaveRascunho(), JSON.stringify({ em: Date.now(), texto: texto.slice(0, 20000), anexos: prontos }));
+  } catch (e) { console.warn('não consegui guardar o rascunho no aparelho:', e.message); }
+}
+function gravaRascunhoLogo() {
+  if (rascunhoTimer) clearTimeout(rascunhoTimer);
+  rascunhoTimer = setTimeout(gravaRascunho, 400);
+}
+function leRascunho() {
+  try {
+    const d = JSON.parse(localStorage.getItem(chaveRascunho()) || 'null');
+    if (!d || !(Date.now() - d.em < RASCUNHO_VALE_MS)) { localStorage.removeItem(chaveRascunho()); return null; }
+    return d;
+  } catch (e) { console.warn('rascunho guardado ilegível, ignorado:', e.message); return null; }
+}
 let filtrosProntos = false;         // os filtros do topo (mais abaixo) já existem?
 let carregouUmaVez = false;         // a primeira página já chegou (ou falhou)
 let demoAtividade = false;         // o tutorial mostra um exemplo da faixa de atividade
@@ -3291,8 +3319,10 @@ function prontoAnexo(a, d) {
   a.pct = null;
   a.id = d.anexo.id;
   a.path = d.anexo.path;
+  if (d.media) a.previaServidor = d.media.thumb || d.media.url || null;
   atualizaCartao(a);
   pintaInfoAnexos();
+  gravaRascunhoLogo();
   tocaSubidas();
   if (enviarQuandoSubir && anexos.every(x => x.estado === 'pronto')) despachaAnexos();
 }
@@ -3336,6 +3366,7 @@ function despachaAnexos() {
   const t = entrada.value.trim();
   entrada.value = '';
   ajustaCampo();
+  gravaRascunho();
   vozNoCampo = false;
   enviarTexto(respondendo && t ? comResposta(t) : t, lista);
 }
@@ -3479,6 +3510,8 @@ function ajustaCampo() {
   }
 }
 entrada.addEventListener('input', ajustaCampo);
+entrada.addEventListener('input', gravaRascunhoLogo);
+window.addEventListener('pagehide', gravaRascunho);
 
 /* O cartão de cada anexo é montado uma vez (a miniatura não pisca a cada 1% de
    progresso); depois só o estado dele muda. */
@@ -3568,6 +3601,7 @@ function pintaAnexos() {
     atualizaCartao(a);
   }
   anexoChip.hidden = !anexos.length;
+  gravaRascunhoLogo();
   pintaEnviar();
   entrada.placeholder = anexos.length ? 'Legenda (opcional), Enter envia'
                                       : PLACEHOLDER_ORIGINAL;
@@ -3645,6 +3679,32 @@ anexoLista.addEventListener('click', ev => {
     tocaSubidas();
   }
 });
+
+/* Volta o rascunho guardado deste agente (texto e anexos que já tinham subido). */
+(function voltaRascunho() {
+  const d = leRascunho();
+  if (!d) return;
+  if (d.texto && !entrada.value) { entrada.value = d.texto; ajustaCampo(); }
+  for (const x of Array.isArray(d.anexos) ? d.anexos.slice(0, MAX_ANEXOS) : []) {
+    if (!x || !x.id) continue;
+    const comPrevia = !!x.previa && (x.kind === 'photo' || x.kind === 'video');
+    anexos.push({
+      n: ++seqAnexo, file: null, kind: x.kind, nome: x.nome || 'anexo', bytes: x.bytes || 0,
+      url: comPrevia && x.kind === 'photo' ? x.previa : null, previaServidor: x.previa || null,
+      estado: 'pronto', pct: null, erro: null, id: x.id, path: x.path || null, xhr: null,
+      tentativa: 0, el: null, semPrevia: !comPrevia || x.kind !== 'photo', cid: novoClienteId(),
+    });
+  }
+  if (anexos.length) pintaAnexos();
+  // o registro dos anexos é da memória do site: se ele reiniciou, o anexo guardado não vale mais
+  for (const a of anexos.filter(x => x.previaServidor)) {
+    fetch(a.previaServidor, { method: 'HEAD', credentials: 'same-origin' }).then(r => {
+      if (r.status !== 404 || !anexos.includes(a)) return;
+      tiraAnexo(a);
+      mostraErro('O anexo "' + a.nome + '" do rascunho expirou (o S2 Bot reiniciou). Cole ou escolha o arquivo de novo.');
+    }).catch(() => { /* sem rede: fica, e o envio avisa se faltar */ });
+  }
+})();
 
 /* Todos os arquivos do que foi colado: print, várias imagens copiadas de uma
    vez, ou arquivos copiados no Finder/Explorer. */
@@ -4853,6 +4913,7 @@ function enviarDoCampo() {
   if (!t) { entrada.focus(); return; }
   entrada.value = '';
   ajustaCampo();
+  gravaRascunho();
   vozNoCampo = false;
   if (lcInterceptaLogin(t)) return;   // /login abre o cartão e não vai ao agente
   menLista.hidden = true;

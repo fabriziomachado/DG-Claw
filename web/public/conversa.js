@@ -1124,7 +1124,8 @@ function telaOciosa() {
 }
 
 function faixa(el, txt) {
-  el.classList.remove('ok');
+  el.classList.remove('ok', 'leve');
+  el.style.left = el.style.width = el.style.right = ''; el.title = '';
   // botões de uma faixa anterior (ex.: "Tentar de novo") não valem pro texto novo
   const acoes = el.querySelector('.acoes');
   if (acoes) acoes.remove();
@@ -1161,7 +1162,11 @@ function respiroDasFaixas() {
 const mostraErro = t => faixa(fErro, t);
 const mostraAviso = t => faixa(fAviso, t);
 fErro.querySelector('.x').onclick = () => faixa(fErro, '');
-fAviso.querySelector('.x').onclick = () => faixa(fAviso, '');
+fAviso.querySelector('.x').onclick = () => {
+  // fechar o aviso de conversa pesada vale como "Agora não" (senão ele volta na próxima resposta)
+  if (fAviso.classList.contains('leve')) { const b = Array.from(fAviso.querySelectorAll('.acoes button')).pop(); if (b) { b.click(); return; } }
+  faixa(fAviso, '');
+};
 
 /* Avisos que vêm da thread (ex.: "Nenhum transcript...") valem enquanto o
    servidor manda. Lista vazia limpa a faixa, mas só se o que está nela é o aviso
@@ -1811,6 +1816,9 @@ function numCurto(n) {
   if (n >= 1e3) return (n / 1e3).toFixed(n >= 1e5 ? 0 : 1).replace('.', ',').replace(/,0$/, '') + ' mil';
   return String(n);
 }
+function dolar(v) {
+  return 'US$ ' + v.toFixed(v >= 10 ? 0 : 2).replace('.', ',');
+}
 function duracao(ms) {
   if (!Number.isFinite(ms)) return '';
   const s = Math.round(ms / 1000);
@@ -1844,7 +1852,8 @@ function detalhesDaResposta(m) {
       `<div><span>Entrada</span><b>${numCurto(u.entrada)} tokens</b></div>` +
       (u.cache ? `<div><span>· do cache (mais barato)</span><b>${numCurto(u.cache)}</b></div>` : '') +
       `<div><span>Saída</span><b>${numCurto(u.saida)} tokens</b></div>` +
-      (Number.isFinite(u.ms) && u.ms > 0 ? `<div><span>Tempo</span><b>${duracao(u.ms)}</b></div>` : '') + '</div>';
+      (Number.isFinite(u.ms) && u.ms > 0 ? `<div><span>Tempo</span><b>${duracao(u.ms)}</b></div>` : '') +
+      (u.usd >= 0.01 ? `<div title="Preço de uso da API; na assinatura não é cobrado por mensagem"><span>Custo na API</span><b>${dolar(u.usd)}</b></div>` : '') + '</div>';
   }
   return html;
 }
@@ -4522,6 +4531,59 @@ function falaNovas() {
   });
 }
 ouvintesChegada.push(() => { if (!esperando) falaNovas(); });
+
+/* Conversa pesada (22/10/2026, pedido do dono): cada mensagem manda de novo a conversa inteira ao
+   modelo. Passou de CONTEXTO_PESADO tokens na última resposta, uma faixa discreta oferece começar
+   limpo (/clear); a memória do agente fica. "Agora não" vale para esta resposta: a faixa só volta
+   se a conversa crescer mais um degrau. */
+const CONTEXTO_PESADO = 120000, CONTEXTO_DEGRAU = 60000;
+let contextoDispensado = 0;
+try { contextoDispensado = Number(sessionStorage.getItem('dgclaw-contexto-dispensado:' + AGENTE.id)) || 0; } catch (_) { /* sem storage */ }
+function confereContexto() {
+  if (fAviso.classList.contains('aparece') && !fAviso.classList.contains('leve')) return;   // outro aviso na frente
+  // ctx: a entrada da última resposta; total e usd: a soma das respostas desde a última conversa nova
+  let ctx = 0, total = 0, usd = 0;
+  for (let k = msgs.length - 1; k >= 0; k--) {
+    const m = msgs[k];
+    if ((m.origin === 'dono' || m.origin === 'comando') && /^\s*\/(clear|new|compact)\b/.test(m.text || '')) break;
+    if (m.origin !== 'agente' || !m.uso) continue;
+    if (!ctx) ctx = Number(m.uso.contexto) || 0;
+    total += (Number(m.uso.entrada) || 0) + (Number(m.uso.saida) || 0);
+    usd += Number(m.uso.usd) || 0;
+  }
+  const mostra = ctx >= CONTEXTO_PESADO && ctx >= contextoDispensado + CONTEXTO_DEGRAU;
+  if (!mostra) { if (fAviso.classList.contains('leve')) faixa(fAviso, ''); return; }
+  if (fAviso.classList.contains('leve') && fAviso.dataset.ctx === String(ctx)) return;
+  const gasto = 'já foram ' + numCurto(total) + ' tokens' + (usd >= 0.01 ? ', uns ' + dolar(usd) : '');
+  faixaComAcoes(fAviso, 'Nossa conversa neste chat está grande: ' + gasto + '. Vamos iniciar um novo chat?', [
+    { rotulo: 'Sim', fn: () => { faixa(fAviso, ''); enviarTexto('/clear'); } },
+    { rotulo: 'Agora não', fn: () => {
+      contextoDispensado = ctx;
+      try { sessionStorage.setItem('dgclaw-contexto-dispensado:' + AGENTE.id, String(ctx)); } catch (_) { /* sem storage */ }
+      faixa(fAviso, '');
+    } },
+  ]);
+  fAviso.classList.add('leve');
+  fAviso.title = 'Cada mensagem leva de novo uns ' + numCurto(ctx) + ' tokens. A memória fica guardada. ' +
+    'O valor é o preço de uso da API; na assinatura ele não é cobrado por mensagem.';
+  fAviso.dataset.ctx = String(ctx);
+  alinhaFaixaLeve();
+}
+/* Na largura do campo de digitar (no computador a faixa ia de ponta a ponta, por cima do menu). */
+function alinhaFaixaLeve() {
+  if (!fAviso.classList.contains('leve')) return;
+  const campo = document.querySelector('.barra .campo');
+  const linha = campo && campo.closest('.barra > *');   // a linha inteira do campo (com o + e o enviar)
+  if (!linha) return;
+  const r = linha.getBoundingClientRect();
+  if (!r.width) return;
+  fAviso.style.left = Math.round(r.left) + 'px';
+  fAviso.style.width = Math.round(r.width) + 'px';
+  fAviso.style.right = 'auto';
+  respiroDasFaixas();
+}
+window.addEventListener('resize', alinhaFaixaLeve);
+ouvintesChegada.push(confereContexto);
 
 async function esperaResposta(since) {
   // Sem "parar de esperar" nem "esperando…" no topo (18/10/2026, pedido do dono): a linha de

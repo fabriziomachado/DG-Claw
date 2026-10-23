@@ -24,7 +24,7 @@ test('cada resposta do agente leva os tokens do turno e o que ele guardou na mem
   const { eventos } = leitor.ler(f, { slug: 'data', nome: 'Data', chat_id: 'c_data', agente_id: 'data' });
   const fala = eventos.find((e) => e.quem === 'agente' && e.text === 'Combinado.');
   assert.ok(fala, 'a fala do agente existe');
-  assert.deepEqual(fala.uso, { entrada: 3055, cache: 3000, saida: 100, ms: 9000 });
+  assert.deepEqual(fala.uso, { entrada: 3055, cache: 3000, saida: 100, contexto: 2003, ms: 9000 });
   assert.deepEqual(fala.memorias, [{ tipo: 'Regra', texto: '(20/10) Só a base clinica nas análises.' }]);
 });
 
@@ -66,4 +66,24 @@ test('/model sonnet vira a linha do modo economia, sem balão do dono nem result
   assert.equal(eventos.length, 1);
   assert.equal(eventos[0].origin, 'linha');
   assert.equal(eventos[0].text, '15:10 · modo economia ligado, Data usa o Sonnet até a semana renovar');
+});
+
+test('a resposta leva o custo em dólar pelo preço de API do modelo de cada chamada (22/10/2026)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'memtok-'));
+  const f = path.join(dir, 's.jsonl');
+  const ts = (s) => new Date(Date.UTC(2026, 9, 22, 0, 0, s)).toISOString();
+  const linhas = [
+    { type: 'user', timestamp: ts(0), message: { role: 'user', content: '<dgchat from="pessoa" chat="c_data" msg="m1" ts="x">oi</dgchat>' } },
+    // Opus 5.5: 1000 × 4 + 1000 × 5 (escrita no cache) + 1e6 × 0,2 (leitura) + 1000 × 20 = 229.000 / 1e6
+    { type: 'assistant', timestamp: ts(2), message: { id: 'a1', model: 'claude-opus-5-5', usage: { input_tokens: 1000, cache_creation_input_tokens: 1000, cache_read_input_tokens: 1e6, output_tokens: 1000 }, content: [] } },
+    // Sonnet 5.5: 1000 × 10 de saída = 0,01; modelo desconhecido não soma
+    { type: 'assistant', timestamp: ts(3), message: { id: 'a2', model: 'claude-sonnet-5-5', usage: { output_tokens: 1000 }, content: [] } },
+    { type: 'assistant', timestamp: ts(4), message: { id: 'a3', model: '<synthetic>', usage: { output_tokens: 5000 },
+      content: [{ type: 'tool_use', id: 't3', name: 'mcp__dgchat__reply', input: { chat: 'c_data', text: 'Pronto.' } }] } },
+  ];
+  fs.writeFileSync(f, linhas.map((l) => JSON.stringify(l)).join('\n') + '\n');
+  const leitor = criarLeitor({ log: () => {}, tz: 'America/Sao_Paulo', canalTelegram: false, midia: { registrar: () => null } });
+  const { eventos } = leitor.ler(f, { slug: 'data', nome: 'Data', chat_id: 'c_data', agente_id: 'data' });
+  const fala = eventos.find((e) => e.quem === 'agente' && e.text === 'Pronto.');
+  assert.equal(fala.uso.usd, 0.239);
 });

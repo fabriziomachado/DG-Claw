@@ -139,6 +139,12 @@
   #faixaErro{background:var(--dg-erro-fundo);color:var(--dg-erro-texto);border:1px solid var(--dg-erro-borda)}
   #faixaAviso{background:var(--dg-pedido-fundo);color:var(--dg-pedido-texto);border:1px solid var(--dg-pedido-borda);
               bottom:calc(var(--barra-h) + 8px)}
+  /* conversa pesada: aviso discreto, não amarelo de decisão */
+  #faixaAviso.leve{background:var(--dg-superficie);color:var(--dg-texto-2);border:1px solid var(--dg-borda);
+                   align-items:center;flex-wrap:wrap;row-gap:8px}
+  #faixaAviso.leve .x{display:none}
+  #faixaAviso.leve .txt{flex:1 1 240px}
+  #faixaAviso.leve .acoes{order:2;flex:0 0 auto;gap:6px}
   #faixaErro.aparece + #faixaAviso.aparece{bottom:calc(var(--barra-h) + 66px)}
   /* botões dentro da faixa ("Tentar de novo", "Descartar"): numa linha própria
      embaixo do texto, que quebra em vez de empurrar a tela pro lado em 390 px */

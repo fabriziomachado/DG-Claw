@@ -1967,7 +1967,9 @@ function render(opt) {
   const ultDono = todas.reduce((a, x) => (ehDono(x) && typeof x.ep === 'number' && x.ep > a ? x.ep : a), 0);
   let divisorPosto = false;
   if (divisorEp != null && ultDono > divisorEp) divisorEp = null;   // você já escreveu depois: a linha sai
-  for (let bi = 0; bi < blocos.length; bi++) {
+  // só passos de rotina (o batimento, por exemplo) e nenhuma mensagem: a conversa segue "nova" (22/10/2026)
+  const soPassos = blocos.length > 0 && blocos.every(b => b.trilha);
+  for (let bi = 0; bi < (soPassos ? 0 : blocos.length); bi++) {
     const bloco = blocos[bi];
     const m = bloco.msg || bloco.trilha[0];
     if (m.dia !== dia) {

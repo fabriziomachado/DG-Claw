@@ -5062,6 +5062,21 @@ document.addEventListener('dgui-pergunta', ev => {
   const perg = String(ev.detail.pergunta || '').replace(/\s+/g, ' ').trim().slice(0, 160);
   enviarTexto(perg ? '↩ ' + perg + '\n' + t : t);
 });
+// "Mandar para o Admin aplicar" (dgui para-admin, 23/10/2026): o texto é fixo e montado aqui, com a
+// data conferida e o agente desta tela; o que o agente escreveu no relatório não vai junto
+document.addEventListener('dgui-para-admin', async ev => {
+  const data = String((ev.detail && ev.detail.relatorio) || '');
+  const feito = (ev.detail && ev.detail.feito) || (() => {});
+  const admin = agentesMenu.find(a => a.tipo === 'admin');
+  if (EH_ADMIN || !admin || !/^\d{4}-\d{2}-\d{2}$/.test(data)) { feito(false); mostraErro('Este botão só funciona na conversa de um agente.'); return; }
+  const [a, m, d] = data.split('-');
+  const texto = '[do cartão do relatório de segurança do ' + AGENTE.nome + '] aplica as correções do relatório de segurança de ' +
+    d + '/' + m + '/' + a + ' (agente ' + AGENTE.id + ', arquivo seguranca/relatorio-' + data + '.md)';
+  try {
+    await api('/api/v1/agents/' + encodeURIComponent(admin.id) + '/send', { method: 'POST', body: { text: texto }, timeoutMs: 75000 });
+    feito(true);
+  } catch (e) { feito(false); mostraErro('Não consegui mandar para o Admin: ' + e.message); }
+});
 const RX_CITA_LOCAL = /^↩ (?:\[([a-f0-9]{8,40})\] )?([^\n]{1,200})\n([\s\S]+)$/;
 const semCita = t => { const r = RX_CITA_LOCAL.exec(String(t || '')); return r ? r[3] : t; };
 btnEnviar.onclick = () => {

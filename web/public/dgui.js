@@ -338,6 +338,20 @@
       `<button type="button" class="dgui-op dgui-op-outra" data-dgui-outra="1"><span class="dgui-op-letra">✎</span><span class="dgui-op-txt"><b>Outra resposta</b><small>escrever do meu jeito</small></span></button>` +
       '</div></div>';
   }
+  /* ── Para o Admin (23/10/2026, pedido do dono): o relatório de segurança do Tech fecha com um
+     botão; o toque do dono manda ao Admin um pedido de texto fixo, montado pela conversa.js. O
+     agente só diz a data do relatório, e nada do que ele escreve chega ao Admin. ── */
+  function paraAdmin(c) {
+    const data = String(c.relatorio || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data)) return aviso('para-admin sem "relatorio" no formato AAAA-MM-DD');
+    const [a, m, d] = data.split('-');
+    return `<div class="dgui-escolha dgui-para-admin" data-escolha="pa${a}${m}${d}">` +
+      `<div class="dgui-escolha-perg">Relatório de segurança de ${d}/${m}/${a}</div>` +
+      '<div class="dgui-escolha-ops">' +
+      `<button type="button" class="dgui-op" data-dgui-para-admin="${data}"><span class="dgui-op-letra">${svgIco('<path d="M4 12 20 4l-6 16-3-7z"/>')}</span>` +
+      '<span class="dgui-op-txt"><b>Mandar para o Admin aplicar</b><small>Ele aplica o que é seguro e pergunta antes do resto</small></span></button>' +
+      '</div></div>';
+  }
   /* ── Carrossel (19/10/2026, pedido do dono): variantes, propostas ou cenários lado a lado, um
      cartão por vez. Cada item: { titulo, detalhe, imagem (só do próprio DG Claw, "/..."), conteudo
      (um componente ou uma lista deles), recomendada }. Com "escolher": true, cada cartão tem
@@ -444,6 +458,7 @@
     if (c.tipo === 'grafico' || c.tipo === 'gráfico') return grafico(c);
     if (c.tipo === 'leitura') return leitura(c);
     if (c.tipo === 'escolha') return escolha(c);
+    if (c.tipo === 'para-admin') return paraAdmin(c);
     if (c.tipo === 'carrossel') return carrossel(c, fundo);
     if (c.tipo === 'passos') return passos(c);
     if (c.tipo === 'painel' && c.vivo && !c._vivoDentro && fundo === 0) return painelVivo(c, fundo);
@@ -924,6 +939,22 @@
       const perg = ev.target.closest('[data-dgui-balao-pergunta]');
       if (perg) { raiz.document.dispatchEvent(new CustomEvent('dgui-pergunta', { detail: { texto: perg.dataset.dguiBalaoPergunta } })); fechaBalao(); return; }
       if (!ev.target.closest('.dgui-balao')) fechaBalao();
+      const pa = ev.target.closest('[data-dgui-para-admin]');
+      if (pa) {
+        const caixa = pa.closest('.dgui-escolha');
+        if (caixa.classList.contains('respondida')) return;
+        const marca = (sim) => {
+          caixa.classList.toggle('respondida', sim); pa.classList.toggle('escolhida', sim);
+          try { if (sim) raiz.localStorage.setItem('dgui-escolha:' + caixa.dataset.escolha, pa.dataset.dguiParaAdmin); else raiz.localStorage.removeItem('dgui-escolha:' + caixa.dataset.escolha); } catch (_) { /* sem storage */ }
+        };
+        marca(true);
+        const sm = pa.querySelector('small'), antes = sm.textContent;
+        sm.textContent = 'Mandando…';
+        // a conversa.js manda e chama feito(ok); sem envio, o botão volta
+        raiz.document.dispatchEvent(new CustomEvent('dgui-para-admin', { detail: { relatorio: pa.dataset.dguiParaAdmin,
+          feito: (ok) => { sm.textContent = ok ? 'Enviado. O Admin responde na conversa dele' : antes; if (!ok) marca(false); } } }));
+        return;
+      }
       // pergunta sugerida: a conversa (conversa.js) escuta e manda ao agente
       const op = ev.target.closest('[data-dgui-opcao]');
       if (op) {
@@ -973,6 +1004,7 @@
       if (!v) continue;
       cx.classList.add('respondida');
       for (const b of cx.querySelectorAll('[data-dgui-opcao]')) if (b.dataset.dguiOpcao === v) b.classList.add('escolhida');
+      for (const b of cx.querySelectorAll('[data-dgui-para-admin]')) { b.classList.add('escolhida'); b.querySelector('small').textContent = 'Enviado ao Admin'; }
     }
   }
   const api = { htmlCarrossel, normaliza, restauraEscolhas, blocoParaHtml, numero, csvDe, tsvDe, pngDe, svgParaImagem, registro };

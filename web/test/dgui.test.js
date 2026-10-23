@@ -179,3 +179,12 @@ test('passos: numerados com o código no bloco da conversa (barra com língua e 
   assert.ok(h.includes('sudo adduser x') && h.includes('>texto<'));
   assert.ok(!/Continue a análise/.test(h), 'passos não ganha perguntas sugeridas');
 });
+
+test('para-admin desenha o botão só com data válida, sem texto do agente', () => {
+  const h = dgui.blocoParaHtml(bloco({ tipo: 'para-admin', relatorio: '2026-10-23', titulo: '<b>x</b>' }));
+  assert.match(h, /data-dgui-para-admin="2026-10-23"/);
+  assert.match(h, /Relatório de segurança de 23\/10\/2026/);
+  assert.ok(!h.includes('<b>x</b>'));
+  assert.match(dgui.blocoParaHtml(bloco({ tipo: 'para-admin', relatorio: '2026-10-23"><img' })), /dgui-aviso/);
+  assert.match(dgui.blocoParaHtml(bloco({ tipo: 'para-admin' })), /dgui-aviso/);
+});

@@ -364,6 +364,7 @@
     q('#lbInicio').value = q('#lbData').value = diaDe(new Date());
     mostraCampos();
     q('#lbQuando').addEventListener('change', mostraCampos);
+    if (window.DGSeletorAgente) window.DGSeletorAgente.opcoes(q('#lbQuando'), { titulo: 'Quando' });
     q('#lbTexto').addEventListener('input', contador);
     q('#lbForm').addEventListener('submit', criar);
     el.addEventListener('click', aoClicar);

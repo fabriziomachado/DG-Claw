@@ -106,7 +106,7 @@
       : memRes && memRes.erro ? `<p class="ss-fraco" style="margin:0">${esc(memRes.erro)}</p>`
       : memRes ? (memRes.trechos.length ? `<div class="ss-res">${memRes.trechos.map(t => `<div class="ss-r"><small>${esc(t.fonte || t.tipo || '')}${t.data ? ' · ' + esc(String(t.data).slice(0, 10).split('-').reverse().join('/')) : ''}${t.score ? ' · ' + Math.round(t.score * 100) + '% parecido' : ''}</small>${esc(t.texto)}</div>`).join('')}</div>`
         : '<p class="ss-fraco" style="margin:0">Nada parecido na memória. Pode ser que isso nunca tenha sido anotado.</p>') : '';
-    return `<div class="ss-sec">${I.cerebro}Memória semântica<span class="q">${ligadas} de ${mem.agentes.length} ligadas</span></div><div class="ss-grupo ss-pad">` +
+    return `<div class="ss-sec">${I.cerebro}Memória semântica<span class="q">${ligadas} de ${mem.agentes.length} ligadas</span></div><div class="ss-grupo ss-pad ss-grupo-mem">` +
       '<div class="ss-conta">Modelo local do Google, roda no servidor: sem conta, sem custo, nada sai da máquina</div>' + linhas +
       '<div class="ss-div"></div>' +
       `<div class="ss-op"><span class="ss-ic">${I.lampada}</span><span class="ss-optx"><b>Lembrete automático na conversa</b><small>antes de responder, o agente procura na memória e nas conversas antigas o que combina com a sua mensagem</small></span>` +
@@ -210,6 +210,12 @@
       })()}</div>` +
       (totE ? `<p class="ss-fraco">${Math.round((totC / totE) * 100)}% da entrada veio do cache, que custa bem menos. Na assinatura, o que conta é o limite de uso da conta, e não o valor.</p>` : '');
     raiz.innerHTML = resumo + `<div class="ss-colunas"><div>${servidor}${agentes}${memoria()}</div><div>${limites()}${consumo}${plano()}</div></div>`;
+    // a lista de agentes da busca na memória é a mesma pílula com foto e cargo do Board
+    const sel = document.getElementById('ssMemAg');
+    if (sel) {
+      sel.addEventListener('change', () => { memAg = sel.value; });
+      if (window.DGSeletorAgente) DGSeletorAgente.liga(sel, mem.agentes.map(a => Object.assign({ id: a.slug, nome: a.nome }, agentesInfo[a.slug] || {})), { titulo: 'De qual agente' });
+    }
   }
 
   // as conferências: o que pede atenção aparece sempre; as que estão ok ficam atrás do "ver todas", para a tela não virar uma lista comprida

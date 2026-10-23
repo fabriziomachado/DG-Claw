@@ -7,6 +7,7 @@
 //   GET /api/v1/historico/<slug>/memoria?arquivo=  texto de um arquivo da lista acima
 //   GET /api/v1/historico/<slug>/arquivadas       as conversas que o /clear tirou da tela (arquivo-conversa.js)
 //   GET /api/v1/historico/<slug>/arquivadas/<id>  as mensagens de uma delas
+//   PUT /api/v1/historico/<slug>/arquivadas/<id>  { titulo } dá nome a ela (vazio volta ao automático)
 //   GET /api/v1/historico/<slug>/sugestoes        as sugestões da conversa vazia, que o próprio agente
 //                                                 mantém em ~/.dgclaw/sugestoes.json (objetivo dele e
 //                                                 últimas conversas); texto curto, nunca HTML
@@ -20,6 +21,7 @@
 
 const { execFile } = require('node:child_process');
 const { trechosArquivados } = require('./arquivo-conversa');
+const { lerJson } = require('./http');
 
 const FTS = '/opt/dgclaw/app/scripts/memory_index/conversas_fts.py';
 const CASA = '/home/agente';
@@ -81,7 +83,8 @@ function sugestoesValidas(bruto) {
 
 // O que a tela de leitura de uma conversa arquivada precisa de cada mensagem.
 function mensagemLeitura(m) {
-  const media = m.media ? { kind: m.media.kind, nome: m.media.nome || '' } : null;
+  const md = m.media;
+  const media = md ? { id: md.id, kind: md.kind, nome: md.nome || '', disponivel: !!md.disponivel, url: md.url || null, thumb: md.thumb || null } : null;
   return { id: m.id, ep: m.ep, origin: m.origin, text: m.text || '', kind: m.kind || '', alerta: m.alerta || '', media };
 }
 
@@ -125,7 +128,8 @@ function criarHistorico({ registro, log, conversa = null, arquivoConversa = null
     const mm = /^\/api\/v1\/historico\/([^/]+)(?:\/(busca|memorias|memoria|arquivadas|sugestoes)(?:\/(\d+(?:\.\d+)?))?)?$/.exec(p);
     if (!mm) { erro(res, 404, 'Rota do histórico desconhecida.'); return true; }
     if (mm[3] && mm[2] !== 'arquivadas') { erro(res, 404, 'Rota do histórico desconhecida.'); return true; }
-    if (m !== 'GET') { erro(res, 405, 'O histórico é só de leitura: use GET.'); return true; }
+    const renomeia = m === 'PUT' && mm[2] === 'arquivadas' && mm[3];
+    if (m !== 'GET' && !renomeia) { erro(res, 405, 'O histórico é só de leitura: use GET.'); return true; }
     const { a, erro: e, status } = agenteDe(decodeURIComponent(mm[1]), mm[2]);
     if (!a) { erro(res, status, e); return true; }
     if (a.tipo === 'admin' && !mm[2]) { json(res, 200, { ok: true, ligada: false, so_arquivadas: true, conversa: 0, memoria: 0 }); return true; }
@@ -170,9 +174,13 @@ function criarHistorico({ registro, log, conversa = null, arquivoConversa = null
       if (mm[2] === 'arquivadas') {
         if (!conversa || !arquivoConversa) { json(res, 200, { ok: true, arquivadas: [] }); return true; }
         const t = await conversa.thread(a);
-        const trechos = trechosArquivados(t.msgs, arquivoConversa.cortes(a.slug));
-        if (!mm[3]) { json(res, 200, { ok: true, arquivadas: trechos }); return true; }
         const id = Number(mm[3]);
+        if (renomeia) {
+          const corpo = await lerJson(req, 4096);
+          if (!arquivoConversa.renomear(a.slug, id, corpo.titulo)) { erro(res, 404, 'Essa conversa arquivada não foi encontrada. Atualize a lista.'); return true; }
+        }
+        const trechos = trechosArquivados(t.msgs, arquivoConversa.cortes(a.slug), arquivoConversa.titulos(a.slug));
+        if (!mm[3]) { json(res, 200, { ok: true, arquivadas: trechos }); return true; }
         const tr = trechos.find((x) => x.id === id);
         if (!tr) { erro(res, 404, 'Essa conversa arquivada não foi encontrada. Atualize a lista.'); return true; }
         const msgs = t.msgs.filter((m) => m.ep >= tr.de && m.ep <= tr.ate).map(mensagemLeitura);
@@ -195,6 +203,7 @@ function criarHistorico({ registro, log, conversa = null, arquivoConversa = null
       json(res, 200, { ok: true, arquivo, grupo: item.grupo, mudou: item.mudou, cortado: item.tamanho > TETO_ARQUIVO, texto: r.saida });
       return true;
     } catch (x) {
+      if (x.status === 400 || x.status === 413) { erro(res, x.status, x.message); return true; }
       log('erro', `Histórico de ${a.slug}: ${p} falhou: ${x.message}`);
       erro(res, 503, 'Não consegui abrir o histórico agora. O agente está ligado?');
       return true;

@@ -1322,9 +1322,11 @@ agente_recriar() {
     exigir_casa_sem_link "$C_CASA" "$C_HOME" "$slug" "dgclaw agente recriar $slug"
 
     unidades="$C_CASA/.unidades-self.tar"
+    crontabs="$C_CASA/.crontabs.tar"
     if [ "$estado" = running ]; then
         passo "Guardando as rotinas do agente $slug"
         guardar_unidades_self "$slug" "$unidades"
+        guardar_crontabs "$slug" "$crontabs"
     else
         aviso "o container nao esta ligado, entao nao da para guardar as rotinas de dentro dele (dgclaw-$slug-self-*). A lista delas fica na casa (.dgclaw/self-crons.json) e o 'reparar' tenta recolocar."
         rm -f "$unidades"
@@ -1343,6 +1345,7 @@ agente_recriar() {
 
     agente_reparar "$slug"
     devolver_unidades_self "$slug" "$unidades"
+    devolver_crontabs "$slug" "$crontabs"
     ok "agente $slug recriado com a imagem atual (casa, cofre e portas intactos)"
 }
 
@@ -1457,6 +1460,36 @@ devolver_unidades_self() {
             || aviso "a rotina $t voltou ao container mas nao ligou. Veja: podman exec dgclaw-$slug systemctl status $t"
     done < <(tar -tf "$origem" | grep '\.timer$')
     ok "rotinas do agente devolvidas e ligadas"
+}
+
+# guardar_crontabs <slug> <arquivo.tar>: copia para fora o crontab que o agente fez com
+# `crontab -e` (fica em /var/spool/cron, dentro do container, e sumia a cada recriar).
+# Se o container nao tem nenhum, o arquivo de uma recriacao anterior fica como esta.
+guardar_crontabs() {
+    local slug="$1" alvo="$2" rc=0
+    if [ "$ENSAIO" = 1 ]; then
+        info "[ensaio] guardaria em $alvo os crontabs de dentro do container"
+        return 0
+    fi
+    # shellcheck disable=SC2016 # o script roda dentro do container
+    ( umask 077; podman exec "dgclaw-$slug" sh -c 'cd /var/spool/cron/crontabs 2>/dev/null || exit 0; set -- *; [ -e "$1" ] || exit 0; tar -cf - "$@"' >"$alvo.novo" ) || rc=$?
+    [ "$rc" -eq 0 ] || falha "nao consegui guardar os crontabs do agente $slug antes de trocar o container (codigo $rc)." \
+        "nada foi mexido ainda. Veja se o container responde: podman exec dgclaw-$slug true; depois rode de novo."
+    if [ -s "$alvo.novo" ]; then mv -f "$alvo.novo" "$alvo"; ok "crontabs guardados ($(tar -tf "$alvo" | tr '\n' ' '))"
+    else rm -f "$alvo.novo"; fi
+}
+
+# devolver_crontabs <slug> <arquivo.tar>: poe os crontabs de volta no container novo.
+devolver_crontabs() {
+    local slug="$1" origem="$2" rc=0
+    if [ "$ENSAIO" = 1 ]; then
+        info "[ensaio] devolveria os crontabs guardados em $origem"
+        return 0
+    fi
+    [ -s "$origem" ] || return 0
+    podman exec -i "dgclaw-$slug" tar -C /var/spool/cron/crontabs -xpf - <"$origem" || rc=$?
+    [ "$rc" -eq 0 ] || { aviso "nao consegui devolver os crontabs do agente $slug (codigo $rc). Estao guardados em $origem. Para devolver na mao: podman exec -i dgclaw-$slug tar -C /var/spool/cron/crontabs -xpf - < $origem"; return 0; }
+    ok "crontabs do agente devolvidos"
 }
 
 # agente_identidade <slug>: regrava so o identidade.md (AGENT.md + regra do canal + a secao

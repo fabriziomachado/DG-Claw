@@ -24,7 +24,9 @@ function resumo(texto, max = 140) {
   return t.length > max ? t.slice(0, max - 1).replace(/\s+\S*$/, '') + '…' : t;
 }
 
-function criarVigiaAlertas({ registro, conversa, alertas, push, log, agora }) {
+function criarVigiaAlertas({ registro, conversa, alertas, push, avisar, log, agora }) {
+  // avisar(aviso, tipo): o caminho com as escolhas do dono (lib/boas-vindas.js); sem ele, push direto
+  const manda = avisar || ((aviso) => push.enviar(aviso));
   const relogio = agora || (() => Date.now());
   let timer = null;
   let rodando = false;
@@ -54,8 +56,8 @@ function criarVigiaAlertas({ registro, conversa, alertas, push, log, agora }) {
       url: '/a/' + encodeURIComponent(agente.slug),
       contador: pendentes(),
     };
-    push.enviar(aviso).then((r) => {
-      if (r.falhas && r.falhas.length) log('aviso', `Vigia de alertas: o aviso de ${nome} não chegou a ${r.falhas.length} aparelho(s).`);
+    manda(aviso, item.tipo).then((r) => {
+      if (r && r.falhas && r.falhas.length) log('aviso', `Vigia de alertas: o aviso de ${nome} não chegou a ${r.falhas.length} aparelho(s).`);
     }).catch((e) => log('erro', `Vigia de alertas: não consegui mandar o aviso de ${nome}: ${e.message}`));
   }
 

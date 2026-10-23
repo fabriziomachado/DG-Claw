@@ -20,9 +20,21 @@ if (navigator.standalone === true ||
 }
 </script>
 <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+<!-- abertura do app no iPhone (22/10/2026): uma imagem por tamanho de tela, em web/public/splash/ -->
+<link rel="apple-touch-startup-image" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/splash/splash-1320x2868.jpg">
+<link rel="apple-touch-startup-image" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/splash/splash-1206x2622.jpg">
+<link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/splash/splash-1290x2796.jpg">
+<link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/splash/splash-1179x2556.jpg">
+<link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/splash/splash-1284x2778.jpg">
+<link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/splash/splash-1170x2532.jpg">
+<link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/splash/splash-1125x2436.jpg">
+<link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="/splash/splash-1242x2688.jpg">
+<link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="/splash/splash-828x1792.jpg">
+<link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="/splash/splash-750x1334.jpg">
 <link rel="icon" href="/icons/icon-192.png">
 <link rel="stylesheet" href="/tema.css">
 <script src="/tema.js"></script>
+<script src="/titulo-app.js"></script>
 <link rel="stylesheet" href="/chat.css">
 <link rel="stylesheet" href="/conversa.css">
 <link rel="stylesheet" href="/fileira.css">
@@ -36,6 +48,7 @@ if (navigator.standalone === true ||
 <link rel="stylesheet" href="/lembretes.css">
 <link rel="stylesheet" href="/foco-tela.css">
 <link rel="stylesheet" href="/sem-zoom.css">
+<link rel="stylesheet" href="/boas-vindas.css">
 <script src="/sem-zoom.js"></script>
 </head>
 <body>
@@ -101,8 +114,8 @@ if (navigator.standalone === true ||
   <div id="anexoChip" hidden><div id="anexoLista" role="list" aria-label="Anexos desta mensagem"></div><div id="anexoInfo" aria-live="polite"></div></div>
   <div id="avisoAdmin" hidden>Comandos como <code>/compact</code> e <code>/clear</code> funcionam aqui.</div>
   <div class="linha1">
-    <button id="btnAnexo" aria-label="Anexar fotos, vídeos, áudios ou PDFs"
-            title="Anexar fotos, vídeos, áudios ou PDFs (vários de uma vez)" data-tour="anexo"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+    <button id="btnAnexo" aria-label="Anexar arquivo ou começar uma conversa nova"
+            title="Anexar arquivo ou começar uma conversa nova" data-tour="anexo"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
     <input type="file" id="arquivo" multiple>
     <div class="campo" data-tour="campo"><textarea id="entrada" rows="1" placeholder="Escrever mensagem"
               autocomplete="off" enterkeyhint="send"></textarea><canvas id="micOnda" aria-hidden="true"></canvas><span id="micTxt" aria-live="polite"></span></div>
@@ -151,6 +164,8 @@ if (navigator.standalone === true ||
 <script src="/economia.js"></script>
 <script src="/ajudantes.js"></script>
 <script src="/conversa.js"></script>
+<script src="/avisos-aparelho.js"></script>
+<script src="/boas-vindas.js"></script>
 <script src="/icones-topo.js"></script>
 <script>
 /* Teclado do iPhone (o teclado, a barra de sugestões ou a de preenchimento

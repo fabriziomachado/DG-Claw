@@ -1,0 +1,24 @@
+/* seletor-agente.css: escolher o agente com a foto e o cargo (seletor-agente.js, 21/10/2026).
+   Saiu do mesa.css em 22/10/2026 para a Saúde do servidor usar o mesmo. */
+.sa{position:relative;display:inline-flex}
+.sa-pilula{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:3px 10px 3px 3px;border-radius:999px;border:1px solid var(--dg-borda);background:transparent;color:var(--dg-texto);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.sa-pilula[aria-expanded="true"]{border-color:var(--dg-azul)}
+.sa-pilula svg{color:var(--dg-texto-3)}
+.sa-av{border-radius:50%;overflow:hidden;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:600;flex:0 0 auto}
+.sa-av img{width:100%;height:100%;object-fit:cover;display:block}
+.sa-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:30;width:min(310px,calc(100vw - 32px));background:var(--dg-superficie);border:1px solid var(--dg-borda);border-radius:14px;box-shadow:var(--dg-sombra);padding:6px}
+.sa-menu[hidden]{display:none}
+.sa-menu.cima{top:auto;bottom:calc(100% + 6px)}
+.sa-tit{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dg-texto-3);padding:8px 8px 6px}
+.sa-op{display:flex;align-items:center;gap:10px;width:100%;padding:8px;border:0;border-radius:10px;background:transparent;color:var(--dg-texto);font:inherit;text-align:left;cursor:pointer}
+.sa-op:hover,.sa-op:focus-visible,.sa-op.on{background:var(--dg-superficie-2);outline:none}
+.sa-tx{flex:1;min-width:0;display:flex;flex-direction:column}
+.sa-tx b{font-weight:600;font-size:14px}
+.sa-tx small{font-size:12.5px;color:var(--dg-texto-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sa-ok{color:var(--dg-azul);display:grid;place-items:center}
+.sa-div{height:1px;background:var(--dg-borda);margin:4px 6px}
+
+/* lista comum com o mesmo menu (DGSeletorAgente.opcoes, 22/10/2026): a pílula é a .av-pil dos avisos */
+.sa-lista .sa-op{padding:9px 10px}
+.sa-lista .sa-menu{width:auto;min-width:200px}
+.sa-valor{white-space:nowrap}

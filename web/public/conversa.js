@@ -282,6 +282,34 @@ let religaTimer = null, religaEspera = 3000;
 let avisoThread = null;             // último aviso da THREAD posto na faixa amarela
 const ouvintesChegada = [];         // chamados no fim de cada integra()
 let anexos = [];                    // arquivos colados/arrastados/escolhidos esperando o Enter
+
+/* Rascunho por agente (pedido do dono, 21/10/2026): texto e anexos JÁ SUBIDOS ficam guardados no
+   aparelho, então trocar de agente e voltar não perde nada. Anexo ainda subindo não entra (o
+   arquivo só existe nesta página). Vale 7 dias, chave "dgclaw:" para sair junto no logout. */
+const RASCUNHO_VALE_MS = 7 * 24 * 3600 * 1000;
+let rascunhoTimer = null;
+function chaveRascunho() { return 'dgclaw:' + AGENTE.id + ':rascunho'; }
+function gravaRascunho() {
+  if (rascunhoTimer) { clearTimeout(rascunhoTimer); rascunhoTimer = null; }
+  try {
+    const texto = typeof entrada !== 'undefined' && entrada ? entrada.value : '';
+    const prontos = anexos.filter(a => a.estado === 'pronto' && a.id)
+      .map(a => ({ id: a.id, kind: a.kind, nome: a.nome, path: a.path, bytes: a.bytes, previa: a.previaServidor || null }));
+    if (!texto.trim() && !prontos.length) { localStorage.removeItem(chaveRascunho()); return; }
+    localStorage.setItem(chaveRascunho(), JSON.stringify({ em: Date.now(), texto: texto.slice(0, 20000), anexos: prontos }));
+  } catch (e) { console.warn('não consegui guardar o rascunho no aparelho:', e.message); }
+}
+function gravaRascunhoLogo() {
+  if (rascunhoTimer) clearTimeout(rascunhoTimer);
+  rascunhoTimer = setTimeout(gravaRascunho, 400);
+}
+function leRascunho() {
+  try {
+    const d = JSON.parse(localStorage.getItem(chaveRascunho()) || 'null');
+    if (!d || !(Date.now() - d.em < RASCUNHO_VALE_MS)) { localStorage.removeItem(chaveRascunho()); return null; }
+    return d;
+  } catch (e) { console.warn('rascunho guardado ilegível, ignorado:', e.message); return null; }
+}
 let filtrosProntos = false;         // os filtros do topo (mais abaixo) já existem?
 let carregouUmaVez = false;         // a primeira página já chegou (ou falhou)
 let demoAtividade = false;         // o tutorial mostra um exemplo da faixa de atividade
@@ -1012,9 +1040,17 @@ function pcDesenha(pedido, abrindo) {
     return e;
   };
   pcEl.textContent = '';
-  pcEl.appendChild(filho('strong', 'pc-titulo', 'O agente está esperando a sua permissão'));
-  pcEl.appendChild(filho('p', 'pc-texto', AGENTE.nome + ' quer fazer isto e parou até você decidir:'));
-  pcEl.appendChild(filho('pre', 'pc-pedido', TR.descricaoPedido(pedido)));
+  // 22/10/2026: no visual novo (paleta do tema, cartão como o de escolha); o ícone é o escudo de traço
+  const cab = filho('div', 'pc-cab');
+  cab.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6z"/><path d="M12 9v4M12 16.5v.01"/></svg>';
+  cab.appendChild(filho('strong', 'pc-titulo', AGENTE.nome + ' pede a sua permissão'));
+  pcEl.appendChild(cab);
+  if (pedido && pedido.titulo) {
+    pcEl.appendChild(filho('p', 'pc-texto', 'Ele parou e só continua depois que você decidir. Quer fazer isto:'));
+    pcEl.appendChild(filho('pre', 'pc-pedido', TR.descricaoPedido(pedido)));
+  } else {
+    pcEl.appendChild(filho('p', 'pc-texto', 'Ele parou e só continua depois que você decidir. Não disse o que quer fazer: se tiver dúvida, negue e pergunte na conversa.'));
+  }
   if (pc.erro) pcEl.appendChild(filho('p', 'pc-erro', pc.erro));
   const linha = filho('div', 'pc-botoes');
   const botao = (texto, classe, decisao) => {
@@ -1024,8 +1060,8 @@ function pcDesenha(pedido, abrindo) {
     b.addEventListener('click', () => pcDecide(decisao));
     return b;
   };
-  linha.appendChild(botao('Aprovar', 'pc-aprova', 'aprovar'));
   linha.appendChild(botao('Negar', 'pc-nega', 'negar'));
+  linha.appendChild(botao('Aprovar', 'pc-aprova', 'aprovar'));
   pcEl.appendChild(linha);
   const msg = pc.decidido ? (pc.decidido === 'aprovar' ? 'Aprovado. Aguardando o agente continuar…' : 'Negado. Aguardando o agente continuar…')
     : (pc.ocupado ? 'Enviando a sua decisão…' : '');
@@ -1088,7 +1124,8 @@ function telaOciosa() {
 }
 
 function faixa(el, txt) {
-  el.classList.remove('ok');
+  el.classList.remove('ok', 'leve');
+  el.style.left = el.style.width = el.style.right = ''; el.title = '';
   // botões de uma faixa anterior (ex.: "Tentar de novo") não valem pro texto novo
   const acoes = el.querySelector('.acoes');
   if (acoes) acoes.remove();
@@ -1125,7 +1162,11 @@ function respiroDasFaixas() {
 const mostraErro = t => faixa(fErro, t);
 const mostraAviso = t => faixa(fAviso, t);
 fErro.querySelector('.x').onclick = () => faixa(fErro, '');
-fAviso.querySelector('.x').onclick = () => faixa(fAviso, '');
+fAviso.querySelector('.x').onclick = () => {
+  // fechar o aviso de conversa pesada vale como "Agora não" (senão ele volta na próxima resposta)
+  if (fAviso.classList.contains('leve')) { const b = Array.from(fAviso.querySelectorAll('.acoes button')).pop(); if (b) { b.click(); return; } }
+  faixa(fAviso, '');
+};
 
 /* Avisos que vêm da thread (ex.: "Nenhum transcript...") valem enquanto o
    servidor manda. Lista vazia limpa a faixa, mas só se o que está nela é o aviso
@@ -1775,6 +1816,9 @@ function numCurto(n) {
   if (n >= 1e3) return (n / 1e3).toFixed(n >= 1e5 ? 0 : 1).replace('.', ',').replace(/,0$/, '') + ' mil';
   return String(n);
 }
+function dolar(v) {
+  return 'US$ ' + v.toFixed(v >= 10 ? 0 : 2).replace('.', ',');
+}
 function duracao(ms) {
   if (!Number.isFinite(ms)) return '';
   const s = Math.round(ms / 1000);
@@ -1808,7 +1852,8 @@ function detalhesDaResposta(m) {
       `<div><span>Entrada</span><b>${numCurto(u.entrada)} tokens</b></div>` +
       (u.cache ? `<div><span>· do cache (mais barato)</span><b>${numCurto(u.cache)}</b></div>` : '') +
       `<div><span>Saída</span><b>${numCurto(u.saida)} tokens</b></div>` +
-      (Number.isFinite(u.ms) && u.ms > 0 ? `<div><span>Tempo</span><b>${duracao(u.ms)}</b></div>` : '') + '</div>';
+      (Number.isFinite(u.ms) && u.ms > 0 ? `<div><span>Tempo</span><b>${duracao(u.ms)}</b></div>` : '') +
+      (u.usd >= 0.01 ? `<div title="Preço de uso da API; na assinatura não é cobrado por mensagem"><span>Custo na API</span><b>${dolar(u.usd)}</b></div>` : '') + '</div>';
   }
   return html;
 }
@@ -1967,7 +2012,9 @@ function render(opt) {
   const ultDono = todas.reduce((a, x) => (ehDono(x) && typeof x.ep === 'number' && x.ep > a ? x.ep : a), 0);
   let divisorPosto = false;
   if (divisorEp != null && ultDono > divisorEp) divisorEp = null;   // você já escreveu depois: a linha sai
-  for (let bi = 0; bi < blocos.length; bi++) {
+  // só passos de rotina (o batimento, por exemplo) e nenhuma mensagem: a conversa segue "nova" (22/10/2026)
+  const soPassos = blocos.length > 0 && blocos.every(b => b.trilha);
+  for (let bi = 0; bi < (soPassos ? 0 : blocos.length); bi++) {
     const bloco = blocos[bi];
     const m = bloco.msg || bloco.trilha[0];
     if (m.dia !== dia) {
@@ -3281,8 +3328,10 @@ function prontoAnexo(a, d) {
   a.pct = null;
   a.id = d.anexo.id;
   a.path = d.anexo.path;
+  if (d.media) a.previaServidor = d.media.thumb || d.media.url || null;
   atualizaCartao(a);
   pintaInfoAnexos();
+  gravaRascunhoLogo();
   tocaSubidas();
   if (enviarQuandoSubir && anexos.every(x => x.estado === 'pronto')) despachaAnexos();
 }
@@ -3326,14 +3375,57 @@ function despachaAnexos() {
   const t = entrada.value.trim();
   entrada.value = '';
   ajustaCampo();
+  gravaRascunho();
   vozNoCampo = false;
   enviarTexto(respondendo && t ? comResposta(t) : t, lista);
 }
 
+/* O ➕ abre um menuzinho (22/10/2026, a pedido do dono): Anexar arquivo e Nova conversa.
+   A nova é o mesmo /clear (o servidor arquiva a anterior no Histórico) e pede um segundo
+   toque, para um toque sem querer não limpar a tela. */
+const menuMais = document.createElement('div');
+menuMais.id = 'menuMais';
+menuMais.setAttribute('role', 'menu');
+menuMais.hidden = true;
+menuMais.innerHTML =
+  '<button type="button" role="menuitem" data-mais="anexar"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4L15 7"/></svg>' +
+  '<span><b>Anexar arquivo</b><small>Fotos, vídeos, áudios, PDFs</small></span></button>' +
+  '<div class="mm-sep"></div>' +
+  '<button type="button" role="menuitem" data-mais="nova"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h8"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>' +
+  '<span><b>Nova conversa</b><small>Guarda esta no Histórico</small></span></button>';
+btnAnexo.parentElement.appendChild(menuMais);
+const itemNova = menuMais.querySelector('[data-mais="nova"]');
+let novaTimer = 0;
+function novaPronta(sim) {
+  clearTimeout(novaTimer);
+  itemNova.classList.toggle('confirma', sim);
+  itemNova.querySelector('b').textContent = sim ? 'Toque de novo para limpar' : 'Nova conversa';
+  itemNova.querySelector('small').textContent = sim ? 'A conversa de agora vai para o Histórico' : 'Guarda esta no Histórico';
+  if (sim) novaTimer = setTimeout(() => novaPronta(false), 4000);
+}
+function menuMaisAbre(abre) {
+  menuMais.hidden = !abre;
+  btnAnexo.classList.toggle('ativo', abre);
+  btnAnexo.setAttribute('aria-expanded', abre ? 'true' : 'false');
+  if (!abre) novaPronta(false);
+}
+btnAnexo.setAttribute('aria-haspopup', 'menu');
 btnAnexo.onclick = () => {
-  if (gravando) { cancelaGravacao(); return; }   // durante a gravação o 📎 vira ✕
-  destravarAudio(); inputArquivo.click();
+  if (gravando) { cancelaGravacao(); return; }   // durante a gravação o ➕ vira ✕
+  menuMaisAbre(menuMais.hidden);
 };
+menuMais.onclick = (ev) => {
+  const b = ev.target.closest('[data-mais]');
+  if (!b) return;
+  if (b.dataset.mais === 'anexar') { menuMaisAbre(false); destravarAudio(); inputArquivo.click(); return; }
+  if (!itemNova.classList.contains('confirma')) { novaPronta(true); return; }
+  menuMaisAbre(false);
+  enviarTexto('/clear');
+};
+document.addEventListener('pointerdown', (ev) => {
+  if (!menuMais.hidden && !menuMais.contains(ev.target) && !btnAnexo.contains(ev.target)) menuMaisAbre(false);
+});
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !menuMais.hidden) menuMaisAbre(false); });
 /* O 📎 também passa pelo chip: anexa, mostra a prévia, a legenda vai no campo
    e só o Enter (ou ➤) manda, tudo numa mensagem só. O input
    tem `multiple`: no iPhone dá pra marcar várias fotos de uma vez. */
@@ -3469,6 +3561,8 @@ function ajustaCampo() {
   }
 }
 entrada.addEventListener('input', ajustaCampo);
+entrada.addEventListener('input', gravaRascunhoLogo);
+window.addEventListener('pagehide', gravaRascunho);
 
 /* O cartão de cada anexo é montado uma vez (a miniatura não pisca a cada 1% de
    progresso); depois só o estado dele muda. */
@@ -3558,6 +3652,7 @@ function pintaAnexos() {
     atualizaCartao(a);
   }
   anexoChip.hidden = !anexos.length;
+  gravaRascunhoLogo();
   pintaEnviar();
   entrada.placeholder = anexos.length ? 'Legenda (opcional), Enter envia'
                                       : PLACEHOLDER_ORIGINAL;
@@ -3636,6 +3731,32 @@ anexoLista.addEventListener('click', ev => {
   }
 });
 
+/* Volta o rascunho guardado deste agente (texto e anexos que já tinham subido). */
+(function voltaRascunho() {
+  const d = leRascunho();
+  if (!d) return;
+  if (d.texto && !entrada.value) { entrada.value = d.texto; ajustaCampo(); }
+  for (const x of Array.isArray(d.anexos) ? d.anexos.slice(0, MAX_ANEXOS) : []) {
+    if (!x || !x.id) continue;
+    const comPrevia = !!x.previa && (x.kind === 'photo' || x.kind === 'video');
+    anexos.push({
+      n: ++seqAnexo, file: null, kind: x.kind, nome: x.nome || 'anexo', bytes: x.bytes || 0,
+      url: comPrevia && x.kind === 'photo' ? x.previa : null, previaServidor: x.previa || null,
+      estado: 'pronto', pct: null, erro: null, id: x.id, path: x.path || null, xhr: null,
+      tentativa: 0, el: null, semPrevia: !comPrevia || x.kind !== 'photo', cid: novoClienteId(),
+    });
+  }
+  if (anexos.length) pintaAnexos();
+  // o registro dos anexos é da memória do site: se ele reiniciou, o anexo guardado não vale mais
+  for (const a of anexos.filter(x => x.previaServidor)) {
+    fetch(a.previaServidor, { method: 'HEAD', credentials: 'same-origin' }).then(r => {
+      if (r.status !== 404 || !anexos.includes(a)) return;
+      tiraAnexo(a);
+      mostraErro('O anexo "' + a.nome + '" do rascunho expirou (o S2 Bot reiniciou). Cole ou escolha o arquivo de novo.');
+    }).catch(() => { /* sem rede: fica, e o envio avisa se faltar */ });
+  }
+})();
+
 /* Todos os arquivos do que foi colado: print, várias imagens copiadas de uma
    vez, ou arquivos copiados no Finder/Explorer. */
 function arquivosColados(ev) {
@@ -3664,20 +3785,43 @@ function aoColar(ev) {
 entrada.addEventListener('paste', aoColar);
 document.addEventListener('paste', ev => { if (ev.target !== entrada) aoColar(ev); });
 
+/* Arrastar vale para a tela inteira (thread, campo, topo): antes só a thread
+   aceitava, e soltar no campo fazia o navegador abrir o arquivo no lugar do
+   chat. Enquanto o arquivo está em cima, uma moldura diz "Solte para anexar".
+   O contador segura o dragleave que dispara a cada filho atravessado. */
 const temArquivo = ev => ev.dataTransfer &&
   Array.from(ev.dataTransfer.types || []).includes('Files');
-chat.addEventListener('dragover', ev => {
+const soltaAqui = document.createElement('div');
+soltaAqui.id = 'soltaAqui';
+soltaAqui.hidden = true;
+soltaAqui.innerHTML = '<div><svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4"/></svg><b>Solte para anexar</b></div>';
+document.body.appendChild(soltaAqui);
+let arrastoes = 0;
+const soltaMostra = (sim) => { soltaAqui.hidden = !sim; if (!sim) arrastoes = 0; };
+document.addEventListener('dragenter', ev => {
+  if (!temArquivo(ev)) return;
+  ev.preventDefault();
+  arrastoes++;
+  soltaMostra(true);
+});
+document.addEventListener('dragover', ev => {
   if (!temArquivo(ev)) return;
   ev.preventDefault();
   ev.dataTransfer.dropEffect = 'copy';
 });
-chat.addEventListener('drop', ev => {
+document.addEventListener('dragleave', ev => {
+  if (!temArquivo(ev)) return;
+  if (--arrastoes <= 0) soltaMostra(false);
+});
+document.addEventListener('drop', ev => {
   if (!temArquivo(ev)) return;
   ev.preventDefault();
+  soltaMostra(false);
   const fs = Array.from((ev.dataTransfer.files) || []);
-  if (fs.length) anexaArquivos(fs);
-  else console.warn('drop na thread sem arquivo legível:', ev.dataTransfer.types);
+  if (fs.length) { anexaArquivos(fs); entrada.focus(); }
+  else console.warn('drop sem arquivo legível:', ev.dataTransfer.types);
 });
+window.addEventListener('blur', () => soltaMostra(false));
 
 /* ── Menu lateral (gaveta do ☰) ───────────────────────────────────────────── */
 function abreMenu(abrir) {
@@ -3860,9 +4004,10 @@ function pintaMic() {
   btnAnexo.classList.toggle('cancela', gravando);
   btnAnexo.innerHTML = gravando ? ICONE.fechar : ICONE.mais;
   btnAnexo.setAttribute('aria-label', gravando ? 'Cancelar a gravação'
-    : 'Anexar fotos, vídeos, áudios ou PDFs');
+    : 'Anexar arquivo ou começar uma conversa nova');
   btnAnexo.title = gravando ? 'Cancelar a gravação (nada é enviado)'
-    : 'Anexar fotos, vídeos, áudios ou PDFs (vários de uma vez)';
+    : 'Anexar arquivo ou começar uma conversa nova';
+  if (gravando) menuMaisAbre(false);
   clearInterval(timerGravando);
   timerGravando = gravando && !micAbrindo ? setInterval(pintaMic, 500) : null;
 }
@@ -4387,6 +4532,59 @@ function falaNovas() {
 }
 ouvintesChegada.push(() => { if (!esperando) falaNovas(); });
 
+/* Conversa pesada (22/10/2026, pedido do dono): cada mensagem manda de novo a conversa inteira ao
+   modelo. Passou de CONTEXTO_PESADO tokens na última resposta, uma faixa discreta oferece começar
+   limpo (/clear); a memória do agente fica. "Agora não" vale para esta resposta: a faixa só volta
+   se a conversa crescer mais um degrau. */
+const CONTEXTO_PESADO = 120000, CONTEXTO_DEGRAU = 60000;
+let contextoDispensado = 0;
+try { contextoDispensado = Number(sessionStorage.getItem('dgclaw-contexto-dispensado:' + AGENTE.id)) || 0; } catch (_) { /* sem storage */ }
+function confereContexto() {
+  if (fAviso.classList.contains('aparece') && !fAviso.classList.contains('leve')) return;   // outro aviso na frente
+  // ctx: a entrada da última resposta; total e usd: a soma das respostas desde a última conversa nova
+  let ctx = 0, total = 0, usd = 0;
+  for (let k = msgs.length - 1; k >= 0; k--) {
+    const m = msgs[k];
+    if ((m.origin === 'dono' || m.origin === 'comando') && /^\s*\/(clear|new|compact)\b/.test(m.text || '')) break;
+    if (m.origin !== 'agente' || !m.uso) continue;
+    if (!ctx) ctx = Number(m.uso.contexto) || 0;
+    total += (Number(m.uso.entrada) || 0) + (Number(m.uso.saida) || 0);
+    usd += Number(m.uso.usd) || 0;
+  }
+  const mostra = ctx >= CONTEXTO_PESADO && ctx >= contextoDispensado + CONTEXTO_DEGRAU;
+  if (!mostra) { if (fAviso.classList.contains('leve')) faixa(fAviso, ''); return; }
+  if (fAviso.classList.contains('leve') && fAviso.dataset.ctx === String(ctx)) return;
+  const gasto = 'já foram ' + numCurto(total) + ' tokens' + (usd >= 0.01 ? ', uns ' + dolar(usd) : '');
+  faixaComAcoes(fAviso, 'Nossa conversa neste chat está grande: ' + gasto + '. Vamos iniciar um novo chat?', [
+    { rotulo: 'Sim', fn: () => { faixa(fAviso, ''); enviarTexto('/clear'); } },
+    { rotulo: 'Agora não', fn: () => {
+      contextoDispensado = ctx;
+      try { sessionStorage.setItem('dgclaw-contexto-dispensado:' + AGENTE.id, String(ctx)); } catch (_) { /* sem storage */ }
+      faixa(fAviso, '');
+    } },
+  ]);
+  fAviso.classList.add('leve');
+  fAviso.title = 'Cada mensagem leva de novo uns ' + numCurto(ctx) + ' tokens. A memória fica guardada. ' +
+    'O valor é o preço de uso da API; na assinatura ele não é cobrado por mensagem.';
+  fAviso.dataset.ctx = String(ctx);
+  alinhaFaixaLeve();
+}
+/* Na largura do campo de digitar (no computador a faixa ia de ponta a ponta, por cima do menu). */
+function alinhaFaixaLeve() {
+  if (!fAviso.classList.contains('leve')) return;
+  const campo = document.querySelector('.barra .campo');
+  const linha = campo && campo.closest('.barra > *');   // a linha inteira do campo (com o + e o enviar)
+  if (!linha) return;
+  const r = linha.getBoundingClientRect();
+  if (!r.width) return;
+  fAviso.style.left = Math.round(r.left) + 'px';
+  fAviso.style.width = Math.round(r.width) + 'px';
+  fAviso.style.right = 'auto';
+  respiroDasFaixas();
+}
+window.addEventListener('resize', alinhaFaixaLeve);
+ouvintesChegada.push(confereContexto);
+
 async function esperaResposta(since) {
   // Sem "parar de esperar" nem "esperando…" no topo (18/10/2026, pedido do dono): a linha de
   // andamento perto do campo já mostra o agente trabalhando. A espera segue por baixo, só para ler
@@ -4843,6 +5041,7 @@ function enviarDoCampo() {
   if (!t) { entrada.focus(); return; }
   entrada.value = '';
   ajustaCampo();
+  gravaRascunho();
   vozNoCampo = false;
   if (lcInterceptaLogin(t)) return;   // /login abre o cartão e não vai ao agente
   menLista.hidden = true;
@@ -4862,6 +5061,21 @@ document.addEventListener('dgui-pergunta', ev => {
   // transforma em citação no balão, e o agente lê a que pergunta a resposta se refere
   const perg = String(ev.detail.pergunta || '').replace(/\s+/g, ' ').trim().slice(0, 160);
   enviarTexto(perg ? '↩ ' + perg + '\n' + t : t);
+});
+// "Mandar para o Admin aplicar" (dgui para-admin, 23/10/2026): o texto é fixo e montado aqui, com a
+// data conferida e o agente desta tela; o que o agente escreveu no relatório não vai junto
+document.addEventListener('dgui-para-admin', async ev => {
+  const data = String((ev.detail && ev.detail.relatorio) || '');
+  const feito = (ev.detail && ev.detail.feito) || (() => {});
+  const admin = agentesMenu.find(a => a.tipo === 'admin');
+  if (EH_ADMIN || !admin || !/^\d{4}-\d{2}-\d{2}$/.test(data)) { feito(false); mostraErro('Este botão só funciona na conversa de um agente.'); return; }
+  const [a, m, d] = data.split('-');
+  const texto = '[do cartão do relatório de segurança do ' + AGENTE.nome + '] aplica as correções do relatório de segurança de ' +
+    d + '/' + m + '/' + a + ' (agente ' + AGENTE.id + ', arquivo seguranca/relatorio-' + data + '.md)';
+  try {
+    await api('/api/v1/agents/' + encodeURIComponent(admin.id) + '/send', { method: 'POST', body: { text: texto }, timeoutMs: 75000 });
+    feito(true);
+  } catch (e) { feito(false); mostraErro('Não consegui mandar para o Admin: ' + e.message); }
 });
 const RX_CITA_LOCAL = /^↩ (?:\[([a-f0-9]{8,40})\] )?([^\n]{1,200})\n([\s\S]+)$/;
 const semCita = t => { const r = RX_CITA_LOCAL.exec(String(t || '')); return r ? r[3] : t; };
@@ -4995,9 +5209,9 @@ function passosTutorial() {
       oque: 'Quando a mensagem começa com / (uma barra), aparece uma lista de comandos que ' + nome + ' entende, como /compact, /context e as skills que ele tem instaladas.',
       como: 'Digite / e a lista abre acima do campo; continue digitando para filtrar. Use as setas e Enter, ou toque no item: o nome vai para o campo e você só acrescenta o que falta e envia. Os que não rodam por aqui aparecem apagados, com o motivo. Para mandar um texto que começa com barra, escreva // no começo.',
       porque: 'Assim você não precisa decorar os nomes. O que o terminal responde (por exemplo o /context) volta na conversa, num bloco fechado "resultado do comando".' },
-    { alvo: '#btnAnexo', titulo: 'Anexos',
-      oque: 'O clipe serve para mandar fotos, vídeos, áudios e PDFs para o agente.',
-      como: 'Toque nele e escolha os arquivos (até 10 por mensagem), ou cole uma imagem direto no campo. Cada arquivo sobe em segundo plano e a mensagem sai quando todos estiverem prontos.',
+    { alvo: '#btnAnexo', titulo: 'Anexos e conversa nova',
+      oque: 'O ➕ serve para mandar fotos, vídeos, áudios e PDFs para o agente, e para começar uma conversa nova.',
+      como: 'Toque nele e escolha Anexar arquivo (até 10 por mensagem), ou cole uma imagem direto no campo. Cada arquivo sobe em segundo plano e a mensagem sai quando todos estiverem prontos. Nova conversa pede um segundo toque e guarda a conversa de agora no Histórico.',
       porque: 'Muita coisa é mais fácil de mostrar do que de explicar: um print de erro, um documento, uma foto.' },
   ];
   if (caps.microfone) {
@@ -5292,6 +5506,7 @@ filtrosEl.addEventListener('click', async ev => {
    hora, até 3 min. Se ela é antiga, traz as páginas de trás até chegar lá. */
 // "Nova conversa" do Histórico: é o mesmo /clear que o dono pode digitar (o servidor arquiva a anterior)
 window.DGConversaNova = () => enviarTexto('/clear');
+window.DGConversaRetomar = (texto) => enviarTexto(texto);
 window.DGConversaIr = async (epMs, doDono) => {
   const ep = epMs / 1000, JANELA = 3 * 60;   // as mensagens contam em segundos
   const perto = () => {

@@ -1,0 +1,98 @@
+/* boas-vindas.css: as telas de abertura do app (22/10/2026). Cores próprias no estilo da landing
+   da Smart.SAU (fundo quase preto, turquesa, verde, destaque amarelo); seguem o tema do app.
+   Kalam (letra de mão): SIL Open Font License, servida daqui (vendor/). */
+@font-face{font-family:Kalam;font-weight:700;font-display:swap;src:url(/vendor/kalam-700-latin.woff2) format('woff2')}
+.bv{--bv-fundo:#05090c;--bv-turq:#2fc4b2;--bv-turq-t:#2fc4b2;--bv-verde:#4cc36a;--bv-amarelo:#f6c443;
+  --bv-texto:#f2f5f4;--bv-texto-2:#a9b5b3;--bv-texto-3:#6c7b79;--bv-borda:rgba(255,255,255,.09);
+  --bv-sup:rgba(255,255,255,.03);--bv-sup-2:rgba(255,255,255,.07);--bv-apagado:rgba(255,255,255,.22);
+  --bv-grade:rgba(47,196,178,.05);--bv-brilho:.35;--bv-btn-texto:#04211d}
+html[data-tema="claro"] .bv{--bv-fundo:#f4f7f6;--bv-turq:#1fae9d;--bv-turq-t:#0f7f72;--bv-verde:#2e9e4f;
+  --bv-texto:#0d1a1c;--bv-texto-2:#4c5c5e;--bv-texto-3:#7d8b8c;--bv-borda:rgba(13,26,28,.1);--bv-sup:#fff;
+  --bv-sup-2:rgba(13,26,28,.06);--bv-apagado:rgba(13,26,28,.15);--bv-grade:rgba(31,174,157,.07);--bv-brilho:.14;--bv-btn-texto:#fff}
+
+.bv{position:fixed;inset:0;z-index:2147483000;background:var(--bv-fundo);color:var(--bv-texto);overflow:hidden;
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  display:flex;justify-content:center;transition:opacity .35s ease}
+.bv.sai{opacity:0;pointer-events:none}
+.bv *{box-sizing:border-box}
+.bv-grade{position:absolute;inset:0;pointer-events:none;
+  background-image:linear-gradient(var(--bv-grade) 1px,transparent 1px),linear-gradient(90deg,var(--bv-grade) 1px,transparent 1px);
+  background-size:34px 34px;-webkit-mask-image:radial-gradient(ellipse at 70% 30%,#000 10%,transparent 70%);mask-image:radial-gradient(ellipse at 70% 30%,#000 10%,transparent 70%)}
+.bv-brilho{position:absolute;width:420px;height:420px;border-radius:50%;filter:blur(70px);opacity:var(--bv-brilho);pointer-events:none;transition:transform .6s ease,background .6s ease}
+.bv-palco{position:relative;width:100%;max-width:460px;height:100%;display:flex;flex-direction:column;
+  padding:calc(env(safe-area-inset-top,0px) + 40px) 28px calc(env(safe-area-inset-bottom,0px) + 28px)}
+
+/* splash */
+.bv-splash{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;transition:opacity .4s ease}
+.bv-splash.some{opacity:0;pointer-events:none}
+.bv-aro{position:relative;width:200px;height:200px;border-radius:50%;padding:5px;flex-shrink:0;
+  background:conic-gradient(from 210deg,var(--bv-turq),var(--bv-verde),transparent 55%,var(--bv-turq));box-shadow:0 0 70px rgba(47,196,178,.35)}
+.bv-aro::before{content:"";position:absolute;inset:-14px;border-radius:50%;border:1px solid rgba(47,196,178,.18)}
+.bv-aro img{width:100%;height:100%;border-radius:50%;object-fit:cover;border:4px solid var(--bv-fundo);display:block}
+.bv-splash .bv-aro{animation:bv-entra .7s cubic-bezier(.2,.8,.2,1) both}
+@keyframes bv-entra{from{transform:scale(.86);opacity:0}to{transform:none;opacity:1}}
+.bv-marca{font-weight:700;letter-spacing:-.02em;font-size:38px;line-height:1}
+.bv-marca b{color:var(--bv-verde);font-weight:700}
+.bv-rot{font-size:11px;font-weight:600;letter-spacing:.28em;text-transform:uppercase;color:var(--bv-texto-3)}
+
+/* telas */
+.bv-telas{flex:1;position:relative;min-height:0}
+.bv-tela{position:absolute;inset:0;display:flex;flex-direction:column;opacity:0;transform:translateX(24px);pointer-events:none;
+  transition:opacity .35s ease,transform .35s ease;overflow-y:auto;scrollbar-width:none}
+.bv-tela::-webkit-scrollbar{display:none}
+.bv-tela.antes{transform:translateX(-24px)}
+.bv-tela.on{opacity:1;transform:none;pointer-events:auto}
+.bv h1{font-size:32px;line-height:1.13;font-weight:800;letter-spacing:-.02em;margin:14px 0 0}
+.bv-mao{font-family:Kalam,"Segoe Print","Bradley Hand",cursive;font-weight:700;font-style:italic;letter-spacing:0}
+.bv-realce{background:var(--bv-amarelo);color:#1a1405;padding:0 8px;border-radius:5px}
+.bv-sub{font-size:16px;line-height:1.5;color:var(--bv-texto-2);margin:14px 0 0}
+.bv-heroi{width:min(300px,70vw);aspect-ratio:1;border-radius:50%;object-fit:cover;align-self:flex-end;margin:0 -20px 18px 0;
+  -webkit-mask-image:radial-gradient(circle,#000 52%,transparent 71%);mask-image:radial-gradient(circle,#000 52%,transparent 71%)}
+.bv-cresce{flex:1;min-height:12px}
+
+.bv-agentes{display:flex;flex-direction:column;gap:10px;margin-top:26px}
+.bv-agente{display:flex;align-items:center;gap:14px;padding:12px 14px;border:1px solid var(--bv-borda);border-radius:18px;background:var(--bv-sup)}
+.bv-agente .foto{width:50px;height:50px;border-radius:50%;object-fit:cover;border:2px solid rgba(47,196,178,.5);flex-shrink:0;
+  display:grid;place-items:center;font-weight:700;color:#fff}
+.bv-agente .n{font-weight:700;font-size:16px}
+.bv-agente .f{font-size:11px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--bv-texto-3);margin-top:3px}
+
+.bv-rot2{font-size:13px;font-weight:600;color:var(--bv-texto-2);margin:20px 0 9px;display:block}
+.bv-campo{width:100%;height:54px;border:1px solid var(--bv-borda);border-radius:16px;background:var(--bv-sup);color:var(--bv-texto);
+  padding:0 16px;font:500 17px/1 inherit;outline:none}
+.bv-campo:focus{border-color:var(--bv-turq)}
+.bv-chips{display:flex;flex-wrap:wrap;gap:8px}
+.bv-chip{font:500 14px/1 inherit;padding:10px 14px;border-radius:999px;border:1px solid var(--bv-borda);background:var(--bv-sup);color:var(--bv-texto-2);cursor:pointer}
+.bv-chip[aria-pressed="true"]{border-color:var(--bv-turq);color:var(--bv-turq-t);background:color-mix(in srgb,var(--bv-turq) 14%,transparent);font-weight:600}
+.bv-dica{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--bv-texto-3);margin-top:16px;line-height:1.45}
+.bv-dica svg{width:15px;height:15px;flex-shrink:0;margin-top:1px}
+
+.bv-opc{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid var(--bv-borda);border-radius:16px;background:var(--bv-sup)}
+.bv-opc + .bv-opc{margin-top:10px}
+.bv-opc-col{flex-direction:column;align-items:stretch;gap:0}
+.bv-opc-linha{display:flex;align-items:center;gap:14px}
+.bv-opc .ic{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;background:var(--bv-sup-2);color:var(--bv-turq-t);flex-shrink:0}
+.bv-opc .ic svg{width:19px;height:19px}
+.bv-opc .t{font-weight:600;font-size:15px}
+.bv-opc .d{font-size:13px;color:var(--bv-texto-3);margin-top:2px}
+.bv-chave{margin-left:auto;width:46px;height:28px;border-radius:14px;background:var(--bv-apagado);position:relative;flex-shrink:0;border:0;cursor:pointer;padding:0}
+.bv-chave::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:left .2s}
+.bv-chave[aria-checked="true"]{background:var(--bv-turq)}
+.bv-chave[aria-checked="true"]::after{left:21px}
+.bv-horas{display:flex;align-items:center;gap:6px;margin-top:10px;padding-left:50px;font-size:13.5px;color:var(--bv-texto-2)}
+.bv-horas input{font:600 14px/1 inherit;padding:6px 8px;border-radius:10px;border:1px solid var(--bv-borda);background:var(--bv-sup-2);color:var(--bv-texto);color-scheme:inherit}
+.bv-erro{font-size:13px;color:#e8705f;margin-top:12px;min-height:18px}
+
+/* rodapé */
+.bv-rodape{display:flex;flex-direction:column;gap:20px;padding-top:16px}
+.bv-linha{display:flex;justify-content:space-between;align-items:center}
+.bv-pontos{display:flex;gap:7px}
+.bv-pontos span{width:8px;height:8px;border-radius:4px;background:var(--bv-apagado);transition:width .3s,background .3s}
+.bv-pontos span.on{width:26px;background:var(--bv-turq)}
+.bv-pular{font:500 14px/1 inherit;color:var(--bv-texto-2);background:none;border:0;padding:8px 0;cursor:pointer}
+.bv-btn{display:flex;align-items:center;justify-content:center;gap:10px;height:54px;border-radius:999px;border:0;width:100%;
+  background:var(--bv-turq);color:var(--bv-btn-texto);font:700 16px/1 inherit;cursor:pointer}
+.bv-btn:disabled{opacity:.45;cursor:default}
+.bv-btn svg{width:18px;height:18px}
+@media (prefers-reduced-motion:reduce){.bv,.bv-tela,.bv-splash,.bv-brilho{transition:none}.bv-splash .bv-aro{animation:none}}
+@media (max-height:700px){.bv h1{font-size:27px}.bv-heroi{width:min(220px,55vw)}.bv-agentes{margin-top:18px}}

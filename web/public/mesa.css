@@ -290,20 +290,3 @@ a{color:#1f7ac2}
 .tz-l .mz-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dg-texto-3)}
 .tz-l .mz-form input,.tz-l .mz-form textarea{font:inherit;font-size:14px;color:var(--dg-texto);background:var(--dg-superficie);border:1px solid var(--dg-borda);border-radius:10px;padding:8px 10px}
 .tz-vazio{margin-top:10px}
-/* seletor de agente com foto e cargo (seletor-agente.js, 21/10/2026) */
-.sa{position:relative;display:inline-flex}
-.sa-pilula{display:inline-flex;align-items:center;gap:6px;min-height:32px;padding:3px 10px 3px 3px;border-radius:999px;border:1px solid var(--dg-borda);background:transparent;color:var(--dg-texto);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
-.sa-pilula[aria-expanded="true"]{border-color:var(--dg-azul)}
-.sa-pilula svg{color:var(--dg-texto-3)}
-.sa-av{border-radius:50%;overflow:hidden;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:600;flex:0 0 auto}
-.sa-av img{width:100%;height:100%;object-fit:cover;display:block}
-.sa-menu{position:absolute;top:calc(100% + 6px);left:0;z-index:30;width:min(310px,calc(100vw - 32px));background:var(--dg-superficie);border:1px solid var(--dg-borda);border-radius:14px;box-shadow:var(--dg-sombra);padding:6px}
-.sa-menu[hidden]{display:none}
-.sa-tit{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--dg-texto-3);padding:8px 8px 6px}
-.sa-op{display:flex;align-items:center;gap:10px;width:100%;padding:8px;border:0;border-radius:10px;background:transparent;color:var(--dg-texto);font:inherit;text-align:left;cursor:pointer}
-.sa-op:hover,.sa-op:focus-visible,.sa-op.on{background:var(--dg-superficie-2);outline:none}
-.sa-tx{flex:1;min-width:0;display:flex;flex-direction:column}
-.sa-tx b{font-weight:600;font-size:14px}
-.sa-tx small{font-size:12.5px;color:var(--dg-texto-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sa-ok{color:var(--dg-azul);display:grid;place-items:center}
-.sa-div{height:1px;background:var(--dg-borda);margin:4px 6px}

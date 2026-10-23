@@ -45,8 +45,10 @@ ARG NODE_MAJOR=22
 ARG CLAUDE_CODE_VERSAO=2.1.296
 ARG CODEX_VERSAO=0.162.1
 ARG BUN_VERSAO=1.4.3
-# gh 2.102.1: Go 1.27.3 (o 2.102.0 tinha CVE alta no net/http e no crypto/x509; Trivy, 21/10/2026)
-ARG GH_VERSAO=2.102.1
+# gh 2.103.0 (22/10/2026). O 2.102.0 tinha CVE alta no net/http e no crypto/x509 (Trivy, 21/10/2026).
+# O repositório do gh só guarda a versão mais nova: quando a fixada some, a construção instala a
+# mais nova em vez de quebrar (e a varredura diária confere).
+ARG GH_VERSAO=2.103.0
 
 LABEL org.opencontainers.image.title="DG Claw agente" \
       org.opencontainers.image.version="${DGCLAW_VERSAO}" \
@@ -58,6 +60,8 @@ ENV TZ=America/Sao_Paulo
 # systemd + as ferramentas de uma máquina de trabalho. Lista decidida pela pesquisa
 # de uso dos agentes (ffmpeg para áudio e vídeo, poppler para PDF, fontes para
 # imagem sem quadradinho, gawk/bc/xz para os scripts dos alunos). Nenhum compilador.
+# O upgrade puxa as correções de segurança já publicadas pelo Ubuntu por cima da base
+# (poppler 9.11, relatório de segurança do Tech, 22/10/2026).
 RUN apt-get update && apt-get install -y --no-install-recommends \
       systemd systemd-sysv dbus dbus-user-session \
       cron sudo tzdata locales \
@@ -67,6 +71,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       openssh-client rsync file tini \
       ffmpeg poppler-utils fontconfig fonts-liberation fonts-noto-color-emoji \
       gawk bc \
+    && apt-get upgrade -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Unidades que só fazem sentido em máquina com hardware. Deixadas de pé, enchem o log
@@ -95,7 +100,8 @@ RUN curl --proto '=https' --tlsv1.2 -fsSL https://deb.nodesource.com/gpgkey/node
     && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
       > /etc/apt/sources.list.d/github-cli.list \
-    && apt-get update && apt-get install -y --no-install-recommends nodejs "gh=${GH_VERSAO}" \
+    && apt-get update && apt-get install -y --no-install-recommends nodejs \
+    && { apt-get install -y --no-install-recommends "gh=${GH_VERSAO}" || { echo "gh ${GH_VERSAO} saiu do repositório; instalo a mais nova" >&2; apt-get install -y --no-install-recommends gh; }; } \
     && rm -rf /var/lib/apt/lists/*
 
 # Claude Code e Codex CLI globais. A credencial não vem junto: cada agente faz o

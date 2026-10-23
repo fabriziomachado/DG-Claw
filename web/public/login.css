@@ -1,33 +1,28 @@
-/* login.css: a tela de entrada do DG Claw (celular primeiro, mesma paleta da conversa). */
+/* login.css: a tela de entrada e a de primeiro acesso do S2 Bot (celular primeiro).
+   22/10/2026: paleta do tema (tema.css), claro e escuro como o resto do app; antes era o verde antigo fixo. */
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-:root{--accent:#2f9e5e;--txt:#0f1c14;--muted:#6c8172;--line:rgba(0,0,0,.12)}
 html,body{height:100%}
-body{margin:0;color:var(--txt);display:flex;align-items:center;justify-content:center;
+body{margin:0;color:var(--dg-texto);background:var(--dg-fundo);display:flex;align-items:center;justify-content:center;
   padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right))
           max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));
-  font:15.5px/1.46 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
-  background:
-    radial-gradient(ellipse at 15% 0%,rgba(255,255,255,.55),transparent 55%),
-    radial-gradient(ellipse at 90% 100%,rgba(139,196,146,.40),transparent 55%),
-    linear-gradient(165deg,#e6f2df 0%,#d8ead1 45%,#cde3c6 100%);
-  background-attachment:fixed}
-.cartao{width:100%;max-width:380px;background:#fff;border-radius:18px;padding:26px 22px 24px;
-  box-shadow:0 4px 22px rgba(0,0,0,.16)}
+  font:15px/1.46 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif}
+.cartao{width:100%;max-width:380px;background:var(--dg-superficie);border:1px solid var(--dg-borda);border-radius:16px;padding:24px 20px 22px}
 .marca{display:flex;align-items:center;gap:10px}
-.marca .emoji{font-size:34px;line-height:1}
-.marca .marca-ico{width:40px;height:40px;border-radius:10px;display:block}
-.marca h1{margin:0;font-size:24px;font-weight:700}
-.sub{margin:6px 0 16px;color:var(--muted);font-size:14.5px}
-.erro{margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#fbe0e0;color:#8f2f2f;
-  border:1px solid #f0bcbc;font-size:14px;line-height:1.4}
+.marca .marca-ico{width:36px;height:36px;border-radius:10px;display:block}
+.marca h1{margin:0;font-size:20px;font-weight:650;letter-spacing:-.01em}
+.sub{margin:6px 0 16px;color:var(--dg-texto-2);font-size:14px}
+.erro{margin:0 0 14px;padding:10px 12px;border-radius:10px;background:var(--dg-erro-fundo);color:var(--dg-erro-texto);
+  border:1px solid var(--dg-erro-borda);font-size:13.5px;line-height:1.4}
 .erro[hidden]{display:none}
-label{display:block;margin:12px 0 5px;font-size:13px;font-weight:600;color:#38523f}
-input[type=text],input[type=password]{width:100%;min-height:46px;padding:11px 14px;border:1px solid var(--line);
-  border-radius:12px;font:inherit;font-size:16px;background:#f4f8f4;color:var(--txt);outline:none}
-input:focus{border-color:var(--accent);background:#fff}
-button{width:100%;margin-top:20px;min-height:48px;border:0;border-radius:24px;background:var(--accent);
-  color:#fff;font:inherit;font-size:16px;font-weight:700;cursor:pointer}
+label{display:block;margin:12px 0 5px;font-size:13px;font-weight:600;color:var(--dg-texto-2)}
+input[type=text],input[type=password]{width:100%;min-height:44px;padding:10px 14px;border:1px solid var(--dg-borda);
+  border-radius:12px;font:inherit;font-size:16px;background:var(--dg-fundo);color:var(--dg-texto);outline:none}
+input:focus{border-color:var(--dg-azul);background:var(--dg-superficie)}
+button{width:100%;margin-top:20px;min-height:44px;border:0;border-radius:999px;background:var(--dg-azul);
+  color:#fff;font:inherit;font-size:15px;font-weight:600;cursor:pointer}
 button:active{opacity:.85}
+button:focus-visible{outline:2px solid var(--dg-azul);outline-offset:2px}
 
 /* No iPhone, campo com fonte abaixo de 16px dá zoom quando recebe o foco. Regra: nada dá zoom no app instalado. */
 @media (pointer:coarse){input,textarea,select{font-size:16px!important}}
+.erro.neutro{background:var(--dg-superficie-2);color:var(--dg-texto);border-color:var(--dg-borda)}

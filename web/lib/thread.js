@@ -533,7 +533,7 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
   /* Memória e tokens de cada resposta (20/10/2026, pedido do dono, proposta B). Enquanto o agente trabalha,
      somam-se os tokens de cada chamada (o transcript repete o mesmo `message.id` em várias linhas: conta uma
      vez) e o que ele escreveu nos arquivos de memória. Quando ele responde (dgchat reply), isso vai junto da
-     fala, em `uso` ({entrada, cache, saida, ms}) e `memorias` ([{tipo, texto}]), e recomeça do zero. */
+     fala, em `uso` ({entrada, cache, saida, ms, usd}) e `memorias` ([{tipo, texto}]), e recomeça do zero. */
   const RX_MEMORIA = /(?:^|\/)(MEMORY\.md|working-memory\.md|CREATOR\.md|memory\/[^/]+\.md)$/i;
   const TIPO_FRONT = { feedback: 'Regra', user: 'Sobre você', project: 'Contexto', reference: 'Fato' };
   function tipoDaMemoria(arquivo, secao, front) {
@@ -572,6 +572,22 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
     const frase = desc || (corpo && corpo.split(/(?<=[.!?])\s/)[0]);
     return frase && frase.length > 8 ? { secao: '', front: front.toLowerCase(), texto: frase.replace(/\*\*(.+?)\*\*/g, '$1').slice(0, 220) } : null;
   }
+  /* Preço de API por milhão de tokens, em dólar (22/10/2026, pedido do dono: o aviso de conversa grande mostra
+     quanto ela custaria). A conta é assinatura, então é o equivalente pago por uso, não o que se cobra.
+     [entrada, saída, leitura do cache]; a escrita no cache custa 1,25× a entrada. Modelo fora da tabela não soma. */
+  const PRECOS_USD = [
+    [/^claude-fable-5/, [10, 50, 0.25]], [/^claude-mythos-5/, [10, 50, 0.25]],
+    [/^claude-opus-5-5/, [4, 20, 0.2]], [/^claude-opus-(5|4-[5-8])/, [5, 25, 0.5]],
+    [/^claude-sonnet-5/, [2, 10, 0.2]], [/^claude-sonnet-4/, [3, 15, 0.3]],
+    [/^claude-haiku-5-5/, [0.1, 0.5, 0.01]], [/^claude-haiku-4/, [1, 5, 0.1]],
+  ];
+  function custoUsd(modelo, u, n) {
+    const achou = PRECOS_USD.find(([rx]) => rx.test(String(modelo || '')));
+    if (!achou) return 0;
+    const [ent, sai, lei] = achou[1];
+    return (n(u.input_tokens) * ent + n(u.cache_creation_input_tokens) * ent * 1.25 +
+            n(u.cache_read_input_tokens) * lei + n(u.output_tokens) * sai) / 1e6;
+  }
   function anotaUso(estado, o) {
     const m = o.message || {};
     const u = m.usage;
@@ -583,6 +599,9 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
     t.cache += n(u.cache_read_input_tokens);
     t.entrada += n(u.input_tokens) + n(u.cache_read_input_tokens) + n(u.cache_creation_input_tokens);
     t.saida += n(u.output_tokens);
+    t.usd = (t.usd || 0) + custoUsd(m.model, u, n);
+    // tamanho da conversa: a entrada da ÚLTIMA chamada do turno (é o que vai de novo na próxima mensagem)
+    t.contexto = n(u.input_tokens) + n(u.cache_read_input_tokens) + n(u.cache_creation_input_tokens);
   }
   /* O agente também grava a memória por um script no terminal (python com s.replace(velho, novo), sed,
      echo >>). Aqui as linhas de tópico ("- ...") que aparecem no comando e não estão no texto "velho" do
@@ -640,7 +659,8 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
     if (!ev || ev.quem !== 'agente') return;
     const t = estado.usoTurno;
     if (t && (t.entrada || t.saida)) {
-      ev.uso = { entrada: t.entrada, cache: t.cache, saida: t.saida, ms: estado.inicioTurnoEp ? Math.max(0, Math.round((ep - estado.inicioTurnoEp) * 1000)) : null };
+      ev.uso = { entrada: t.entrada, cache: t.cache, saida: t.saida, contexto: t.contexto || 0, ms: estado.inicioTurnoEp ? Math.max(0, Math.round((ep - estado.inicioTurnoEp) * 1000)) : null };
+      if (t.usd) ev.uso.usd = Math.round(t.usd * 1e4) / 1e4;
     }
     if (estado.memTurno.length) ev.memorias = estado.memTurno.slice();
     estado.usoTurno = null; estado.memTurno = []; estado.inicioTurnoEp = ep;
@@ -657,7 +677,16 @@ function criarLeitor({ log, tz, canalTelegram, midia }) {
     // meio (a sessão voltou a responder sem compact_boundary). Sem isso, uma resposta em texto puro, sem dgchat
     // nem ferramenta, era descartada aqui e o "já volto" ficava pendurado até vencer o prazo.
     const provaInterrupcao = estado.compactandoEp !== null && /"type"\s*:\s*"assistant"/.test(linha);
-    if (!resultadoPendente && !provaInterrupcao && !/dgchat|<channel|canal-externo|plataforma|dgclaw-poke|command-name|local-command-std|compact_boundary|"content"\s*:\s*"\s*\/compact|telegram__|__whatsapp_|"name":"(?:Bash|Write|Edit|MultiEdit|NotebookEdit)"/.test(linha)) return;
+    const interessa = resultadoPendente || provaInterrupcao || /dgchat|<channel|canal-externo|plataforma|dgclaw-poke|command-name|local-command-std|compact_boundary|"content"\s*:\s*"\s*\/compact|telegram__|__whatsapp_|"name":"(?:Bash|Write|Edit|MultiEdit|NotebookEdit)"/.test(linha);
+    if (!interessa) {
+      // As outras chamadas do agente (Read, Grep, só texto ou pensamento) não viram nada na tela, mas os tokens
+      // delas contam no total da resposta e no custo (22/10/2026: antes ficavam de fora).
+      if (!/"type"\s*:\s*"assistant"/.test(linha) || !linha.includes('"usage"')) return;
+      let o;
+      try { o = JSON.parse(linha); } catch (_) { return; }
+      if (o && o.isSidechain !== true && o.message && Array.isArray(o.message.content)) anotaUso(estado, o);
+      return;
+    }
 
     let o;
     try { o = JSON.parse(linha); } catch (_) { return; } // linha truncada (transcript sendo escrito) não derruba nada

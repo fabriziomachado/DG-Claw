@@ -139,6 +139,12 @@
   #faixaErro{background:var(--dg-erro-fundo);color:var(--dg-erro-texto);border:1px solid var(--dg-erro-borda)}
   #faixaAviso{background:var(--dg-pedido-fundo);color:var(--dg-pedido-texto);border:1px solid var(--dg-pedido-borda);
               bottom:calc(var(--barra-h) + 8px)}
+  /* conversa pesada: aviso discreto, não amarelo de decisão */
+  #faixaAviso.leve{background:var(--dg-superficie);color:var(--dg-texto-2);border:1px solid var(--dg-borda);
+                   align-items:center;flex-wrap:wrap;row-gap:8px}
+  #faixaAviso.leve .x{display:none}
+  #faixaAviso.leve .txt{flex:1 1 240px}
+  #faixaAviso.leve .acoes{order:2;flex:0 0 auto;gap:6px}
   #faixaErro.aparece + #faixaAviso.aparece{bottom:calc(var(--barra-h) + 66px)}
   /* botões dentro da faixa ("Tentar de novo", "Descartar"): numa linha própria
      embaixo do texto, que quebra em vez de empurrar a tela pro lado em 390 px */
@@ -580,34 +586,31 @@ html[data-tema="escuro"] .tl-saida.erro,html[data-tema="escuro"] .tl-cmd.erro>su
   html:not([data-tema="claro"]) .tl-saida.erro,html:not([data-tema="claro"]) .tl-cmd.erro>summary,html:not([data-tema="claro"]) .tl-grupo.erro>summary{color:#ffb3aa}
 }
 
-/* ── Cartão de permissão ── */
-.pc{position:relative;max-width:880px;margin:14px auto 4px;padding:14px;border:2px solid #aa7900;border-radius:16px;
-    background:#fff8db;color:#3b2f00;box-sizing:border-box;overflow-wrap:anywhere}
+/* ── Cartão de permissão ── (22/10/2026: paleta do tema, no jeito do cartão de escolha) */
+.pc{position:relative;max-width:880px;margin:14px auto 4px;padding:12px 14px;border:1px solid var(--dg-pedido-borda);border-radius:14px;
+    background:var(--dg-superficie);color:var(--dg-texto);box-sizing:border-box;overflow-wrap:anywhere}
 .pc[hidden]{display:none}
 .pc:focus{outline:none}
 .pc.entra{animation:lcEntra .22s ease-out}
-.pc-titulo{display:block;font-size:16px;line-height:1.3}
-.pc-texto{margin:6px 0 8px;font-size:14px;line-height:1.45}
-.pc-pedido{margin:0 0 10px;padding:10px 12px;max-height:200px;overflow:auto;border-radius:10px;background:rgba(0,0,0,.07);
-  font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;box-sizing:border-box}
-.pc-botoes{display:flex;gap:10px;flex-wrap:wrap}
-.pc-btn{flex:1 1 140px;display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:48px;
-  padding:0 16px;border-radius:24px;border:1px solid transparent;font:inherit;font-size:16px;font-weight:700;cursor:pointer}
-.pc-aprova{background:#218344;color:#fff}
-.pc-nega{background:var(--dg-superficie);color:#8a1f17;border-color:#8a1f17}
+.pc-cab{display:flex;align-items:center;gap:8px;color:var(--dg-pedido-texto)}
+.pc-cab svg{flex:0 0 auto}
+.pc-titulo{display:block;font-size:14.5px;font-weight:600;line-height:1.3;color:var(--dg-texto)}
+.pc-texto{margin:4px 0 10px 26px;font-size:13px;line-height:1.45;color:var(--dg-texto-2)}
+.pc-pedido{margin:0 0 12px;padding:8px 10px;max-height:200px;overflow:auto;border-radius:10px;background:var(--dg-superficie-2);color:var(--dg-texto);
+  font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;overflow-wrap:anywhere;box-sizing:border-box}
+.pc-botoes{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.pc-btn{display:inline-flex;align-items:center;justify-content:center;box-sizing:border-box;min-height:36px;min-width:104px;
+  padding:0 16px;border-radius:999px;border:1px solid transparent;font:inherit;font-size:13.5px;font-weight:600;cursor:pointer}
+.pc-aprova{background:var(--dg-azul);color:#fff}
+.pc-nega{background:transparent;color:var(--dg-texto);border-color:var(--dg-borda)}
+.pc-nega:hover{background:var(--dg-superficie-2)}
 .pc-btn:active{opacity:.7}
 .pc-btn:disabled{opacity:.55;cursor:default}
-.pc-btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
-.pc-erro{margin:8px 0 0;padding:8px 12px;border-radius:10px;background:#fdecec;color:#8a1f17;font-size:13.5px;line-height:1.4}
-.pc-status{margin:10px 0 0;min-height:1em;font-size:14px;font-weight:600}
-html[data-tema="escuro"] .pc{background:#3c341b;color:#fff3c8;border-color:#e5bd4c}
-html[data-tema="escuro"] .pc-nega{background:transparent;color:#ffd9d4;border-color:#ffd9d4}
-html[data-tema="escuro"] .pc-erro{background:#4a1f1b;color:#ffd9d4}
-@media(prefers-color-scheme:dark){
-  html:not([data-tema="claro"]) .pc{background:#3c341b;color:#fff3c8;border-color:#e5bd4c}
-  html:not([data-tema="claro"]) .pc-nega{background:transparent;color:#ffd9d4;border-color:#ffd9d4}
-  html:not([data-tema="claro"]) .pc-erro{background:#4a1f1b;color:#ffd9d4}
-}
+.pc-btn:focus-visible{outline:2px solid var(--dg-azul);outline-offset:2px}
+.pc-erro{margin:0 0 10px;padding:8px 10px;border-radius:10px;background:var(--dg-erro-fundo);color:var(--dg-erro-texto);font-size:13px;line-height:1.4}
+.pc-status{margin:8px 0 0;min-height:0;font-size:13px;color:var(--dg-texto-2);text-align:right}
+.pc-status:empty{display:none}
+@media(max-width:520px){.pc-btn{flex:1 1 0}}
 @media(prefers-reduced-motion:reduce){.pc.entra{animation:none}}
 .meta.fila{color:#8a5a00;font-weight:600}
 
@@ -1165,3 +1168,29 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 .pa-gira{display:block;width:14px;height:14px;border-radius:50%;border:2px solid var(--dg-borda);border-top-color:var(--dg-texto-2);animation:paGira .8s linear infinite}
 @keyframes paGira{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.pa-gira{animation:none}}
+
+/* ── Menu do ➕ (22/10/2026): Anexar arquivo e Nova conversa, acima do botão ── */
+.linha1{position:relative}
+#btnAnexo.ativo{background:var(--dg-superficie-2)}
+#menuMais{position:absolute;left:0;bottom:calc(100% + 8px);z-index:45;width:244px;max-width:calc(100vw - 32px);
+          background:var(--dg-superficie);border:1px solid var(--dg-borda);border-radius:16px;
+          box-shadow:var(--dg-sombra);padding:6px;box-sizing:border-box}
+#menuMais[hidden]{display:none}
+#menuMais button{display:flex;align-items:center;gap:12px;width:100%;min-height:44px;padding:10px 12px;border:0;
+                 border-radius:10px;background:transparent;color:var(--dg-texto);font:inherit;text-align:left;cursor:pointer}
+#menuMais button:hover,#menuMais button.confirma{background:var(--dg-superficie-2)}
+#menuMais svg{flex:0 0 auto;color:var(--dg-texto-2)}
+#menuMais span{display:flex;flex-direction:column;min-width:0}
+#menuMais b{font-weight:500;font-size:15px}
+#menuMais small{font-size:12.5px;line-height:1.3;color:var(--dg-texto-3)}
+#menuMais button.confirma small{color:var(--dg-texto-2)}
+.mm-sep{height:1px;background:var(--dg-borda);margin:4px 8px}
+
+/* ── Soltar arquivo em qualquer lugar da conversa (22/10/2026) ── */
+#soltaAqui{position:fixed;inset:10px;z-index:90;pointer-events:none;display:grid;place-items:center;
+           border:2px dashed var(--dg-azul);border-radius:18px;
+           background:color-mix(in srgb,var(--dg-fundo,#000) 72%,transparent)}
+#soltaAqui[hidden]{display:none}
+#soltaAqui div{display:flex;flex-direction:column;align-items:center;gap:10px;color:var(--dg-texto)}
+#soltaAqui svg{color:var(--dg-azul)}
+#soltaAqui b{font-weight:500;font-size:16px}

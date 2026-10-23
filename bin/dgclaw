@@ -71,6 +71,7 @@ Agentes
       Exemplo:  dgclaw agente listar
 
   dgclaw agente parar|iniciar|reiniciar <slug>
+  dgclaw agente religar                  liga os que nao estao de pe (menos os parados de proposito)
       Exemplo:  dgclaw agente reiniciar ana
 
   dgclaw agente reparar <slug>           regrava o config.sh e refaz a parte de dentro (runner, painel e rotinas)
@@ -1156,9 +1157,13 @@ agente_acao() {
     case "$acao" in
         parar)
             executar podman stop "$c" >/dev/null
-            ok "agente $slug parado"
+            # parado de proposito: o "religar" da subida do servidor pula este agente
+            executar mkdir -p "$DG_LIB/agentes-parados"
+            executar touch "$DG_LIB/agentes-parados/$slug"
+            ok "agente $slug parado (fica parado mesmo se o servidor reiniciar; ligue com: dgclaw agente iniciar $slug)"
             ;;
         iniciar)
+            executar rm -f "$DG_LIB/agentes-parados/$slug"
             executar podman start "$c" >/dev/null
             if [ "$ENSAIO" != 1 ]; then
                 local t
@@ -1180,6 +1185,27 @@ agente_acao() {
             ok "runner do agente $slug reiniciado"
             ;;
     esac
+}
+
+# agente_religar: liga os agentes que nao estao de pe, menos os que o dono parou de proposito
+# (dgclaw agente parar deixa a marca em $DG_LIB/agentes-parados). Roda na subida do servidor pela
+# unidade dgclaw-agentes-boot.service: o restart "unless-stopped" dos containers nao vale depois de
+# um reinicio, porque o podman-restart do sistema so religa os "always" (queda de 23/10/2026).
+agente_religar() {
+    exigir_ferramentas jq podman
+    local slug estado erros=0
+    while IFS= read -r slug; do
+        [ -n "$slug" ] || continue
+        if [ -e "$DG_LIB/agentes-parados/$slug" ]; then info "agente $slug: parado de proposito, fica parado"; continue; fi
+        estado="$(podman inspect -f '{{.State.Status}}' "dgclaw-$slug" 2>/dev/null || echo ausente)"
+        case "$estado" in
+            running) info "agente $slug: ja estava de pe" ;;
+            ausente) aviso "agente $slug: nao tem container; rode: dgclaw agente reparar $slug"; erros=$((erros + 1)) ;;
+            *) ( agente_acao iniciar "$slug" ) || { aviso "agente $slug nao ligou; veja: dgclaw status"; erros=$((erros + 1)); } ;;
+        esac
+    done < <(agentes_ler | jq -r '.agentes[] | select(.tipo == "agente") | .slug')
+    [ "$erros" -eq 0 ] || falha "$erros agente(s) nao ligaram depois da subida do servidor." "veja com: dgclaw status"
+    ok "agentes religados"
 }
 
 # config_sh_valor <arquivo> <CHAVE>: le o valor de uma linha `export CHAVE='valor'` do
@@ -1688,6 +1714,7 @@ agente_main() {
         criar) agente_criar "$@" ;;
         listar) agente_listar "$@" ;;
         parar|iniciar|reiniciar) agente_acao "$sub" "$@" ;;
+        religar) agente_religar "$@" ;;
         reparar) agente_reparar "$@" ;;
         recriar) agente_recriar "$@" ;;
         identidade) agente_identidade "$@" ;;

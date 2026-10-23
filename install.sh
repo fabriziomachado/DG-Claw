@@ -1039,6 +1039,22 @@ RestartSec=3
 WantedBy=multi-user.target
 FIM
     ligar_unidade dgclaw-web.service reiniciar
+    # os agentes voltam sozinhos depois de um reinicio do servidor (queda de 23/10/2026)
+    cat <<'FIM' | escrever_arquivo "$DG_UNITS/dgclaw-agentes-boot.service" 644
+[Unit]
+Description=DG Claw: liga os agentes quando o servidor sobe (menos os parados de proposito)
+After=network-online.target dgclaw-web.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/dgclaw/app/bin/dgclaw agente religar
+TimeoutStartSec=600
+
+[Install]
+WantedBy=multi-user.target
+FIM
+    ligar_unidade dgclaw-agentes-boot.service sem-reiniciar
 }
 
 # --- 9. admin -------------------------------------------------------------------

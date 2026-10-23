@@ -295,6 +295,18 @@
     document.head.appendChild(s);
   }
 
+  /* O botão de versão nova do S2 Bot (as releases do fork) no rodapé do menu, em todas as telas da casca. */
+  function carregaVersaoNova() {
+    if (raiz.DGVersaoNova || document.querySelector('script[src="/versao-nova.js"]')) return;
+    const l = document.createElement('link');
+    l.rel = 'stylesheet'; l.href = '/versao-nova.css';
+    document.head.appendChild(l);
+    const s = document.createElement('script');
+    s.src = '/versao-nova.js';
+    s.onerror = () => console.warn('casca: o botão de versão nova (/versao-nova.js) não carregou; as telas seguem sem ele.');
+    document.head.appendChild(s);
+  }
+
   function monta(opcoes) {
     const o = opcoes || {};
     est.pagina = o.pagina || '';
@@ -307,6 +319,7 @@
     document.documentElement.classList.remove('casca-espera');
     pintaTitulo();
     carregaFaixaAtualizacao();
+    carregaVersaoNova();
     $('btnMenu').onclick = () => abreMenu(true);
     $('btnFechaMenu').onclick = () => abreMenu(false);
     $('overlayMenu').onclick = () => abreMenu(false);

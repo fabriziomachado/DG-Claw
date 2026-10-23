@@ -423,7 +423,7 @@ def main():
 
     # destinos (so com consentimento)
     endpoint = env_or_cfg(cfg, 'DGCLAW_REPORT_ENDPOINT')
-    repo = env_or_cfg(cfg, 'DGCLAW_REPORT_GITHUB_REPO') or 'DGatoM/DG-Claw'
+    repo = env_or_cfg(cfg, 'DGCLAW_REPORT_GITHUB_REPO') or 'fabriziomachado/DG-Claw'
     contact = env_or_cfg(cfg, 'DGCLAW_AUTHOR_CONTACT')
 
     print(f'bundle salvo em: {out_path}  ({meta["bytes"]} bytes)')

@@ -90,7 +90,7 @@ tem "fala em dia" "em dia" "$OUT"
 igual "nenhum recado ao Admin" 0 "$(recados)"
 igual "pasta do estado 700" 700 "$(stat -c %a "$RAIZ/var/lib/dgclaw/web/atualizacao")"
 igual "estado 600" 600 "$(stat -c %a "$ESTADO")"
-tem "a URL do compare leva o commit instalado e a main" "/repos/DGatoM/DG-Claw/compare/$INSTALADO...main" "$(cat "$REQ")"
+tem "a URL do compare leva o commit instalado e a main" "/repos/fabriziomachado/DG-Claw/compare/$INSTALADO...main" "$(cat "$REQ")"
 igual "uma linha de log" 1 "$(grep -c . "$LOG")"
 
 echo "a frente, com item novo no CHANGELOG"

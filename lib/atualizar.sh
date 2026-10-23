@@ -80,7 +80,7 @@ atualizar_achar_repo() {
         # Sem git so da para reinstalar o que ja esta na pasta (zip novo por cima): --sem-baixar, e nunca --voltar.
         if [ "$ATU_SEM_BAIXAR" != 1 ] || [ "$ATU_MODO" = voltar ]; then
             falha "'$ATU_REPO' nao e um repositorio git, entao nao tenho como baixar a versao nova nem voltar para a antiga." \
-                  "se voce atualizou os arquivos a mao (zip novo por cima), rode com --sem-baixar. Se nao, clone de novo: git clone https://github.com/DGatoM/DG-Claw"
+                  "se voce atualizou os arquivos a mao (zip novo por cima), rode com --sem-baixar. Se nao, clone de novo: git clone https://github.com/fabriziomachado/DG-Claw"
         fi
         aviso "'$ATU_REPO' nao e um repositorio git; vou so reinstalar o que esta na pasta. Nao havera como anotar a versao antiga no backup."
     fi

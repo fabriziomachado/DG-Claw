@@ -53,6 +53,7 @@ const { criarHistorico } = require('./lib/historico');
 const { criarArquivoConversa } = require('./lib/arquivo-conversa');
 const { criarAvatares } = require('./lib/avatar');
 const { criarAtualizacao } = require('./lib/atualizacao');
+const { criarVersaoNova } = require('./lib/versao-nova');
 const { criarNaoLidas } = require('./lib/nao-lidas');
 const { criarUso } = require('./lib/uso');
 
@@ -161,6 +162,9 @@ function criarServidor(opcoes) {
   // /api/v1/estados NÃO entra na caixa: ela só atende agentes de trabalho, e um agente não tem por que
   // enxergar o estado (nem o nome) dos vizinhos. O Admin, no host, lê os documentos e a tela.
   const atualizacao = criarAtualizacao({ dataDir: config.dataDir, log });
+  // versão nova do S2 Bot: as releases do fork, para o botão do rodapé do menu (lib/versao-nova.js)
+  const versaoNova = criarVersaoNova({ appDir: opcoes.appDirVersao || path.resolve(__dirname, '..'), dataDir: config.dataDir, log, repo: process.env.DGCLAW_ATUALIZA_REPO, buscar: opcoes.buscarVersaoNova });
+  if (!opcoes.semVigiaAlertas) versaoNova.iniciar();
 
   let versaoJsCache = { ts: 0, valor: '0' };
   /** Versão da tela: mtime de conversa.js. A tela compara com a que carregou e se recarrega sozinha. */
@@ -376,6 +380,7 @@ function criarServidor(opcoes) {
     if (p.startsWith('/api/v1/memoria') && await memoriaSemantica.rotas(req, res, url, sessao)) return undefined;
 
     if ((p === '/api/v1/atualizacao' || p.startsWith('/api/v1/atualizacao/')) && await atualizacao.rotas(req, res, url, sessao)) return undefined;
+    if ((p === '/api/v1/versao-nova' || p.startsWith('/api/v1/versao-nova/')) && await versaoNova.rotas(req, res, url, sessao)) return undefined;
 
     if (p === '/api/v1/onboarding') {
       if (falhaDoRegistro(req, res, true)) return;
@@ -1145,7 +1150,7 @@ function criarServidor(opcoes) {
         });
       });
     },
-    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); vigiaAlertas.parar(); boasVindas.parar(); limites.parar(); avisos.parar(); vigiaAtencao.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
+    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); vigiaAlertas.parar(); boasVindas.parar(); limites.parar(); avisos.parar(); vigiaAtencao.parar(); versaoNova.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
   };
 }
 

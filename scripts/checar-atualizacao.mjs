@@ -36,7 +36,8 @@ const ARQ_ESTADO = path.join(DIR_ESTADO, 'estado.json');
 const ARQ_AVISADO = path.join(DIR_ESTADO, 'avisado-admin.json');
 const ARQ_LOG = path.join(RAIZ, 'var/log/dgclaw/checar-atualizacao.log');
 
-const REPO_PADRAO = 'DGatoM/DG-Claw';
+// S2 Bot: o padrão é o fork do dono; o projeto original não é fonte de atualização aqui.
+const REPO_PADRAO = 'fabriziomachado/DG-Claw';
 const BRANCH_PADRAO = 'main';
 const API_URL = process.env.DGCLAW_AVISO_API_URL || 'https://api.github.com';
 const RAW_URL = process.env.DGCLAW_AVISO_RAW_URL || 'https://raw.githubusercontent.com';

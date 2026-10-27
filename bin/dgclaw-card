@@ -214,9 +214,15 @@ cmd_abrir() {
       HTTP="$http_input"; RESP="$resp_input"
       falha_geral ;;
   esac
+  # O monitor liga ANTES de escrever na saída. Quem guarda só o id (`| head -1`, como na skill) fecha o
+  # cano depois da primeira linha, e o echo seguinte matava o script com SIGPIPE antes de ligar o monitor:
+  # o card ficava sem vigia e ninguém avisava o fim (24/10/2026, Tech).
+  local mon_saida="" mon_cod=0
+  if [ "$monitor" = 1 ]; then mon_saida="$(ligar_monitor "$id" "$entregue" "$cada" 2>&1)" || mon_cod=$?; fi
   echo "$id"
+  if [ "$mon_cod" != 0 ]; then echo "$mon_saida" >&2; exit "$mon_cod"; fi
   echo "Card aberto em $(nome_do_provedor "$provedor"). Para acompanhar: dgclaw-card esperar $id && dgclaw-card ler $id"
-  [ "$monitor" = 0 ] || ligar_monitor "$id" "$entregue" "$cada"
+  [ -z "$mon_saida" ] || echo "$mon_saida"
 }
 
 # Liga o modo monitor num card que acabou de abrir. O dgclaw-monitor mora ao lado deste script.

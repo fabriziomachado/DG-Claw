@@ -245,6 +245,12 @@ mundo '{"status":"working","updatedAt":'"$(agora_ms)"'}' '{"status":"working","u
 "$CARD" abrir --provedor codex --titulo "T" --pedido "faca" --monitor --entregue "arquivo pronto" --cada 3 >"$T/o" 2>"$T/e"; c=$?
 ok "abrir --monitor --entregue sai com 0" "$([ $c = 0 ] && echo 0 || echo 1)"
 "$MON" list | grep -q "^c2.*a cada 3 min"; ok "abrir --monitor deixou o card c2 monitorado a cada 3 min" $?
+# como na skill: quem guarda so o id com `| head -1` fecha o cano depois da primeira linha; o monitor
+# tem de ligar mesmo assim (24/10/2026: o SIGPIPE matava o script antes do add)
+mundo '{"status":"working","updatedAt":'"$(agora_ms)"'}' '{"status":"working","updatedAt":'"$(agora_ms)"'}' '{"novo_id":"c2"}'
+"$MON" rm c2 >/dev/null 2>&1
+id="$("$CARD" abrir --provedor codex --titulo "T" --pedido "faca" --monitor --entregue "arquivo pronto" 2>"$T/e" | head -1)"
+[ "$id" = "c2" ] && "$MON" list | grep -q "^c2"; ok "abrir --monitor com | head -1 devolve o id e deixa o card monitorado" $?
 # o add falha (o runner nao lista o card novo): o card fica aberto e a saida e 8, com o comando a mao
 mundo '{"status":"working","updatedAt":'"$(agora_ms)"'}' null '{"novo_id":"c9"}'
 "$CARD" abrir --provedor codex --titulo "T" --pedido "faca" --monitor --entregue "arquivo pronto" >"$T/o" 2>"$T/e"; c=$?

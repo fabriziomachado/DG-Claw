@@ -654,13 +654,15 @@ function pintaPassos(est) {
   const n = feitos.length + (p ? 1 : 0);
   const ini = desde || (Date.parse(est.desde || '') / 1000) || agoraSeg;
   pgMetaEl.textContent = (n ? (n === 1 ? '1 passo · ' : n + ' passos · ') : '') + mmss(agoraSeg - ini);
-  pgListaEl.hidden = !pgAberto;
-  if (pgAberto) {
+  // sem passo feito nem passo de agora, a lista aberta só diria "nenhum passo" em cima da linha que já
+  // mostra o que ele faz (25/10/2026, o dono estranhou): fica fechada até existir passo
+  const temPassos = feitos.length > 0 || !!p;
+  pgListaEl.hidden = !pgAberto || !temPassos;
+  if (pgAberto && temPassos) {
     const inicioAgora = p ? (Date.parse(est.desde || '') / 1000 || agoraSeg) : agoraSeg;
     const agoraLi = p ? `<li class="pg-passo agora"><i class="pg-gira" aria-hidden="true"></i>${icPasso(TR.tipoPasso(p.ferramenta))}` +
       `<span class="pg-rot">${esc(rot)}</span><span class="pg-q">${esc(TR.duracao(agoraSeg - inicioAgora))}</span></li>` : '';
-    const html = '<ul class="pg-passos">' + (feitos.length || agoraLi ? htmlPassos(feitos, inicioAgora) + agoraLi
-      : `<li class="pg-passo vazio">${esc(AGENTE.nome)} ainda não rodou nenhum passo neste pedido.</li>`) + '</ul>';
+    const html = '<ul class="pg-passos">' + htmlPassos(feitos, inicioAgora) + agoraLi + '</ul>';
     if (pgListaEl.innerHTML !== html) pgListaEl.innerHTML = html;
   }
   if (!pgTimer) pgTimer = setInterval(() => {

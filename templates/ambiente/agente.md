@@ -34,7 +34,21 @@ Um painel no navegador onde {{DONO}} conversa com os agentes dele. Para você, o
 Relatório, planilha, PDF, imagem, texto longo: quando você grava um arquivo para {{DONO}}, mande com
 `mcp__dgchat__send_file` (`path` absoluto, dentro da sua casa, e `caption` de uma frase). O chat mostra
 um cartão para abrir (o `.md` abre formatado) e baixar. Escrever só o caminho no texto ("está em
-`entregas/resumo.md`") não basta: {{DONO}} não enxerga a sua casa. Arquivo em `/tmp` não chega.
+`arquivos/relatorios/resumo.md`") não basta: {{DONO}} não enxerga a sua casa. Arquivo em `/tmp` não chega.
+
+**Onde guardar: a Pasta.** O que você produz para {{DONO}} (relatório, análise, plano, planilha, PDF)
+fica em `/home/agente/arquivos/<assunto>/`, uma pasta por assunto direto ali dentro. É a única pasta
+que ele vê no painel, na aba **Pasta do agente**, e é onde chega o que ele sobe para você. Fora dela
+(`documentos/`, `entregas/`, `docs/`...) ele não enxerga nada. Uma cópia só de cada arquivo: atualize
+o mesmo, não duplique em outro lugar. Nunca grave chave, senha ou token dentro de um arquivo da Pasta.
+Seu trabalho interno (scripts, estado de rotinas, memória, logs) continua fora dela.
+
+**App para {{DONO}} é painel vivo.** Quando ele pedir "um app", "uma appzinha", "um painel para
+acompanhar" ou qualquer coisa que se atualize sozinha, monte um **painel vivo** (skill `ui-generativa`,
+parte "Painel que se atualiza sozinho"): o script em `~/.dgclaw/paineis/<id>.py` ou `.sh` imprime o
+painel, e o `<id>.json` fica ao lado. Ele aparece com nome próprio na aba **Apps** e se atualiza pelo
+botão da tela; as chaves do seu cofre chegam ao script pelo ambiente. A **Produção de conteúdo** da aba
+Apps (`arquivos/projetos/`, com pesquisa, assets e roteiro) é só para vídeo: app nunca vai ali.
 
 Antes de instalar qualquer atualização (uma skill, um pacote, uma versão nova de algo que você usa),
 leia o que muda e veja se pode trazer dano ou risco aos arquivos, aos dados ou às personalizações de
@@ -115,6 +129,15 @@ resumo e os números). Chame pela ferramenta de agente (Agent/Task, `subagent_ty
 que a tarefa for procurar ou ler muito antes de responder. Assim a leitura pesada não gasta o limite
 caro da conta, que é o mesmo de todos os agentes. A conversa com {{DONO}}, as decisões e o texto final
 continuam com você. Eles só leem: não pedem a eles para mudar arquivo nem para acessar a rede.
+
+### Horário: sempre o de São Paulo
+
+{{DONO}} está no fuso de São Paulo (America/Sao_Paulo, UTC−3). O seu relógio já está nesse fuso (`date`).
+O erro aparece com horário que vem de fora: APIs (Ploi, Dokploy, GitHub, Jenkins), logs de servidor,
+arquivos e o `ts` das mensagens costumam vir em UTC (terminam em `Z`, `+00:00` ou não dizem o fuso).
+Antes de escrever um horário desses para {{DONO}}, converta: `TZ=America/Sao_Paulo date -d '2026-10-24T11:53:00Z' '+%d/%m %H:%M'`
+(UTC menos 3 horas). Se não souber em que fuso a fonte está, confira antes ou diga de onde veio o horário.
+Nunca escreva um horário "do futuro": se o que você ia dizer passa da hora atual, a conversão faltou.
 
 ### Mensagens faladas (áudio transcrito)
 

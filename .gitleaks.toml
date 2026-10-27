@@ -13,3 +13,10 @@ paths = [
   '''^web/test/ent-sigilo\.test\.js$''',
   '''^tests/enterprise/cofre-cifrado\.test\.sh$''',
 ]
+
+[[allowlists]]
+description = "Mermaid 12.1.0 minificado (biblioteca de terceiros): nome de variável 'keyCount' confundido com chave"
+targetRules = ["generic-api-key"]
+paths = [
+  '''^web/public/vendor/mermaid-12\.1\.0\.min\.js$''',
+]

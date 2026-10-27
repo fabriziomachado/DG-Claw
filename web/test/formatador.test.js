@@ -35,7 +35,7 @@ test('visor da Pasta: esquema, link dentro de link e `código` ficam de fora', (
   assert.match(h, /<a href="https:\/\/x\.y\/a\.md" target="_blank" rel="noopener">s<\/a>/);
   assert.match(h, /<a href="#" class="lnk-pasta" data-pasta="a\.md">ver \.\.\/a\.md<\/a>/);
   assert.match(h, /<code>b\.md<\/code>/);
-  assert.doesNotMatch(h, /<script>/);
+  assert.doesNotMatch(h, /<script/i);
 });
 
 test('chat e visor do chat: sem { pasta: true } o link relativo continua texto', () => {

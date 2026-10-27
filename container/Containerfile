@@ -61,7 +61,9 @@ ENV TZ=America/Sao_Paulo
 # de uso dos agentes (ffmpeg para áudio e vídeo, poppler para PDF, fontes para
 # imagem sem quadradinho, gawk/bc/xz para os scripts dos alunos). Nenhum compilador.
 # O upgrade puxa as correções de segurança já publicadas pelo Ubuntu por cima da base
-# (poppler 9.11, relatório de segurança do Tech, 22/10/2026).
+# (poppler 9.11, relatório de segurança do Tech, 22/10/2026). O cache guarda esta camada: para puxar
+# uma correção nova do Ubuntu, troque a data abaixo (zlib1g 2.3, 25/10/2026).
+ARG DGCLAW_APT_EM=2026-10-25
 RUN apt-get update && apt-get install -y --no-install-recommends \
       systemd systemd-sysv dbus dbus-user-session \
       cron sudo tzdata locales \

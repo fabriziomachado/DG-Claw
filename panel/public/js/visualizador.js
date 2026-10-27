@@ -11,6 +11,7 @@
 //   vídeo   → <video controls>
 //   áudio   → <audio controls>
 //   pdf     → <iframe>
+//   pagina  → <iframe> da tela /ver-arquivo do app (texto, .md, .html com a cara da conversa)
 //   o resto → a frase que diz que aquele formato não abre no navegador, mais o
 //             botão de baixar.
 //
@@ -61,6 +62,10 @@
     }
     if (item.tipo === 'audio') {
       return `<div class="dgv-audio"><audio src="${url}" controls preload="metadata"></audio></div>`;
+    }
+    if (item.tipo === 'pagina' && item.ver) {
+      // texto, .md e .html na tela de leitura do app, com a cara da conversa (25/10/2026)
+      return `<iframe class="dgv-pagina" src="${esc(item.ver)}" title="${nome}"></iframe>`;
     }
     if (item.tipo === 'pdf') {
       // O PDF do agente é lido pelo leitor do próprio navegador. Em celular alguns

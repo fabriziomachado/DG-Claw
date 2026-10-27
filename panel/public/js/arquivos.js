@@ -399,6 +399,17 @@
    */
   function abrirArquivo(b) {
     const rel = b.dataset.ver;
+    // Texto, .md e .html abrem com a cara da conversa (25/10/2026, pedido do dono): a tela /ver-arquivo do
+    // app usa o mesmo formatador e, para .html, a mesma caixa isolada do visual. Editar continua no texto puro.
+    const slug = (/\/p\/([^/]+)/.exec(BASE) || [])[1];
+    if (b.dataset.editavel && slug) {
+      window.DGVisualizador.abrir({
+        nome: b.dataset.nome, url: urlBaixar(rel), tipo: 'pagina', ext: b.dataset.ext,
+        bytes: b.dataset.bytes ? Number(b.dataset.bytes) : null,
+        ver: `/ver-arquivo?agente=${encodeURIComponent(decodeURIComponent(slug))}&caminho=${encodeURIComponent(rel)}`,
+      });
+      return;
+    }
     if (b.dataset.editavel) {
       if (aberto && aberto.rel === rel && aberto.modo === 'ver') { aberto = null; limparAberto(); return; }
       aberto = { rel, modo: 'ver' };

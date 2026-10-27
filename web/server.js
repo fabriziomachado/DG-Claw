@@ -47,6 +47,7 @@ const { criarEstados } = require('./lib/estados');
 const { criarPrefsAtencao } = require('./lib/prefs-atencao');
 const { criarVigiaAtencao } = require('./lib/vigia-atencao');
 const { criarMesa } = require('./lib/mesa');
+const { arquivoDaPasta, imagemDaPasta } = require('./lib/pasta-ver');
 const { criarAvisos } = require('./lib/avisos');
 const { criarIntegracoes } = require('./lib/integracoes');
 const { criarHistorico } = require('./lib/historico');
@@ -366,10 +367,42 @@ function criarServidor(opcoes) {
     return n;
   }
 
+  function servirImagemDaPasta(res, m, a) {
+    const img = imagemDaPasta(a.real);
+    if (img.erro) return H.erroJson(res, img.status, img.erro);
+    res.writeHead(200, { 'Content-Type': img.mime, 'Content-Length': img.dados.length, 'X-Content-Type-Options': 'nosniff',
+      'Cache-Control': 'private, max-age=300', 'Content-Security-Policy': "default-src 'none'; sandbox" });
+    return res.end(m === 'HEAD' ? undefined : img.dados);
+  }
+
   async function api(req, res, url, sessao) {
     const p = url.pathname;
     const m = req.method;
     if (p.startsWith('/api/v1/tarefas') && await mesa.rota(req, res, url, sessao)) return undefined;
+    // Pasta do agente aberta com a cara da conversa (25/10/2026): o arquivo de <casa>/arquivos vira mídia,
+    // e a tela /ver-arquivo usa o formatador e o visual isolado da conversa (lib/pasta-ver.js)
+    const mPasta = /^\/api\/v1\/agents\/([^/]+)\/pasta\/abrir$/.exec(p);
+    if (mPasta) {
+      if (m !== 'GET') return H.erroJson(res, 405, 'Use GET com ?caminho=<arquivo da Pasta>.');
+      if (sessao.via === 'caixa') return H.erroJson(res, 403, 'A Pasta do agente é vista pelo dono, no navegador.');
+      const agente = agenteOuErro(res, decodeURIComponent(mPasta[1]));
+      if (!agente) return undefined;
+      const a = arquivoDaPasta(agente.home_host, url.searchParams.get('caminho'));
+      if (a.erro) return H.erroJson(res, a.status, a.erro);
+      return H.enviaJson(res, 200, { ok: true, media: midia.registrar(agente.slug, a.real, { nome: a.nome }) });
+    }
+    // Imagem da Pasta com endereço fixo (25/10/2026): a foto de um painel vivo (app) ou de um carrossel.
+    // Só imagem comum (pelos primeiros bytes, sem SVG), só da Pasta, só o dono.
+    const mImg = /^\/api\/v1\/agents\/([^/]+)\/pasta\/imagem$/.exec(p);
+    if (mImg) {
+      if (m !== 'GET' && m !== 'HEAD') return H.erroJson(res, 405, 'Use GET com ?caminho=<imagem da Pasta>.');
+      if (sessao.via === 'caixa') return H.erroJson(res, 403, 'A Pasta do agente é vista pelo dono, no navegador.');
+      const agente = agenteOuErro(res, decodeURIComponent(mImg[1]));
+      if (!agente) return undefined;
+      const a = arquivoDaPasta(agente.home_host, url.searchParams.get('caminho'));
+      if (a.erro) return H.erroJson(res, a.status, a.erro);
+      return servirImagemDaPasta(res, m, a);
+    }
 
     if (await foco.tratarRota(req, res, url, sessao)) return undefined;
 
@@ -1081,6 +1114,14 @@ function criarServidor(opcoes) {
       if (!servirArquivo(req, res, path.join(config.publicDir, 'conversa.html'), 'no-store')) {
         log('erro', `A tela da conversa não está instalada: falta ${path.join(config.publicDir, 'conversa.html')}.`);
         H.paginaErro(res, 500, 'Tela não instalada', 'O arquivo da tela da conversa não foi encontrado no servidor. Reinstale o DG Claw Web.');
+      }
+      return undefined;
+    }
+
+    if (p === '/ver-arquivo' && (m === 'GET' || m === 'HEAD')) {
+      if (!sessao) return semSessaoPagina(req, res, url);
+      if (!servirArquivo(req, res, path.join(config.publicDir, 'ver-arquivo.html'), 'no-store')) {
+        H.paginaErro(res, 500, 'Tela não instalada', 'O arquivo da tela de leitura da Pasta não foi encontrado no servidor. Reinstale o DG Claw Web.');
       }
       return undefined;
     }

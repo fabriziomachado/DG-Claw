@@ -52,6 +52,16 @@ test('GET /api/v1/agents: Admin primeiro, formato esperado e voz/microfone falso
   } finally { await s.fechar(); }
 });
 
+test('GET /api/v1/agents: ultima_ts em epoch ms da última mensagem; null (nunca 0) sem conversa', async () => {
+  const s = await cenario();
+  try {
+    const ag = (await s.t.c.get('/api/v1/agents')).json.agentes;
+    const ana = ag.find((x) => x.id === 'ana'), admin = ag.find((x) => x.id === 'admin');
+    assert.ok(Number.isFinite(ana.ultima_ts) && ana.ultima_ts > 1.7e12, `ultima_ts da Ana: ${ana.ultima_ts}`);
+    assert.equal(admin.ultima_ts, null);
+  } finally { await s.fechar(); }
+});
+
 test('rotulo_provedor: usa a rota do runner, guarda 60 s em cache', async () => {
   const s = await cenario({ ana: { provedor: { sessao: 's', provedor: 'claude', rotulo: 'Claude Opus 5.5, na assinatura' } } });
   try {
@@ -541,4 +551,33 @@ test('páginas: / vai para o Admin, /a/<slug> serve a conversa e slug inexistent
     assert.equal(nao.status, 404); assert.match(nao.texto, /Não existe agente/);
     assert.equal((await s.t.c.get('/api/saude', { semCookie: true })).json.ok, true);
   } finally { await s.fechar(); }
+});
+
+test('send: voz:true põe voz="1" no fim dos atributos do envelope; sem voz (ou outro valor) não põe', async () => {
+  const s = await cenario();
+  try {
+    await s.t.c.post('/api/v1/agents/ana/send', { json: { text: 'falado', voz: true } });
+    await s.t.c.post('/api/v1/agents/ana/send', { json: { text: 'escrito' } });
+    await s.t.c.post('/api/v1/agents/ana/send', { json: { text: 'texto da string', voz: 'true' } });
+    await s.t.c.post('/api/v1/agents/ana/send', { json: { text: 'um', voz: 1 } });
+    const [a, b, c, d] = s.rAna.rec.inputs.map((i) => i.text);
+    assert.match(a, /^<dgchat from="pessoa" chat="c_ana" msg="[^"]+" ts="[^"]+" voz="1">falado<\/dgchat>$/);
+    for (const t of [b, c, d]) assert.ok(!t.includes('voz='), t);
+  } finally { await s.fechar(); }
+});
+
+test('send: comando de barra não leva a tag de voz', async () => {
+  const s = await cenario();
+  try {
+    const r = await s.t.c.post('/api/v1/agents/ana/send', { json: { text: '/compact', voz: true } });
+    assert.equal(r.status, 200, r.texto);
+    for (const i of s.rAna.rec.inputs) assert.ok(!i.text.includes('voz='), i.text);
+  } finally { await s.fechar(); }
+});
+
+test('montarEnvelope: voz só com true', () => {
+  const base = { from: 'pessoa', chat: 'c', msg: 'm', ts: 't', text: 'x' };
+  assert.equal(montarEnvelope({ ...base, voz: true }), '<dgchat from="pessoa" chat="c" msg="m" ts="t" voz="1">x</dgchat>');
+  assert.equal(montarEnvelope({ ...base, voz: 'true' }), '<dgchat from="pessoa" chat="c" msg="m" ts="t">x</dgchat>');
+  assert.equal(montarEnvelope(base), '<dgchat from="pessoa" chat="c" msg="m" ts="t">x</dgchat>');
 });

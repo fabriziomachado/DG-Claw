@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+# dgclaw-atualizar-s2bot: instala uma release do S2 Bot a partir do fork (fabriziomachado/DG-Claw),
+# com backup antes e volta automática se algo falhar. É o roteiro que o Admin segue quando o dono toca
+# em "Atualizar" na janela de versão nova (web/public/versao-nova.js). Nunca olha o projeto original.
+#
+# Uso:
+#   dgclaw-atualizar-s2bot <tag> [--ensaio]   instala a release <tag> (ex.: v1.5.0-s2bot)
+#   dgclaw-atualizar-s2bot voltar <pasta>      volta para o backup <pasta> (o que o roteiro fez antes)
+#
+# Passos: confere a tag no fork, baixa a release numa pasta de trabalho, roda os testes do Web e do
+# runner ali (se falharem, nada aqui foi mexido), faz o backup (programa, configurações, dados do painel,
+# unidades, CLAUDE.md do Admin e a imagem dos agentes), copia, reinicia o Web, refaz a imagem, recria os
+# agentes um por vez e reinicia o Admin por último, desacoplado. Qualquer falha depois do backup volta.
+# As casas dos agentes (memória, arquivos, cofre) nunca são tocadas.
+set -uo pipefail
+
+# Este arquivo fica dentro de /opt/dgclaw/app, que a própria atualização troca: roda de uma cópia.
+if [ -z "${DGCLAW_ATUALIZAR_COPIA:-}" ]; then
+    copia="$(mktemp /tmp/dgclaw-atualizar-s2bot.XXXXXX)"
+    cp "$0" "$copia" && chmod 700 "$copia"
+    DGCLAW_ATUALIZAR_COPIA=1 exec bash "$copia" "$@"
+fi
+
+REPO="${DGCLAW_ATUALIZA_REPO:-fabriziomachado/DG-Claw}"
+APP=/opt/dgclaw/app
+TRABALHO=/var/lib/dgclaw/atualizacao-s2bot
+BACKUPS=/var/backups/dgclaw
+IMG=localhost/dgclaw-agente
+LOG=/var/log/dgclaw-atualizar-s2bot.log
+RX_TAG='^v?[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}(-[0-9A-Za-z.-]{1,30})?$'
+ENSAIO=0
+
+passo() { printf '\n== %s\n' "$*" | tee -a "$LOG"; }
+info() { printf '   %s\n' "$*" | tee -a "$LOG"; }
+falha() { printf '\nFALHOU: %s\n' "$*" | tee -a "$LOG" >&2; exit 1; }
+faz() {
+    if [ "$ENSAIO" = 1 ]; then printf '   [ensaio] %s\n' "$*" | tee -a "$LOG"; return 0; fi
+    printf '   + %s\n' "$*" >>"$LOG"; "$@" >>"$LOG" 2>&1
+}
+agentes() { node -e 'const a=require("/etc/dgclaw/agentes.json").agentes||[];for(const x of a)if(x.tipo!=="admin")console.log(x.slug)'; }
+env_limpo() { env -u IS_SANDBOX -u CLAUDECODE -u CLAUDE_CODE_CHILD_SESSION -u CLAUDE_CODE_SESSION_ID -u CLAUDE_CODE_ENTRYPOINT -u CODEX_HOME "$@"; }
+
+espera_imagem() {
+    # o "construir" sobe uma unidade que roda o podman build; acaba quando o build some
+    local ate=$((SECONDS + 3600))
+    sleep 5
+    while pgrep -x podman -a | grep -q ' build '; do
+        [ $SECONDS -lt $ate ] || return 1
+        sleep 10
+    done
+    dgclaw imagem status 2>&1 | grep -q 'imagem dos agentes pronta'
+}
+
+web_de_pe() {
+    local i
+    for i in $(seq 1 15); do
+        if systemctl is-active -q dgclaw-web && [ "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8300/api/v1/agents)" = 401 ]; then return 0; fi
+        sleep 2
+    done
+    return 1
+}
+
+voltar() {
+    local D="$1"
+    for f in app.tar.zst etc-dgclaw.tar.zst web-dados.tar.zst units.tar.zst CLAUDE.md imagem.txt; do
+        [ -s "$D/$f" ] || falha "falta $D/$f: não dá para voltar com segurança. Nada foi mexido na volta."
+    done
+    local img; img="$(cat "$D/imagem.txt")"
+    podman image exists "$img" || falha "a imagem $img do backup não existe mais. Nada foi mexido na volta."
+    passo "Voltando para o backup $D"
+    faz systemctl stop dgclaw-web
+    faz rm -rf "$APP"
+    faz tar --zstd -C / -xpf "$D/app.tar.zst" || falha "não consegui devolver o programa ($D/app.tar.zst)."
+    faz tar --zstd -C / -xpf "$D/etc-dgclaw.tar.zst"
+    faz rm -rf /var/lib/dgclaw/web
+    faz tar --zstd -C / -xpf "$D/web-dados.tar.zst"
+    faz tar --zstd -C / -xpf "$D/units.tar.zst"
+    faz cp -p "$D/CLAUDE.md" /opt/dgclaw/admin/CLAUDE.md
+    faz systemctl daemon-reload
+    faz systemctl start dgclaw-web
+    web_de_pe || info "o Web não respondeu depois da volta: confira journalctl -u dgclaw-web"
+    faz podman tag "$img" "$IMG:latest"
+    local a
+    for a in $(agentes); do
+        info "recriando $a com a imagem de antes"
+        faz dgclaw agente recriar "$a" || info "o agente $a não subiu na volta: confira dgclaw status"
+    done
+    faz systemd-run --unit="dgclaw-admin-volta-$(date +%s)" --on-active=8 systemctl restart dgclaw-admin
+    passo "Voltou. O Admin reinicia em alguns segundos."
+}
+
+if [ "${1:-}" = voltar ]; then
+    [ -n "${2:-}" ] || falha "diga a pasta do backup: dgclaw-atualizar-s2bot voltar /var/backups/dgclaw/antes-<versão>-<data>"
+    voltar "$2"
+    exit 0
+fi
+
+TAG="${1:-}"
+[ "${2:-}" = --ensaio ] && ENSAIO=1
+[[ "$TAG" =~ $RX_TAG ]] || falha "a versão '$TAG' não parece uma release do S2 Bot (esperava algo como v1.5.0-s2bot)."
+[ "$(id -u)" = 0 ] || falha "rode como root."
+mkdir -p "$TRABALHO" "$BACKUPS"
+printf '\n#### %s: atualizar para %s (%s)\n' "$(date -Is)" "$TAG" "$REPO" >>"$LOG"
+
+passo "1/8 Conferindo a release $TAG no fork $REPO"
+git ls-remote --exit-code --tags "https://github.com/$REPO.git" "refs/tags/$TAG" >>"$LOG" 2>&1 \
+    || falha "a release $TAG não existe em github.com/$REPO (ou o GitHub não respondeu). Nada foi mexido."
+
+passo "2/8 Baixando a release"
+DIR="$TRABALHO/$TAG"
+rm -rf "$DIR"
+git clone -q --depth 1 --branch "$TAG" "https://github.com/$REPO.git" "$DIR" >>"$LOG" 2>&1 || falha "não consegui baixar a release. Nada foi mexido."
+[ -s "$DIR/VERSAO-S2BOT" ] && info "versão do S2 Bot na release: $(tr -d '[:space:]' <"$DIR/VERSAO-S2BOT")"
+
+passo "3/8 Testando a release antes de instalar"
+( cd "$DIR/web" && env_limpo node --test test/ ) >"$TRABALHO/teste-web.txt" 2>&1
+grep -E '^# (tests|pass|fail)' "$TRABALHO/teste-web.txt" | tee -a "$LOG"
+grep -q '^# fail 0$' "$TRABALHO/teste-web.txt" || falha "os testes do Web falharam (veja $TRABALHO/teste-web.txt). Nada foi mexido."
+( cd "$DIR/runner" && npm ci --no-audit --no-fund \
+    && ( cd node_modules/node-pty && node scripts/prebuild.js; node scripts/post-install.js ) \
+    && npx tsc -p tsconfig.build.json ) >>"$LOG" 2>&1 || falha "não consegui compilar o runner da release. Nada foi mexido."
+node -e "require('$DIR/runner/node_modules/node-pty')" 2>>"$LOG" || falha "o módulo do terminal (node-pty) da release não carrega. Nada foi mexido."
+info "testes do Web passaram e o runner compilou"
+[ "$ENSAIO" = 1 ] && { passo "Ensaio: parei antes do backup. Nada foi mexido."; exit 0; }
+
+passo "4/8 Backup do que roda hoje"
+B="$BACKUPS/antes-$TAG-$(date +%Y%m%d-%H%M)"
+mkdir -p "$B" && chmod 700 "$B"
+tar --zstd -C / -cpf "$B/app.tar.zst" opt/dgclaw/app \
+  && tar --zstd -C / -cpf "$B/etc-dgclaw.tar.zst" etc/dgclaw \
+  && tar --zstd -C / -cpf "$B/web-dados.tar.zst" var/lib/dgclaw/web \
+  && ( cd / && tar --zstd -cpf "$B/units.tar.zst" etc/systemd/system/dgclaw-* ) \
+  && cp -p /opt/dgclaw/admin/CLAUDE.md "$B/" || falha "o backup não ficou completo ($B). Nada foi mexido."
+for f in "$B"/*.tar.zst; do tar --zstd -tf "$f" >/dev/null || falha "o backup $f não abre. Nada foi mexido."; done
+podman tag "$IMG:latest" "$IMG:antes-$TAG" && echo "$IMG:antes-$TAG" >"$B/imagem.txt" || falha "não consegui guardar a imagem atual. Nada foi mexido."
+info "backup em $B (volta: dgclaw-atualizar-s2bot voltar $B)"
+
+desfaz() { info "algo falhou depois do backup; voltando sozinho"; voltar "$B"; falha "$1 Voltei para a versão de antes."; }
+
+passo "5/8 Instalando os arquivos"
+rsync -a --delete --exclude=/.git/ --exclude=node_modules/ --exclude=/runner/dist/ --exclude=__pycache__/ --exclude='*.pyc' \
+    "$DIR/" "$APP/" >>"$LOG" 2>&1 || desfaz "a cópia dos arquivos falhou."
+rsync -a --delete "$DIR/runner/dist/" "$APP/runner/dist/" >>"$LOG" 2>&1 \
+  && rsync -a --delete "$DIR/runner/node_modules/" "$APP/runner/node_modules/" >>"$LOG" 2>&1 || desfaz "a cópia do runner falhou."
+
+passo "6/8 Reiniciando o painel"
+systemctl restart dgclaw-web >>"$LOG" 2>&1
+web_de_pe || desfaz "o painel não voltou depois de reiniciar."
+info "painel de pé"
+
+passo "7/8 Refazendo a imagem dos agentes (uns 10 minutos)"
+dgclaw imagem construir >>"$LOG" 2>&1 || desfaz "a construção da imagem não começou."
+espera_imagem || desfaz "a imagem nova não ficou pronta."
+info "imagem pronta"
+
+passo "8/8 Recriando os agentes, um por vez"
+for a in $(agentes); do
+    info "recriando $a"
+    dgclaw agente recriar "$a" >>"$LOG" 2>&1 || desfaz "o agente $a não subiu com a versão nova."
+    dgclaw agente identidade "$a" >>"$LOG" 2>&1 || info "não regravei as instruções de $a (confira depois)"
+    sleep 10
+    dgclaw status 2>&1 | grep -q "agente $a: de pe" || desfaz "o agente $a não respondeu com a versão nova."
+done
+
+systemd-run --unit="dgclaw-admin-atualizacao-$(date +%s)" --on-active=8 systemctl restart dgclaw-admin >>"$LOG" 2>&1
+passo "Pronto: S2 Bot na versão $TAG. O Admin reinicia em alguns segundos. Volta, se precisar: dgclaw-atualizar-s2bot voltar $B"

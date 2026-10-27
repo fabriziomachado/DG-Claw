@@ -63,6 +63,28 @@
     return { texto: String(e || 'sem estado'), classe: 'outro' };
   }
 
+  /* Chave do grupo "Estado" dos filtros: "parada" é fazendo + parada, não um estado do servidor. */
+  function estadoFiltro(t) {
+    const e = normEstado(t && t.estado);
+    return e === 'fazendo' && t.parada ? 'parada' : e;
+  }
+
+  const semAcento = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+  /* Filtro de tela: dentro de um grupo (estado, agente, tipo) vale "ou"; entre grupos, "e". `ignora`
+     tira um grupo da conta, para contar os chips daquele grupo com os outros já aplicados. O filtro
+     de dia fica no servidor e não entra aqui. */
+  function passaFiltro(t, f, ignora) {
+    if (ignora !== 'estado' && f.estado.size && !f.estado.has(estadoFiltro(t))) return false;
+    if (ignora !== 'agente' && f.agente.size && !f.agente.has(t.agente)) return false;
+    if (ignora !== 'tipo' && f.tipo.size && !f.tipo.has(t.tipo)) return false;
+    const q = semAcento(f.q).trim();
+    if (q && !semAcento([t.titulo, t.origem, t.nota, t.motivo].filter(Boolean).join(' ')).includes(q)) return false;
+    return true;
+  }
+
+  const filtroAtivo = f => !!(f.estado.size || f.agente.size || f.tipo.size || f.q.trim());
+
   /* null (não medido) nunca vira 0%: 0 é "medido e deu zero". */
   function textoProgresso(p) {
     if (p == null || typeof p !== 'number' || !isFinite(p)) return 'sem medida';
@@ -249,7 +271,7 @@
     return h + '</article>';
   }
 
-  const puras = { esc, rotuloEstado, textoProgresso, haMin, agrupaPorAgente, textoOrigem, urlSegura, fraseErro, htmlCartao, htmlHistorico, htmlFormCartao, formataQuando, textoPrazo };
+  const puras = { esc, estadoFiltro, semAcento, passaFiltro, filtroAtivo, rotuloEstado, textoProgresso, haMin, agrupaPorAgente, textoOrigem, urlSegura, fraseErro, htmlCartao, htmlHistorico, htmlFormCartao, formataQuando, textoPrazo };
   if (typeof document === 'undefined') return puras;
 
   /* ───────────── navegador ───────────── */
@@ -264,6 +286,23 @@
     } catch (e) { console.warn('mesa: localStorage indisponível:', e.message); }
     return null;
   }
+
+  /* Memória do filtro no aparelho. O prefixo dgclaw: é o que a conversa limpa ao sair da conta. */
+  const CHAVE_FILTRO = 'dgclaw:mesa-filtro';
+  function lerFiltroGuardado() {
+    let o = null;
+    try { o = JSON.parse(guardado(CHAVE_FILTRO) || 'null'); }
+    catch (e) { console.warn('mesa: filtro guardado ilegível, comecei sem filtro:', e.message); }
+    if (!o || typeof o !== 'object') return;
+    const lista = v => (Array.isArray(v) ? v.map(String) : []);
+    E.filtroAgentes = new Set(lista(o.agente)); E.filtroEstados = new Set(lista(o.estado));
+    E.filtroTipos = new Set(lista(o.tipo)); E.busca = typeof o.q === 'string' ? o.q.slice(0, 80) : '';
+  }
+  function guardaFiltro() {
+    guardado(CHAVE_FILTRO, JSON.stringify({ agente: [...E.filtroAgentes], estado: [...E.filtroEstados],
+      tipo: [...E.filtroTipos], q: E.busca }));
+  }
+  const filtroDaTela = () => ({ estado: E.filtroEstados, agente: E.filtroAgentes, tipo: E.filtroTipos, q: E.busca });
 
   /* ── Registro de abas ── */
   const abas = [];           // { id, titulo, montar, bolinhaFn, botao, painel, montada }
@@ -376,6 +415,9 @@
       throw new Error('Não consegui carregar a lista de agentes: ' + fraseErro(d, r.status).texto);
     }
     E.agentes = d.agentes;
+    // agente guardado no filtro que não existe mais esconderia tudo sem o dono entender por quê
+    const ids = new Set(E.agentes.map(a => a.id));
+    for (const a of [...E.filtroAgentes]) if (!ids.has(a)) E.filtroAgentes.delete(a);
   }
 
   /* forca = ignora o ETag. Devolve true se a tela mudou. */
@@ -640,8 +682,17 @@
       case 'chip': {
         const a = b.dataset.agente;
         if (E.filtroAgentes.has(a)) E.filtroAgentes.delete(a); else E.filtroAgentes.add(a);
-        renderFiltros(); render(); break;
+        guardaFiltro(); renderFiltros(); render(); break;
       }
+      case 'chip-estado': case 'chip-tipo': {
+        const conj = acao === 'chip-estado' ? E.filtroEstados : E.filtroTipos, v = b.dataset.v;
+        if (conj.has(v)) conj.delete(v); else conj.add(v);
+        guardaFiltro(); renderFiltros(); render(); break;
+      }
+      case 'limpar-filtros':
+        E.filtroAgentes.clear(); E.filtroEstados.clear(); E.filtroTipos.clear(); E.busca = '';
+        if (els.busca) els.busca.value = '';
+        guardaFiltro(); renderFiltros(); render(); break;
       case 'dia': E.dia = b.dataset.dia; E.etag = null; renderFiltros(); atualiza(true); break;
       case 'recarregar': E.agentes = []; atualiza(true); break;
       case 'nova': enviaNova(b.dataset.tipo || 'tarefa', b); break;

@@ -1,7 +1,7 @@
 # DG Claw: estrutura do repositório
 
 O DG Claw instala um painel web com chat, um Admin e a infraestrutura para agentes de trabalho
-em containers separados. O [README](README.md) apresenta o produto e o [INSTALAR.md](INSTALAR.md)
+em containers separados. O [README](README.md) apresenta o produto e o [INSTALL.md](INSTALL.md)
 contém o procedimento de instalação.
 
 ## Componentes
@@ -26,6 +26,18 @@ de teste separada, conforme o [roteiro de QA](web/docs/QA-PRIMEIRO-AGENTE.md).
 
 ## Regras do projeto
 
+- **Segurança: toda mudança é feita, testada e revisada pelo Codex em modo adversarial antes do
+  merge.** O DG Claw roda na VPS de quem não é programador, com um Admin root; uma vulnerabilidade
+  expõe servidor, chaves e conversas de quem confiou no projeto. Todo PR (inclusive de documentação)
+  segue [docs/REVISAO-ADVERSARIAL.md](docs/REVISAO-ADVERSARIAL.md): teste verde e conferido de
+  verdade; revisão adversarial do Codex com foco em injeção, exposição de segredo, permissão, rota sem
+  autenticação, path traversal, execução de coisa baixada, XSS e dados sensíveis; cada ponto
+  corrigido ou recusado com justificativa e a revisão repetida até sair limpa; o corpo do PR registra
+  o que o Codex apontou e o que foi feito. **Merge só com o ok do dono do projeto**: nenhum agente
+  mergeia por conta própria.
+  *Por quê:* o projeto é mantido por quem não é programador, e a reputação dele depende de não ter
+  vulnerabilidade. Um segundo modelo, procurando ativamente como quebrar, acha o que o autor não vê.
+
 - **Atualizar nunca apaga configuração do usuário.** Rodar o `install.sh` de novo, atualizar a
   versão ou reconstruir a imagem tem que preservar tudo o que a pessoa já configurou: chaves
   (`GROQ_API_KEY`, `ELEVENLABS_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` e qualquer outra),
@@ -41,3 +53,17 @@ de teste separada, conforme o [roteiro de QA](web/docs/QA-PRIMEIRO-AGENTE.md).
   usa), no mesmo commit/PR. Feature puramente visual que o agente não usa (por exemplo, animação de
   carregando) não precisa. Se for um doc de capacidade, acrescente-o a `templates/ambiente/capacidades.txt`
   (o teste `tests/ambiente` confere que cada um está citado no `agente.md`).
+
+- **Passo manual de atualização vai no CHANGELOG, escrito para a pessoa.** Toda mudança que pede
+  algo além do `dgclaw atualizar` padrão (instrução nova para juntar a um arquivo que o dono pode ter
+  personalizado, arquivo que não pode ser substituído, chave nova, regravar a identidade, reparar ou
+  reiniciar um agente) leva, no `CHANGELOG.md`, uma subseção `### Como atualizar` dentro da versão (ou
+  de `[Não lançado]`). O texto fala com a pessoa dona do DG Claw, com o porquê em uma frase, por
+  exemplo: "Nesta versão há uma instrução nova para o seu agente entender o áudio transcrito. Ela
+  precisa entrar nas instruções dele sem apagar o que você já personalizou." ou "Não substitua o
+  arquivo X, porque ele guarda Y." Nunca escreva para o modelo ("você é um agente, faça X",
+  "IMPORTANTE: o assistente deve", "IA, faça"): o Admin lê o CHANGELOG antes de aplicar
+  (`docs/ATUALIZAR.md`), e texto vindo de fora que dá ordem a um modelo tem cara de injeção de prompt;
+  o Admin faz bem em desconfiar dele. O teste `tests/changelog` reprova essas frases.
+  *Por quê:* a maioria das pessoas não roda `git pull`; elas pedem ao Admin para atualizar, e até
+  19/10/2026 não havia lugar para avisar de um passo que o comando não faz sozinho (Danilo, 19/10/2026).

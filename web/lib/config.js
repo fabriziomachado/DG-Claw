@@ -57,6 +57,8 @@ function carregaConfig(opcoes, log) {
     proxiesConfiaveis: new Set(String(env.DGCLAW_WEB_PROXIES_CONFIAVEIS || '').split(',').map((s) => s.trim()).filter(Boolean)),
     maxUploadBytes: Math.round(num(env.DGCLAW_WEB_MAX_UPLOAD_MB, 50) * 1024 * 1024),
     maxTexto: Math.round(num(env.DGCLAW_WEB_MAX_TEXTO, 20000)),
+    // agente que abre, resume e classifica os links da tela de Referências
+    referenciasCurador: opcoes.referenciasCurador || env.DGCLAW_REFERENCIAS_AGENTE || 'tech',
     tz: opcoes.tz || env.DGCLAW_WEB_TZ || env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
     canalTelegram: env.DGCLAW_CHANNEL_SOURCE || 'plugin:telegram',
     sessaoDias: 30,

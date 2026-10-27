@@ -36,7 +36,11 @@ const SH_ATUALIZA = 'b="$1"; t="$2"; cd ' + CASA + ' || exit 9; ' +
   'python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$b.json.tmp" 2>> "$b.erro" || { rm -f "$b.json.tmp"; exit 4; }; ' +
   'mv -f "$b.json.tmp" "$b.json"';
 
-function criarPaineisVivos({ registro, log = () => {}, roda = rodaPadrao, agora = Date.now }) {
+// As chaves do cofre (25/10/2026): o `podman exec` não herda o ambiente do runner, e o script de um painel
+// que consulta uma API (Dokploy, SoftDesk) parava com "KeyError". `chavesDe(agente)` devolve { NOME: valor };
+// cada uma vai como `-e NOME` (sem valor) e o valor vai no ambiente do processo do podman, nunca na linha
+// de comando (que aparece no `ps`).
+function criarPaineisVivos({ registro, log = () => {}, roda = rodaPadrao, agora = Date.now, chavesDe = () => ({}) }) {
   const json = (res, status, corpo) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(corpo)); };
   const erro = (res, status, motivo) => json(res, status, { ok: false, erro: motivo });
   const ultimaRodada = new Map();   // "slug/id" -> ms
@@ -68,7 +72,12 @@ function criarPaineisVivos({ registro, log = () => {}, roda = rodaPadrao, agora 
     if (agora() - ult < INTERVALO_MIN_MS) return { ok: true, recente: true };
     ultimaRodada.set(k, agora());
     const p = (async () => {
-      const r = await naCaixa(a, ['sh', '-c', SH_ATUALIZA, 'atualiza', `${PASTA}/${id}`, String(TEMPO_SCRIPT_S)]);
+      let chaves = {};
+      try { chaves = chavesDe(a) || {}; } catch (e) { log('aviso', `Painel vivo ${k}: não li o cofre (${e.message}); o script roda sem as chaves.`); }
+      const nomes = Object.keys(chaves).filter((n) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(n));
+      const r = await roda('podman', ['exec', '-u', 'agente', '-w', CASA, ...nomes.flatMap((n) => ['-e', n]),
+        a.container || `dgclaw-${a.slug}`, 'sh', '-c', SH_ATUALIZA, 'atualiza', `${PASTA}/${id}`, String(TEMPO_SCRIPT_S)],
+      { env: Object.assign({}, process.env, ...nomes.map((n) => ({ [n]: chaves[n] }))) });
       if (r.ok) return { ok: true };
       const motivo = r.codigo === 3 ? `o agente ainda não deixou o script deste painel (~/.dgclaw/paineis/${id}.sh)`
         : r.codigo === 4 ? 'o script do painel não devolveu um JSON válido'

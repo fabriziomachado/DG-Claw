@@ -41,6 +41,10 @@ ExecStartPre=/bin/mkdir -p /home/agente/.dgclaw/logs
 ExecStart=/usr/bin/node /opt/dgclaw/app/runner/dist/index.js
 Restart=always
 RestartSec=3
+# O llama-server da memória (filho no mesmo grupo) às vezes ignora o SIGTERM, e o padrão de 90 s
+# segurava a parada além dos 60 s que o painel espera num reinício (24/10/2026, Tech travou ao
+# guardar chave no cofre). Passado este prazo, o systemd mata o grupo com SIGKILL.
+TimeoutStopSec=15
 
 [Install]
 WantedBy=multi-user.target

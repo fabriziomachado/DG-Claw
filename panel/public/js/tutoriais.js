@@ -14,7 +14,7 @@
 // `porque` é obrigatório por regra do repo. Passo sem o "por que" vira legenda, e
 // legenda a pessoa já tinha no tooltip.
 //
-// QUEM LÊ ISTO NÃO É DESENVOLVEDOR e não é o Danilo: é a Marta, é o Paulo, o
+// QUEM LÊ ISTO NÃO É DESENVOLVEDOR e não é o mantenedor: é a Marta, é o Paulo, o
 // dono do agente, que abre a tela para saber se está tudo bem. Por isso nenhum
 // passo diz "endpoint", "cron", "systemd" ou "sessão": diz o que a pessoa vê e o
 // que ela faz com aquilo.
@@ -112,6 +112,13 @@
         titulo: 'Trocar o modelo, o provedor ou a forma de pagar',
         corpo: 'Abre uma janela com três escolhas: o provedor (Claude ou Codex), o modelo e a forma de pagar, cada uma com uma explicação embaixo. Se você escolher pagar pela API e o Cofre ainda não tiver a chave, a janela pede a chave ali mesmo e a guarda no Cofre; ela não aparece mais depois. Ao confirmar, o agente reinicia: a conversa atual fecha e ele volta numa conversa nova, com a memória intacta. Quando ele não está logado na assinatura, aparece também o botão "Conectar minha conta", que mostra o link e o código, sem você abrir terminal.',
         porque: 'Trocar de modelo muda o custo e o jeito de pensar do agente, então a janela explica cada opção antes de você confirmar, e avisa do reinício. Sem esse aviso, a conversa em andamento pareceria ter sumido sem motivo.',
+      },
+      {
+        chave: 'uso',
+        alvo: '#uso-assinatura',
+        titulo: 'Quanto da assinatura já foi usada',
+        corpo: 'Duas barras: a janela de 5 horas e a semanal. Cada uma mostra o percentual já gasto, quando zera e há quanto tempo foi medido. Verde fica abaixo de 70%, âmbar de 70% a 89% e vermelho a partir de 90%. O número não é calculado pelo painel: o próprio Claude Code (ou o Codex) informa ao agente, a cada resposta, quanto da conta já foi usado, e o agente repassa para cá. Por isso, logo depois de ligar, aparece "sem dado" até a primeira resposta. Se o horário de zerar já passou, a barra diz "zerou às" e espera a próxima resposta para medir de novo. Quando o agente paga por chave de API, não existe janela: o custo aparece no painel do provedor.',
+        porque: 'Quando a assinatura chega ao limite, o agente para de responder até a janela zerar, e de fora isso parece defeito. Ver a barra subir antes avisa a tempo de segurar tarefas pesadas, ou de trocar de conta.',
       },
       {
         chave: 'faixa',
@@ -411,6 +418,7 @@
   // (eles não têm um título fixo no HTML para este mapa achar).
   const SECOES = [
     { alvo: '#prov-status', aba: 'status', chave: 'modelo' },
+    { alvo: '#uso-assinatura', aba: 'status', chave: 'uso' },
     { alvo: '#wm-status', aba: 'status', chave: 'memoria-trabalho' },
     { alvo: '#cerebro-grid', aba: 'status', chave: 'cerebro' },
     { alvo: '#thoughts-present', aba: 'status', chave: 'pensamentos' },

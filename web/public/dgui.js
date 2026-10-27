@@ -73,11 +73,33 @@
     const bom = c.bom === 'baixa' ? 'baixa' : 'alta';
     const humor = !t || t === 'neutra' ? 'neutro' : (t === bom ? 'bom' : 'ruim');
     const seta = t === 'alta' ? '▲' : t === 'baixa' ? '▼' : '';
+    // foto redonda ao lado do título (25/10/2026, pedido do dono): só endereço do próprio S2 Bot,
+    // como a imagem do carrossel; uma imagem da Pasta do agente sai em /api/v1/agents/<slug>/pasta/imagem
+    const foto = [c.foto, c.imagem].find((x) => typeof x === 'string' && /^\/(?!\/)/.test(x));
+    const tit = c.titulo ? `<div class="dgui-kpi-tit">${txt(c.titulo)}</div>` : '';
     return `<div class="dgui-kpi">` +
-      (c.titulo ? `<div class="dgui-kpi-tit">${txt(c.titulo)}</div>` : '') +
+      (foto ? `<div class="dgui-kpi-cab"><img class="dgui-kpi-foto" loading="lazy" alt="" src="${esc(foto)}">${tit}</div>` : tit) +
       `<div class="dgui-kpi-valor">${txt(c.valor)}</div>` +
       (c.variacao || seta ? `<div class="dgui-kpi-var ${humor}">${seta ? `<span aria-hidden="true">${seta}</span> ` : ''}${txt(c.variacao || '')}</div>` : '') +
-      (c.legenda ? `<div class="dgui-kpi-leg">${txt(c.legenda)}</div>` : '') + '</div>';
+      (c.legenda ? `<div class="dgui-kpi-leg">${txt(c.legenda)}</div>` : '') + barraDoKpi(c) + '</div>';
+  }
+  // barra que vai enchendo (25/10/2026, meta atingida): "progresso" de 0 a 100, fundo vazio = 100%
+  function barraDoKpi(c) {
+    const p = typeof c.progresso === 'number' ? c.progresso : numero(c.progresso);
+    if (p === null || p === undefined || !isFinite(p)) return '';
+    const v = Math.max(0, Math.min(100, p));
+    return `<div class="dgui-kpi-barra" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${v}"><i style="width:${v}%"></i></div>`;
+  }
+
+  /* Imagem na largura toda (25/10/2026, mapa num app): sem contador nem moldura de carrossel.
+     Só endereço do próprio S2 Bot, como a foto do kpi e a imagem do carrossel. */
+  function imagem(c) {
+    const src = [c.src, c.imagem, c.url].find((x) => typeof x === 'string' && /^\/(?!\/)/.test(x));
+    if (!src) return aviso('imagem sem "src" do próprio S2 Bot');
+    const prop = typeof c.proporcao === 'string' && /^\d{1,4}\s*\/\s*\d{1,4}$/.test(c.proporcao) ? ` style="aspect-ratio:${c.proporcao.replace(/\s/g, '')}"` : '';
+    return `<figure class="dgui-imagem">` + (c.titulo ? `<div class="dgui-painel-tit">${txt(c.titulo)}</div>` : '') +
+      `<img loading="lazy" alt="${esc(String(c.alt || c.titulo || '').slice(0, 160))}" src="${esc(src)}"${prop}>` +
+      (c.legenda ? `<figcaption>${txt(c.legenda)}</figcaption>` : '') + '</figure>';
   }
 
   /* ── Tabela ── */
@@ -122,8 +144,19 @@
     const cats = (Array.isArray(c.categorias) ? c.categorias : []).slice(0, LIMITE.pontos).map(String);
     const ss = (Array.isArray(c.series) ? c.series : []).slice(0, LIMITE.series)
       .filter((s) => s && Array.isArray(s.valores))
-      .map((s, k) => ({ nome: String(s.nome || ''), cor: k, valores: cats.map((_, i) => numero(s.valores[i])) }));
+      .map((s) => ({ nome: String(s.nome || ''), cor: corPedida(s.cor), valores: cats.map((_, i) => numero(s.valores[i])) }));
+    // série sem "cor" pega a próxima da paleta que ninguém usou, para a legenda não esconder duas juntas
+    const usadas = new Set(ss.map((s) => s.cor).filter((x) => x !== null));
+    let livre = 0;
+    for (const s of ss) if (s.cor === null) { while (usadas.has(livre % 6) && livre < 12) livre++; s.cor = livre % 6; usadas.add(s.cor); livre++; }
     return { cats, ss };
+  }
+  /* "cor" por série (25/10/2026, mesma cor de uma pessoa em todos os gráficos): só nomes da paleta do tema,
+     que já tem a versão clara e a escura de cada uma. Hex solto ficaria errado num dos temas. */
+  const CORES_SERIE = { azul: 0, verde: 1, laranja: 2, ambar: 2, amarelo: 2, violeta: 3, roxo: 3, vermelho: 4, ciano: 5 };
+  function corPedida(v) {
+    const k = String(v || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    return Object.prototype.hasOwnProperty.call(CORES_SERIE, k) ? CORES_SERIE[k] : null;
   }
   const un = (c) => (c.unidade ? String(c.unidade).slice(0, 8) : '');
   const rot = (n, c) => (n === null ? '–' : fmt(n) + (un(c) ? (un(c) === '%' ? '%' : ' ' + un(c)) : ''));
@@ -460,6 +493,7 @@
     if (c.tipo === 'escolha') return escolha(c);
     if (c.tipo === 'para-admin') return paraAdmin(c);
     if (c.tipo === 'carrossel') return carrossel(c, fundo);
+    if (c.tipo === 'imagem') return imagem(c);
     if (c.tipo === 'passos') return passos(c);
     if (c.tipo === 'painel' && c.vivo && !c._vivoDentro && fundo === 0) return painelVivo(c, fundo);
     if (c.tipo === 'painel' && Array.isArray(c.filtros) && c.filtros.length && c.variantes && typeof c.variantes === 'object') return painelComFiltros(c, fundo);

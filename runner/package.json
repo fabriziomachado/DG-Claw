@@ -1,6 +1,6 @@
 {
   "name": "@dgclaw/runner",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "O dono do processo do CLI (Claude Code ou Codex) de UM agente do DG Claw. Fala o mesmo protocolo HTTP/WS do DG AI Bunker.",
@@ -16,8 +16,8 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.6.5",
     "@types/ws": "^8.5.0",
-    "typescript": "^5.8.0"
+    "typescript": "^7.0.2"
   }
 }

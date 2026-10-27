@@ -32,9 +32,10 @@ test('blocoParaHtml: devolve null para nome inválido e HTML para válido', () =
 
 test('conversa.js liga o gancho e o html carrega os arquivos novos', () => {
   const pub = path.join(__dirname, '..', 'public');
-  assert.match(fs.readFileSync(path.join(pub, 'conversa.js'), 'utf8'), /campoCofre\.blocoParaHtml/);
+  // o gancho fica no formatador (tirado do conversa.js em 25/10/2026), que a conversa carrega
+  assert.match(fs.readFileSync(path.join(pub, 'formatador.js'), 'utf8'), /campoCofre\.blocoParaHtml/);
   const html = fs.readFileSync(path.join(pub, 'conversa.html'), 'utf8');
-  assert.ok(html.includes('/campo-cofre.js') && html.includes('/campo-cofre.css'));
+  assert.ok(html.includes('/campo-cofre.js') && html.includes('/campo-cofre.css') && html.includes('/formatador.js'));
 });
 
 test('alvo: `slug:NOME` só vira campo na conversa do Admin e grava no cofre do outro agente', () => {

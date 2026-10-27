@@ -43,12 +43,21 @@ const { criarPrimeiroAcesso } = require('./lib/primeiro-acesso');
 const { criarCaixaAgente, quemChamou } = require('./lib/caixa-agente');
 const { criarPush } = require('./lib/push');
 const { criarLembretes } = require('./lib/lembretes');
+const { criarEstados } = require('./lib/estados');
+const { criarPrefsAtencao } = require('./lib/prefs-atencao');
+const { criarVigiaAtencao } = require('./lib/vigia-atencao');
 const { criarMesa } = require('./lib/mesa');
+const { criarReferencias } = require('./lib/referencias');
+const { arquivoDaPasta, imagemDaPasta } = require('./lib/pasta-ver');
 const { criarAvisos } = require('./lib/avisos');
 const { criarIntegracoes } = require('./lib/integracoes');
 const { criarHistorico } = require('./lib/historico');
 const { criarArquivoConversa } = require('./lib/arquivo-conversa');
 const { criarAvatares } = require('./lib/avatar');
+const { criarAtualizacao } = require('./lib/atualizacao');
+const { criarVersaoNova } = require('./lib/versao-nova');
+const { criarNaoLidas } = require('./lib/nao-lidas');
+const { criarUso } = require('./lib/uso');
 
 const METODOS_QUE_ESCREVEM = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const TIPOS_ESTATICOS = {
@@ -104,7 +113,7 @@ function criarServidor(opcoes) {
   const cofreAgente = criarCofreAgente({ config, log, reiniciar: opcoes.reiniciarCofre });
   const voz = opcoes.voz || criarVoz({ env: config.env, log });
   const sigilo = opcoes.sigilo || criarSigilo({ env: config.env, registro, dataDir: config.dataDir, log, timeoutMs: opcoes.timeoutSigiloMs });
-  const cofreRotas = criarCofreRotas({ config, runner, cofre: cofreAgente, voz, log, registro });
+  const cofreRotas = criarCofreRotas({ config, runner, cofre: cofreAgente, voz, log, registro, entregar: (...a) => conversa.entregar(...a), esperaAvisoMs: opcoes.esperaAvisoMs });
   const proxy = criarProxy({ config, registro, log, cofreRotas });
   const caixa = criarCaixaAgente({ config, registro, log, porta: () => servidor.address().port, agora: opcoes.agora });
   const push = criarPush({ dataDir: config.dataDir, log, agora: opcoes.agora, enviarHttp: opcoes.enviarPush });
@@ -122,6 +131,17 @@ function criarServidor(opcoes) {
   const mesa = criarMesa({ arquivo: path.join(config.dataDir, 'mesa', 'tarefas.json'), registro, runner, log, agora: opcoes.agora, tz: config.tz, avisarDono: (aviso) => boasVindas.avisar(aviso, 'pedido') });
   // O agente fala com a Mesa pelo dgclaw-mesa, que passa pela caixa: a rota precisa estar liberada.
   caixa.permitir('/api/v1/tarefas');
+  // endereços do próprio servidor (IPs das placas e nomes do Caddyfile): link para eles não vira leitura do curador
+  const proprios = Object.values(require('node:os').networkInterfaces()).flat().map(i => i && i.address).filter(Boolean);
+  try { proprios.push(...(fs.readFileSync('/etc/caddy/Caddyfile', 'utf8').match(/^[^\s#{][^\s{]*(?=\s*\{)/gm) || []).map(x => x.replace(/^https?:\/\//, '').replace(/:\d+$/, '').toLowerCase())); } catch (_) { /* sem Caddy: ficam só os IPs */ }
+  const referencias = criarReferencias({ pasta: path.join(config.dataDir, 'referencias'), registro, runner, log, curador: config.referenciasCurador, agora: opcoes.agora, proprios });
+  // o curador (tech) lê a lista e grava título, resumo e assuntos pelo dgclaw-api
+  caixa.permitir('/api/v1/referencias');
+  const naoLidas = criarNaoLidas({ arquivo: path.join(config.dataDir, 'nao-lidas.json'), conversa, registro, log, relogio: opcoes.agora, lerThread: conversa.threadCompartilhada });
+  const uso = criarUso({ registro, runner, log, timeoutMs: opcoes.timeoutUsoMs });
+  // O agente consulta o uso da PRÓPRIA assinatura pela caixa (dgclaw-api GET /api/v1/uso); a rota
+  // filtra pelo slug da caixa, então ele nunca vê os outros. O Admin, no host, usa a API normal.
+  caixa.permitir('/api/v1/uso');
   const avisos = criarAvisos({ config, registro, runner, caixa, log, agora: opcoes.agora });
   const integracoes = criarIntegracoes({ registro, log });
   const arquivoConversa = criarArquivoConversa({ dataDir: config.dataDir, log });
@@ -136,11 +156,23 @@ function criarServidor(opcoes) {
   const feedback = criarFeedback({ config, conversa, log });
   const threadTela = async (agente) => mencoes.junta(agente.slug, arquivoConversa.visivel(agente.slug, await conversa.thread(agente)));
   const historico = criarHistorico({ registro, log, conversa, arquivoConversa });
-  const paineisVivos = opcoes.paineisVivos || criarPaineisVivos({ registro, log });
+  const paineisVivos = opcoes.paineisVivos || criarPaineisVivos({ registro, log, chavesDe: (ag) => cofreAgente.variaveis(ag) });
   // Foto trocada pelo dono no menu: vale por cima da foto da criação e do avatar do registro.
   const avatares = criarAvatares({ dataDir: config.dataDir, registro, log });
   caixa.permitir('/api/v1/avisos');
   caixa.permitir('/api/v1/pedidos');
+  // Só o caminho exato da documentação do cofre (os templates mandam o agente ler); o cofre em si não é rota da caixa.
+  caixa.permitir('/api/v1/cofre/docs.md');
+  // Aviso de versão nova: só o dono, pelo painel. De propósito NÃO entra em caixa.permitir (agente em container não usa).
+  const estados = criarEstados({ conversa, naoLidas, registro, log });
+  const prefsAtencao = criarPrefsAtencao({ arquivo: path.join(config.dataDir, 'push', 'preferencias.json'), log });
+  const vigiaAtencao = criarVigiaAtencao({ registro, estados, lerThread: conversa.threadCompartilhada, push: { enviar: (aviso, tipo) => boasVindas.avisar(aviso, tipo === 'terminou' ? 'terminou' : 'pedido') }, prefs: prefsAtencao, relogio: opcoes.agora, log, intervaloMs: opcoes.vigiaIntervaloMs });
+  // /api/v1/estados NÃO entra na caixa: ela só atende agentes de trabalho, e um agente não tem por que
+  // enxergar o estado (nem o nome) dos vizinhos. O Admin, no host, lê os documentos e a tela.
+  const atualizacao = criarAtualizacao({ dataDir: config.dataDir, log });
+  // versão nova do S2 Bot: as releases do fork, para o botão do rodapé do menu (lib/versao-nova.js)
+  const versaoNova = criarVersaoNova({ appDir: opcoes.appDirVersao || path.resolve(__dirname, '..'), dataDir: config.dataDir, log, repo: process.env.DGCLAW_ATUALIZA_REPO, buscar: opcoes.buscarVersaoNova });
+  if (!opcoes.semVigiaAlertas) versaoNova.iniciar();
 
   let versaoJsCache = { ts: 0, valor: '0' };
   /** Versão da tela: mtime de conversa.js. A tela compara com a que carregou e se recarrega sozinha. */
@@ -342,10 +374,43 @@ function criarServidor(opcoes) {
     return n;
   }
 
+  function servirImagemDaPasta(res, m, a) {
+    const img = imagemDaPasta(a.real);
+    if (img.erro) return H.erroJson(res, img.status, img.erro);
+    res.writeHead(200, { 'Content-Type': img.mime, 'Content-Length': img.dados.length, 'X-Content-Type-Options': 'nosniff',
+      'Cache-Control': 'private, max-age=300', 'Content-Security-Policy': "default-src 'none'; sandbox" });
+    return res.end(m === 'HEAD' ? undefined : img.dados);
+  }
+
   async function api(req, res, url, sessao) {
     const p = url.pathname;
     const m = req.method;
     if (p.startsWith('/api/v1/tarefas') && await mesa.rota(req, res, url, sessao)) return undefined;
+    if (p === '/api/v1/referencias' || p.startsWith('/api/v1/referencias/')) return referencias.rota(req, res, url, sessao);
+    // Pasta do agente aberta com a cara da conversa (25/10/2026): o arquivo de <casa>/arquivos vira mídia,
+    // e a tela /ver-arquivo usa o formatador e o visual isolado da conversa (lib/pasta-ver.js)
+    const mPasta = /^\/api\/v1\/agents\/([^/]+)\/pasta\/abrir$/.exec(p);
+    if (mPasta) {
+      if (m !== 'GET') return H.erroJson(res, 405, 'Use GET com ?caminho=<arquivo da Pasta>.');
+      if (sessao.via === 'caixa') return H.erroJson(res, 403, 'A Pasta do agente é vista pelo dono, no navegador.');
+      const agente = agenteOuErro(res, decodeURIComponent(mPasta[1]));
+      if (!agente) return undefined;
+      const a = arquivoDaPasta(agente.home_host, url.searchParams.get('caminho'));
+      if (a.erro) return H.erroJson(res, a.status, a.erro);
+      return H.enviaJson(res, 200, { ok: true, media: midia.registrar(agente.slug, a.real, { nome: a.nome }) });
+    }
+    // Imagem da Pasta com endereço fixo (25/10/2026): a foto de um painel vivo (app) ou de um carrossel.
+    // Só imagem comum (pelos primeiros bytes, sem SVG), só da Pasta, só o dono.
+    const mImg = /^\/api\/v1\/agents\/([^/]+)\/pasta\/imagem$/.exec(p);
+    if (mImg) {
+      if (m !== 'GET' && m !== 'HEAD') return H.erroJson(res, 405, 'Use GET com ?caminho=<imagem da Pasta>.');
+      if (sessao.via === 'caixa') return H.erroJson(res, 403, 'A Pasta do agente é vista pelo dono, no navegador.');
+      const agente = agenteOuErro(res, decodeURIComponent(mImg[1]));
+      if (!agente) return undefined;
+      const a = arquivoDaPasta(agente.home_host, url.searchParams.get('caminho'));
+      if (a.erro) return H.erroJson(res, a.status, a.erro);
+      return servirImagemDaPasta(res, m, a);
+    }
 
     if (await foco.tratarRota(req, res, url, sessao)) return undefined;
 
@@ -354,6 +419,9 @@ function criarServidor(opcoes) {
     if (p === '/api/v1/saude-servidor' && await saudeServidor.rotas(req, res, url, sessao)) return undefined;
     if (p.startsWith('/api/v1/limites') && await limites.rotas(req, res, url, sessao)) return undefined;
     if (p.startsWith('/api/v1/memoria') && await memoriaSemantica.rotas(req, res, url, sessao)) return undefined;
+
+    if ((p === '/api/v1/atualizacao' || p.startsWith('/api/v1/atualizacao/')) && await atualizacao.rotas(req, res, url, sessao)) return undefined;
+    if ((p === '/api/v1/versao-nova' || p.startsWith('/api/v1/versao-nova/')) && await versaoNova.rotas(req, res, url, sessao)) return undefined;
 
     if (p === '/api/v1/onboarding') {
       if (falhaDoRegistro(req, res, true)) return;
@@ -411,8 +479,54 @@ function criarServidor(opcoes) {
 
     if (p === '/api/v1/agents' && m === 'GET') {
       if (falhaDoRegistro(req, res, true)) return undefined;
-      const lista = await Promise.all(registro.estado().agentes.map(agentePublico));
+      const lista = await Promise.all(registro.estado().agentes.map(async (a) => Object.assign(await agentePublico(a), { ultima_ts: await conversa.ultimaMensagemTs(a) })));
       return H.enviaJson(res, 200, { ok: true, agentes: lista, voz: lista.some((a) => a.voz), microfone: voz.microfone, limite_upload_bytes: config.maxUploadBytes, usuario: sessao.usuario });
+    }
+
+    if (p === '/api/v1/nao-lidas') {
+      if (falhaDoRegistro(req, res, true)) return undefined;
+      if (m !== 'GET') return H.erroJson(res, 405, 'Use GET para ver quantas mensagens não lidas cada agente tem.');
+      try { return H.enviaJson(res, 200, { ok: true, agentes: await naoLidas.contar(sessao.usuario) }); } catch (e) {
+        return H.erroJson(res, e.status || 500, e.status ? e.message : `Não consegui contar as mensagens não lidas (${e.message}).`);
+      }
+    }
+
+    if (p === '/api/v1/uso/docs.md' && m === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(fs.readFileSync(path.join(__dirname, 'docs', 'USO-DA-ASSINATURA.md'), 'utf8'));
+    }
+
+    if (p === '/api/v1/uso') {
+      if (falhaDoRegistro(req, res, true)) return undefined;
+      if (m !== 'GET') return H.erroJson(res, 405, 'Use GET para ver quanto da assinatura de cada agente já foi usado.');
+      try { return H.enviaJson(res, 200, { ok: true, agentes: await uso.consultar(caixa.ehPedidoDaCaixa(req)) }); } catch (e) {
+        return H.erroJson(res, e.status || 500, `Não consegui juntar o uso das assinaturas (${e.message}).`);
+      }
+    }
+
+    if (p === '/api/v1/estados/docs.md' && m === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(fs.readFileSync(path.join(__dirname, 'docs', 'ESTADO-DOS-AGENTES.md'), 'utf8'));
+    }
+    if (p === '/api/v1/estados') {
+      if (falhaDoRegistro(req, res, true)) return undefined;
+      if (m !== 'GET') return H.erroJson(res, 405, 'Use GET para ver o estado de cada agente (trabalhando, precisa de você, terminou, ocioso ou sem sinal).');
+      if (sessao.via === 'caixa') return H.erroJson(res, 403, 'O estado dos agentes é só do dono, pelo painel. Um agente de trabalho enxerga só a própria casa.');
+      try { return H.enviaJson(res, 200, { ok: true, agentes: await estados.todos(sessao.usuario) }); } catch (e) {
+        return H.erroJson(res, e.status || 500, e.status ? e.message : `Não consegui montar o estado dos agentes (${e.message}).`);
+      }
+    }
+    if (p === '/api/v1/push/preferencias') {
+      if (sessao.via === 'caixa') return H.erroJson(res, 403, 'As preferências de aviso do aparelho são só do dono, pelo painel.');
+      if (m === 'GET') {
+        try { return H.enviaJson(res, 200, { ok: true, preferencias: prefsAtencao.de(sessao.usuario) }); } catch (e) { return H.erroJson(res, e.status || 500, e.message); }
+      }
+      if (m !== 'POST') return H.erroJson(res, 405, 'Use GET para ler e POST com {"precisa_de_voce": true, "terminou": false} para mudar.');
+      let corpo;
+      try { corpo = await H.lerJson(req, 1024); } catch (e) { return H.erroJson(res, e.status || 400, e.message); }
+      try { return H.enviaJson(res, 200, { ok: true, preferencias: prefsAtencao.grava(sessao.usuario, corpo) }); } catch (e) {
+        return H.erroJson(res, e.status || 500, e.status ? e.message : `Não consegui guardar a preferência (${e.message}).`);
+      }
     }
 
     if (p === '/api/v1/compartilhados/docs.md' && m === 'GET') {
@@ -482,6 +596,10 @@ function criarServidor(opcoes) {
       res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8', 'Cache-Control': 'no-store' });
       return res.end(fs.readFileSync(path.join(__dirname, '..', 'docs', 'CAIXA-DO-AGENTE.md'), 'utf8'));
     }
+    if (p === '/api/v1/cofre/docs.md' && m === 'GET') {
+      res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8', 'Cache-Control': 'no-store' });
+      return res.end(fs.readFileSync(path.join(__dirname, '..', 'docs', 'COFRE-NA-CONVERSA.md'), 'utf8'));
+    }
     if (p === '/api/v1/push/docs.md' && m === 'GET') {
       res.writeHead(200, { 'Content-Type': 'text/markdown; charset=utf-8', 'Cache-Control': 'no-store' });
       return res.end(fs.readFileSync(path.join(__dirname, 'docs', 'AVISOS-NO-APARELHO.md'), 'utf8'));
@@ -530,7 +648,7 @@ function criarServidor(opcoes) {
       if (await avatares.tratar(req, res, url, sessao, { enviaJson: H.enviaJson, erroJson: H.erroJson, lerCorpo: H.lerCorpo, agentePublico })) return undefined;
     }
 
-    let mm = /^\/api\/v1\/agents\/([^/]+)(?:\/([a-z]+))?$/.exec(p);
+    let mm = /^\/api\/v1\/agents\/([^/]+)(?:\/([a-z-]+))?$/.exec(p);
     if (mm) {
       if (falhaDoRegistro(req, res, true)) return undefined;
       const agente = agenteOuErro(res, decodeURIComponent(mm[1]));
@@ -579,6 +697,18 @@ function criarServidor(opcoes) {
         if (!parou) log('aviso', `${agente.slug}: não reagiu ao Esc em 8 s (registro parado e runner em working); a tela oferece reiniciar.`);
         return H.enviaJson(res, 200, { ok: true, parou, travado: !parou });
       }
+      // Cancelar um pedido que ainda espera na fila do agente (26/10/2026, pedido do dono). Só o dono.
+      if (acao === 'cancelar-fila' && m === 'POST') {
+        if (sessao && sessao.via === 'caixa') return H.erroJson(res, 403, 'Só o dono cancela um pedido, pelo painel.');
+        const corpo = await lerEnvio(req, res);
+        if (!corpo) return undefined;
+        const msg = String(corpo.msg || '');
+        if (!/^[A-Za-z0-9_-]{4,64}$/.test(msg)) return H.erroJson(res, 400, 'Mande em "msg" o id da mensagem na fila. Nada foi cancelado.');
+        const r = await runner.cancelarFila(agente, msg);
+        if (r.ok) { log('info', `${agente.slug}: o dono cancelou um pedido que estava na fila.`); return H.enviaJson(res, 200, { ok: true, cancelado: true }); }
+        if (r.resultado === 'ja_saiu' || r.resultado === 'nao_achei') return H.enviaJson(res, 409, { ok: false, cancelado: false, motivo: r.resultado, erro: `O pedido já chegou a ${agente.nome}. Use o parar, se ele ainda estiver trabalhando nele.` });
+        return H.erroJson(res, 502, `Não consegui cancelar: ${r.erro || 'o runner não respondeu'}.`);
+      }
       // Agente congelado: reinicia a sessão no runner (a mesma conversa; a fila de mensagens continua).
       if (acao === 'destravar' && m === 'POST') {
         if (sessao && sessao.via === 'caixa') return H.erroJson(res, 403, 'Só o dono reinicia um agente, pelo painel.');
@@ -622,13 +752,47 @@ function criarServidor(opcoes) {
       if (acao === 'permissao' && m === 'POST') {
         const corpo = await lerEnvio(req, res);
         if (!corpo) return undefined;
-        const r = await conversa.permissao(agente, corpo.decisao);
+        const r = await conversa.permissao(agente, corpo.decisao, corpo.tool_use_id);
         return H.enviaJson(res, r.status, r.corpo);
+      }
+      if (acao === 'pergunta' && m === 'POST') {
+        const corpo = await lerEnvio(req, res);
+        if (!corpo) return undefined;
+        const r = await conversa.responderPergunta(agente, corpo);
+        return H.enviaJson(res, r.status, r.corpo);
+      }
+      if (acao === 'reiniciar' && m === 'POST') {
+        const r = await conversa.reiniciar(agente);
+        return H.enviaJson(res, r.status, r.corpo);
+      }
+      if (acao === 'lido' && m === 'POST') {
+        let corpo;
+        try { corpo = await H.lerJson(req, 1024); } catch (e) { return H.erroJson(res, e.status || 400, e.message); }
+        const abriu = !!corpo && corpo.abriu === true;
+        const ep = corpo && typeof corpo.ep === 'number' ? corpo.ep : (abriu && (corpo.ep === undefined || corpo.ep === null) ? null : NaN);
+        if (ep !== null && (!Number.isFinite(ep) || ep < 0)) {
+          return H.erroJson(res, 400, `O campo "ep" precisa ser um número maior ou igual a zero (o ep da última mensagem que apareceu na tela). Recebi: ${JSON.stringify(corpo && corpo.ep === undefined ? null : corpo && corpo.ep).slice(0, 40)}.`);
+        }
+        try { return H.enviaJson(res, 200, { ok: true, visto_ep: naoLidas.marcar(sessao.usuario, agente.slug, ep, { abriu }) }); } catch (e) {
+          return H.erroJson(res, e.status || 500, e.status ? e.message : `Não consegui guardar que a conversa foi lida (${e.message}).`);
+        }
+      }
+      if (acao === 'nao-lido' && (m === 'POST' || m === 'DELETE')) {
+        try {
+          naoLidas.marcarNaoLida(sessao.usuario, agente.slug, m === 'POST');
+          return H.enviaJson(res, 200, { ok: true, marcada_nao_lida: m === 'POST' });
+        } catch (e) {
+          return H.erroJson(res, e.status || 500, e.status ? e.message : `Não consegui ${m === 'POST' ? 'marcar' : 'desmarcar'} a conversa como não lida (${e.message}).`);
+        }
+      }
+      if (acao === 'vendo' && m === 'POST') {
+        vigiaAtencao.vendo(agente.slug);
+        return H.enviaJson(res, 200, { ok: true });
       }
       if (acao === 'upload' && m === 'POST') return upload(req, res, agente);
       if (acao === 'comandos' && m === 'GET') return H.enviaJson(res, 200, Object.assign({ ok: true, agente: agente.slug }, await comandos.catalogo(agente)));
       if (acao === 'comando' && m === 'POST') return comandoPost(req, res, agente);
-      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'interromper', 'destravar', 'cota', 'mencao', 'aviso', 'pedido', 'upload', 'permissao', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
+      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'interromper', 'cancelar-fila', 'destravar', 'cota', 'mencao', 'aviso', 'pedido', 'upload', 'permissao', 'pergunta', 'reiniciar', 'lido', 'nao-lido', 'vendo', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
     }
 
     mm = /^\/api\/v1\/media\/([0-9a-f]{16})\/visual$/.exec(p);
@@ -816,10 +980,13 @@ function criarServidor(opcoes) {
     const slug = typeof corpo.agent_id === 'string' ? corpo.agent_id : (registro.estado().agentes[0] || {}).slug;
     const agente = registro.obter(slug);
     if (!agente) return H.erroJson(res, 404, `Não existe agente com o id "${String(slug).slice(0, 40)}".`);
-    const r = await voz.falar(agente, corpo.text, typeof corpo.voice_id === 'string' ? corpo.voice_id : null);
+    const parte = corpo.parte == null ? 0 : corpo.parte;
+    if (!Number.isInteger(parte) || parte < 0) {
+      return H.erroJson(res, 400, `O campo "parte" precisa ser um número inteiro a partir de 0 (o pedaço de voz pedido). Recebi ${JSON.stringify(parte).slice(0, 40)}. Nada foi falado.`);
+    }
+    const r = await voz.falar(agente, corpo.text, typeof corpo.voice_id === 'string' ? corpo.voice_id : null, parte);
     if (r.erro) return H.erroJson(res, r.status, r.erro);
-    const cab = { 'Content-Type': 'audio/mpeg', 'Content-Length': r.audio.length, 'Cache-Control': 'no-store', 'X-TTS-Chars': String(r.chars) };
-    if (r.cortado) cab['X-TTS-Cortado'] = '1';
+    const cab = { 'Content-Type': 'audio/mpeg', 'Content-Length': r.audio.length, 'Cache-Control': 'no-store', 'X-TTS-Chars': String(r.chars), 'X-TTS-Partes': String(r.partes), 'X-TTS-Parte': String(r.parte) };
     res.writeHead(200, cab);
     return res.end(r.audio);
   }
@@ -853,6 +1020,9 @@ function criarServidor(opcoes) {
     if (slugCaixa && !(p.startsWith('/api/') && caixa.rotaPermitida(p))) {
       return H.erroJson(res, 403, `A rota ${p.slice(0, 120)} não está liberada para agentes. Só as rotas que a frente liberou com caixa.permitir() respondem pela caixa.`);
     }
+
+    // Porta do Atalho do compartilhar (iPhone): sem sessão nem Origin, só com a chave dele no Authorization.
+    if (p === '/api/referencias/entrada' && m === 'POST' && !slugCaixa) return referencias.entrada(req, res, H.ipDoPedido(req, config.proxiesConfiaveis));
 
     // CSRF: toda escrita exige Origin igual à do próprio Web (a caixa não vem de navegador).
     if (ehMutacao(req) && !slugCaixa && !origemOk(req)) {
@@ -971,6 +1141,21 @@ function criarServidor(opcoes) {
       return undefined;
     }
 
+    if ((p === '/referencias' || p === '/referencias/') && (m === 'GET' || m === 'HEAD')) {
+      if (!sessao) return semSessaoPagina(req, res, url);
+      if (!servirArquivo(req, res, path.join(config.publicDir, 'referencias.html'), 'no-store')) {
+        H.paginaErro(res, 500, 'Tela não instalada', 'O arquivo da tela de Referências não foi encontrado no servidor. Reinstale o DG Claw Web.');
+      }
+      return undefined;
+    }
+    if (p === '/ver-arquivo' && (m === 'GET' || m === 'HEAD')) {
+      if (!sessao) return semSessaoPagina(req, res, url);
+      if (!servirArquivo(req, res, path.join(config.publicDir, 'ver-arquivo.html'), 'no-store')) {
+        H.paginaErro(res, 500, 'Tela não instalada', 'O arquivo da tela de leitura da Pasta não foi encontrado no servidor. Reinstale o DG Claw Web.');
+      }
+      return undefined;
+    }
+
     if ((p === '/mesa' || p === '/mesa/') && (m === 'GET' || m === 'HEAD')) {
       if (!sessao) return semSessaoPagina(req, res, url);
       if (!servirArquivo(req, res, path.join(config.publicDir, 'mesa.html'), 'no-store')) {
@@ -1022,7 +1207,7 @@ function criarServidor(opcoes) {
   });
 
   return {
-    servidor, config, registro, auth, midia, conversa, log, caixa, push, limites, lembretes, avisos, cofreAgente,
+    servidor, config, registro, auth, midia, conversa, log, caixa, push, limites, lembretes, avisos, cofreAgente, estados, vigiaAtencao, prefsAtencao,
     ouvir(porta, host) {
       return new Promise((resolve, reject) => {
         servidor.once('error', reject);
@@ -1031,11 +1216,12 @@ function criarServidor(opcoes) {
           caixa.iniciar();
           lembretes.iniciar();
           avisos.iniciar();
+          vigiaAtencao.iniciar();
           resolve(servidor.address());
         });
       });
     },
-    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); vigiaAlertas.parar(); boasVindas.parar(); limites.parar(); avisos.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
+    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); vigiaAlertas.parar(); boasVindas.parar(); limites.parar(); avisos.parar(); vigiaAtencao.parar(); versaoNova.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
   };
 }
 

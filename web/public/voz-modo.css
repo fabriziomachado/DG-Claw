@@ -1,0 +1,48 @@
+/* voz-modo.css: a onda ao lado do microfone e a tela da conversa por voz (voz-modo.js).
+   Discreto de propósito (26/10/2026, o dono achou a bola azul exagerada): linha de pontinhos
+   cinza, três pontos ao pensar, botões neutros. Para tirar, apague este arquivo e o voz-modo.js. */
+
+/* A onda ocupa o lugar do enviar com o campo vazio (como no ChatGPT). Com texto, anexo,
+   ditado ou com o agente trabalhando (o quadrado de parar), volta o enviar de sempre. */
+#btnVoz{flex:0 0 38px;width:38px;height:38px;margin-left:2px;border:0;border-radius:50%;
+        background:var(--dg-azul);color:#fff;padding:0;display:none;align-items:center;justify-content:center;
+        transition:background .15s}
+#btnVoz:hover{background:var(--dg-azul-forte)}
+html:not(.sem-mic):not(.sem-voz) .linha1:has(#btnEnviar.apagado:not(.parar)):not(.ditando) #btnVoz{display:flex}
+html:not(.sem-mic):not(.sem-voz) .linha1:has(#btnEnviar.apagado:not(.parar)):not(.ditando) #btnEnviar{display:none}
+
+/* A onda faz o papel do antigo "contínua" do topo */
+#btnContinua{display:none !important}
+
+/* ── Tela de voz: fica no lugar da barra de digitar ── */
+.vm-palco{--vm-forte:var(--dg-texto-2);--vm-fraco:var(--dg-borda);
+          display:flex;flex-direction:column;align-items:center;padding:8px 16px 14px;user-select:none;-webkit-user-select:none}
+.vm-palco[hidden]{display:none}
+html.modo-voz .barra>:not(.vm-palco){display:none !important}
+html.modo-voz{--barra-h:250px !important}
+
+.vm-onda{position:relative;width:min(300px,100%);height:72px;border:0;background:transparent;padding:0;
+         display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.vm-onda canvas{width:100%;height:44px;display:block}
+.vm-pts{position:absolute;display:none;gap:8px}
+.vm-pts i{width:7px;height:7px;border-radius:50%;background:var(--dg-texto-3);animation:vm-pisca 1.2s infinite ease-in-out}
+.vm-pts i:nth-child(2){animation-delay:.2s}
+.vm-pts i:nth-child(3){animation-delay:.4s}
+@keyframes vm-pisca{0%,80%,100%{opacity:.25;transform:scale(.85)}40%{opacity:1;transform:scale(1)}}
+.vm-palco[data-estado="pensando"] canvas,.vm-palco[data-estado="abrindo"] canvas{visibility:hidden}
+.vm-palco[data-estado="pensando"] .vm-pts,.vm-palco[data-estado="abrindo"] .vm-pts{display:flex}
+.vm-palco[data-estado="mudo"] canvas{opacity:.45}
+
+.vm-estado{margin-top:6px;font-size:14.5px;font-weight:500;color:var(--dg-texto-2)}
+.vm-sub{min-height:18px;margin-top:2px;font-size:12.5px;color:var(--dg-texto-3);text-align:center}
+
+.vm-ctrl{display:flex;gap:40px;margin-top:14px}
+.vm-ctrl button{width:46px;height:46px;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center;cursor:pointer;
+                transition:background .15s,color .15s,border-color .15s}
+.vm-mic{background:transparent;border:1px solid var(--dg-borda);color:var(--dg-texto-2)}
+.vm-mic:hover{background:var(--dg-superficie-2)}
+.vm-mic.on{background:var(--dg-texto);border-color:var(--dg-texto);color:var(--dg-fundo)}
+.vm-fim{background:var(--dg-superficie-2);border:0;color:var(--dg-texto)}
+.vm-fim:hover{background:var(--dg-borda)}
+
+@media (prefers-reduced-motion:reduce){.vm-pts i{animation:none;opacity:.6}}

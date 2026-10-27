@@ -147,3 +147,38 @@ test('grupos do menu: cada página no seu grupo, "Como funciona" no rodapé e po
   // toda aba fixa do painel tem lugar (num grupo ou no rodapé)
   for (const [chave] of M.ABAS_PAINEL) assert.ok(M.GRUPOS.some(g => g.chaves.includes(chave)) || chave === 'como', chave);
 });
+
+test('hora da última mensagem: hh:mm hoje, "ontem", dd/mm antes, e vazio quando não se sabe', () => {
+  const agora = new Date(2026, 9, 19, 15, 0).getTime();
+  assert.equal(M.horaCurta(new Date(2026, 9, 19, 9, 5).getTime(), agora), '09:05');
+  assert.equal(M.horaCurta(new Date(2026, 9, 18, 23, 59).getTime(), agora), 'ontem');
+  assert.equal(M.horaCurta(new Date(2026, 9, 3, 12, 0).getTime(), agora), '03/10');
+  assert.equal(M.horaCurta(new Date(2026, 8, 30, 12, 0).getTime(), new Date(2026, 9, 1, 8, 0).getTime()), 'ontem', 'vira o mês');
+  for (const nada of [null, undefined, 0, NaN, '12']) assert.equal(M.horaCurta(nada, agora), '');
+});
+
+test('seletor: mostra a hora em .ml-hora só quando há ultima_ts, escapada', () => {
+  const com = M.itemAgente({ id: 'a', nome: 'A', ultima_ts: Date.now() }, 'b');
+  assert.match(com, /<span class="ml-hora">\d\d:\d\d<\/span>/);
+  assert.doesNotMatch(M.itemAgente({ id: 'a', nome: 'A', ultima_ts: null }, 'b'), /ml-hora/);
+  assert.match(pub('menu-lado.css'), /\.ml-aqui \+ \.ml-hora\{margin-left:6px\}/);
+});
+
+test('seletor: bolinha de não lidas em .ml-nl com número, 99+, e sem ela no atual, em 0 e em null', () => {
+  assert.match(M.itemAgente({ id: 'a', nome: 'A', nao_lidas: 3 }, 'b'), /<span class="ml-nl"[^>]*aria-label="3 mensagens não lidas">3<\/span>/);
+  assert.match(M.itemAgente({ id: 'a', nome: 'A', nao_lidas: 1 }, 'b'), /aria-label="1 mensagem não lida">1</);
+  assert.match(M.itemAgente({ id: 'a', nome: 'A', nao_lidas: 99, mais: true }, 'b'), />99\+<\/span>/);
+  assert.doesNotMatch(M.itemAgente({ id: 'a', nome: 'A', nao_lidas: 5 }, 'a'), /ml-nl/);
+  assert.doesNotMatch(M.itemAgente({ id: 'a', nome: 'A', nao_lidas: null }, 'b'), /ml-nl/);
+  assert.doesNotMatch(M.itemAgente({ id: 'a', nome: 'A', nao_lidas: 0 }, 'b'), /ml-nl/);
+  assert.doesNotMatch(M.itemAgente({ id: 'a', nome: 'A' }, 'b'), /ml-nl/);
+  assert.match(pub('menu-lado.css'), /\.ml-nl\{[^}]*background:#d93025/);
+});
+
+test('totalNaoLidas soma só os outros agentes e ignora null', () => {
+  const lista = [{ id: 'admin' }, { id: 'ana' }, { id: 'bia' }, { id: 'caio' }];
+  const contagens = { admin: { nao_lidas: 5 }, ana: { nao_lidas: 2 }, bia: { nao_lidas: null }, caio: { nao_lidas: 0 } };
+  assert.equal(M.totalNaoLidas(lista, contagens, 'admin'), 2);
+  assert.equal(M.totalNaoLidas(lista, {}, 'admin'), 0);
+  assert.equal(M.totalNaoLidas(lista, { bia: { nao_lidas: null } }, 'admin'), 0);
+});

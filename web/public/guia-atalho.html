@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Atalho do compartilhar - S2 Bot</title>
+<link rel="icon" href="/icons/icon-192.png">
+<link rel="stylesheet" href="/tema.css">
+<script src="/tema.js"></script>
+<!-- Guia dos Atalhos "Mandar pro S2 Bot" e "Arquivo pro S2 Bot" (25/10/2026), montado com o dono no primeiro iPhone. Sem segredo:
+     a chave nasce na tela de Referências e nunca aparece aqui. -->
+<style>
+  body{margin:0;background:var(--dg-fundo);color:var(--dg-texto);
+       font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",sans-serif}
+  .g{max-width:640px;margin:0 auto;padding:calc(24px + env(safe-area-inset-top)) 16px calc(48px + env(safe-area-inset-bottom))}
+  svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+  .volta{display:inline-flex;align-items:center;gap:6px;color:var(--dg-texto-2);text-decoration:none;font-size:14px;margin-bottom:16px}
+  h1{font-size:22px;font-weight:650;margin:0 0 6px;letter-spacing:-.015em}
+  .sub{color:var(--dg-texto-2);margin:0 0 20px}
+  .rot{font-size:11.5px;letter-spacing:.06em;font-weight:700;color:var(--dg-texto-3);text-transform:uppercase;margin:28px 0 10px}
+  .cartao{background:var(--dg-superficie);border:1px solid var(--dg-borda);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+  .cartao p{margin:4px 0}
+  .passo{display:flex;gap:12px}
+  .n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--dg-superficie-2);color:var(--dg-texto);
+     font-size:13px;font-weight:650;display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .passo h2{font-size:15px;font-weight:600;margin:2px 0 4px}
+  .passo ul{margin:4px 0 0;padding-left:18px;color:var(--dg-texto-2)}
+  .passo li{margin:3px 0}
+  b{color:var(--dg-texto);font-weight:600}
+  code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:var(--dg-superficie-2);border-radius:6px;padding:1px 6px;overflow-wrap:anywhere}
+  .copia{display:flex;align-items:center;gap:6px;background:var(--dg-superficie-2);border-radius:10px;padding:6px 6px 6px 10px;margin-top:8px}
+  .copia code{flex:1;min-width:0;background:none;padding:0}
+  .copia button{width:32px;height:32px;border:0;border-radius:50%;background:none;color:var(--dg-texto-2);display:flex;align-items:center;justify-content:center;cursor:pointer}
+  .nota{display:flex;gap:10px;color:var(--dg-texto-2);font-size:14px}
+  .nota svg{margin-top:2px;color:var(--dg-texto-3)}
+  .erro{border-color:var(--dg-pedido-borda);background:var(--dg-pedido-fundo)}
+  .erro b{color:var(--dg-pedido-texto)}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  td{padding:8px 0;border-top:1px solid var(--dg-borda);vertical-align:top}
+  tr:first-child td{border-top:0}
+  td:first-child{width:42%;padding-right:12px;color:var(--dg-texto)}
+  td:last-child{color:var(--dg-texto-2)}
+</style>
+</head>
+<body>
+<main class="g">
+  <a class="volta" href="/referencias"><svg viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"/></svg>Referências</a>
+  <h1>Atalho do compartilhar</h1>
+  <p class="sub">São dois atalhos no compartilhar do iPhone: <b>Mandar pro S2 Bot</b> leva links e <b>Arquivo pro S2 Bot</b> leva imagem e PDF. Você toca e vai para as suas Referências, sem abrir o app. Quando quiser um resumo, abra a referência e toque na estrela: o Tech lê e resume.</p>
+
+  <div class="cartao nota"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg>
+    <div><b>Outro iPhone com o mesmo Apple ID?</b> Não precisa fazer nada: o iCloud leva o atalho sozinho. Confira no app Atalhos. Não gere chave nova, porque ela desliga a antiga em todos os aparelhos.</div></div>
+
+  <div class="rot">Antes de começar</div>
+  <div class="cartao">
+    <p>No S2 Bot, abra <b>Referências</b> no menu e toque no ícone de compartilhar no alto. Se ainda não houver chave, toque em <b>Gerar chave</b>. Deixe essa tela aberta: você vai copiar dela o endereço e a chave.</p>
+    <div class="copia"><code id="endereco">/api/referencias/entrada</code><button type="button" data-copia="endereco" title="Copiar o endereço" aria-label="Copiar o endereço"><svg viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/></svg></button></div>
+  </div>
+
+  <div class="rot">Atalho de links, uns 3 minutos</div>
+  <div class="cartao passo"><span class="n">1</span><div><h2>Criar o atalho</h2><ul>
+    <li>Abra o app <b>Atalhos</b> e toque em <b>+</b>.</li>
+    <li>Na busca de ações, digite <b>Obter Conteúdo</b> e toque em <b>Obter Conteúdo do URL</b>.</li>
+    <li>Toque na palavra azul <b>URL</b> e cole o endereço.</li></ul></div></div>
+  <div class="cartao passo"><span class="n">2</span><div><h2>Método e chave</h2><ul>
+    <li>Toque em <b>Mostrar Mais</b> e troque <b>GET</b> por <b>POST</b>.</li>
+    <li>Em <b>Cabeçalhos</b>, toque em <b>Adicionar novo cabeçalho</b>.</li>
+    <li>Chave: <code>Authorization</code></li>
+    <li>Valor: <code>Bearer</code>, um espaço e a chave copiada da tela de Referências. Ela sempre começa com <code>ref_</code>.</li></ul></div></div>
+  <div class="cartao passo"><span class="n">3</span><div><h2>O que vai junto</h2><ul>
+    <li>Em <b>Corpo da Solicitação</b>, escolha <b>JSON</b>.</li>
+    <li>Toque em <b>Adicionar novo campo</b> e escolha <b>Texto</b>.</li>
+    <li>À esquerda (chave), escreva <code>url</code>.</li>
+    <li>À direita (valor), não escreva: toque e escolha a variável <b>Entrada do Atalho</b>, que fica como uma pílula azul.</li></ul></div></div>
+  <div class="cartao passo"><span class="n">4</span><div><h2>Nome e lugar no compartilhar</h2><ul>
+    <li>Toque no nome no alto da tela, escolha <b>Renomear</b> e escreva <code>Mandar pro S2 Bot</code>.</li>
+    <li>Toque no <b>ⓘ</b> embaixo e ligue <b>Mostrar na Folha de Compartilhamento</b>, com <b>URLs</b> e <b>Texto</b>.</li>
+    <li>Saia para salvar.</li></ul></div></div>
+  <div class="cartao passo"><span class="n">5</span><div><h2>Testar e deixar à mão</h2><ul>
+    <li>Abra uma página ou um post, toque em compartilhar e escolha <b>Mandar pro S2 Bot</b>. Em segundos ele aparece em Referências.</li>
+    <li>Para ficar na fileira de cima das ações: no fim do compartilhar, <b>Editar Ações</b>, toque no <b>+</b> do atalho e arraste para o topo dos Favoritos.</li></ul></div></div>
+
+  <div class="rot">Atalho de imagem e PDF, uns 3 minutos</div>
+  <div class="cartao nota"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/></svg>
+    <div>Antes, ligue <b>Imagens</b> e <b>PDF</b> em Referências, no ícone de compartilhar do alto. Lá também ficam o botão que desliga o compartilhar e o tamanho máximo do arquivo.</div></div>
+  <div class="cartao passo"><span class="n">1</span><div><h2>Criar o atalho</h2><ul>
+    <li>No app <b>Atalhos</b>, toque em <b>+</b>, busque <b>Obter Conteúdo do URL</b> e cole o mesmo endereço.</li>
+    <li><b>Mostrar Mais</b>: troque <b>GET</b> por <b>POST</b> e adicione o cabeçalho <code>Authorization</code> com <code>Bearer</code>, um espaço e a mesma chave do outro atalho.</li></ul></div></div>
+  <div class="cartao passo"><span class="n">2</span><div><h2>O arquivo vai junto</h2><ul>
+    <li>Em <b>Corpo da Solicitação</b>, escolha <b>Formulário</b>.</li>
+    <li>Toque em <b>Adicionar novo campo</b> e escolha <b>Arquivo</b>.</li>
+    <li>À esquerda (chave), escreva <code>arquivo</code>. À direita, escolha a pílula <b>Entrada do Atalho</b>.</li></ul></div></div>
+  <div class="cartao passo"><span class="n">3</span><div><h2>Nome e lugar no compartilhar</h2><ul>
+    <li>Renomeie para <code>Arquivo pro S2 Bot</code>.</li>
+    <li>No <b>ⓘ</b>, ligue <b>Mostrar na Folha de Compartilhamento</b> e deixe marcados só <b>Imagens</b> e <b>PDFs</b>.</li>
+    <li>Teste: no app Fotos, abra um print, toque em compartilhar e escolha <b>Arquivo pro S2 Bot</b>.</li></ul></div></div>
+
+  <div class="rot">Ver se deu certo (opcional, nos dois)</div>
+  <div class="cartao passo"><span class="n">+</span><div><h2>Aviso na tela</h2><ul>
+    <li>No fim do atalho, acrescente <b>Obter Valor do Dicionário</b> e escreva <code>mensagem</code> em <b>Chave</b>.</li>
+    <li>Depois acrescente <b>Mostrar Notificação</b> com a pílula <b>Valor do Dicionário</b>.</li>
+    <li>Assim aparece "Guardado nas Referências", ou o motivo quando não entra (desligado, arquivo grande demais).</li></ul></div></div>
+
+  <div class="rot">Se não funcionar</div>
+  <div class="cartao"><table>
+    <tr><td>"Chave do Atalho inválida"</td><td>A chave colada não é a certa ou foi trocada. Copie de novo a que começa com <code>ref_</code>. Se ninguém tem mais a chave, gere outra e troque em todos os iPhones.</td></tr>
+    <tr><td>"Não achei um link"</td><td>Normal ao tocar no ▶ dentro do app Atalhos, que roda sem nada compartilhado. Teste pelo compartilhar. Se acontecer lá, confira se <code>url</code> está à esquerda e a pílula <b>Entrada do Atalho</b> à direita.</td></tr>
+    <tr><td>Não aparece no compartilhar</td><td>Confira o <b>Mostrar na Folha de Compartilhamento</b> no ⓘ. A fileira de ícones coloridos do alto é só para apps da App Store: o atalho fica na lista de ações.</td></tr>
+    <tr><td>"está desligado"</td><td>O compartilhar, ou aquele tipo (Links, Imagens, PDF), está desligado em Referências, no ícone de compartilhar do alto.</td></tr>
+    <tr><td>"Arquivo grande demais"</td><td>Passou do tamanho máximo escolhido nos mesmos ajustes (5, 10, 20 ou 50 MB).</td></tr>
+    <tr><td>Chegou, mas sem resumo</td><td>É o normal: o resumo é sob pedido. Abra a referência e toque na estrela. Se ficar "não abriu", a página pede login ou bloqueia leitura, e o link fica guardado assim mesmo.</td></tr>
+  </table></div>
+
+  <div class="cartao nota erro"><svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l2 2M14 9l2 2"/></svg>
+    <div><b>Não compartilhe o atalho pronto com outras pessoas.</b> A chave vai dentro dele, e com ela qualquer um manda links e arquivos para as suas Referências.</div></div>
+</main>
+<script>
+(function () {
+  var end = location.origin + '/api/referencias/entrada';
+  document.getElementById('endereco').textContent = end;
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-copia]');
+    if (!b || !navigator.clipboard) return;
+    navigator.clipboard.writeText(end).then(function () { b.title = 'Copiado'; }, function () {});
+  });
+})();
+</script>
+</body>
+</html>

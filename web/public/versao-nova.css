@@ -1,0 +1,47 @@
+/* versao-nova.css: botão "Atualização disponível" no rodapé do menu e a janela da versão nova (23/10/2026). */
+.vn-botao{display:flex;align-items:center;gap:10px;width:100%;margin:4px 0 6px;padding:10px 12px;box-sizing:border-box;
+  border:1px solid var(--dg-borda);border-radius:12px;background:var(--dg-superficie);color:var(--dg-texto);
+  font:inherit;font-size:14px;font-weight:500;text-align:left;cursor:pointer}
+.vn-botao:hover{background:var(--dg-superficie-2)}
+.vn-botao:focus-visible{outline:2px solid var(--dg-azul);outline-offset:1px}
+.vn-botao svg{flex:0 0 auto;color:var(--dg-texto-2)}
+.vn-ponto{margin-left:auto;width:8px;height:8px;flex:0 0 8px;border-radius:50%;background:var(--dg-entrega-texto);
+  box-shadow:0 0 0 3px var(--dg-entrega-fundo)}
+.vn-versao{display:block;text-align:right;font-size:12px;color:var(--dg-texto-3);white-space:nowrap;padding-right:6px}
+
+.vn-veu{position:fixed;inset:0;z-index:120;background:var(--dg-sobreposicao);display:flex;align-items:flex-start;justify-content:center;
+  padding:max(24px,8vh) 12px 12px;box-sizing:border-box;overflow-y:auto}
+.vn-jan{width:100%;max-width:440px;background:var(--dg-superficie);color:var(--dg-texto);border:1px solid var(--dg-borda);
+  border-radius:16px;box-shadow:var(--dg-sombra);padding:18px 16px 16px;box-sizing:border-box}
+.vn-cab{display:flex;align-items:center;gap:8px}
+.vn-cab h2{margin:0;flex:1;font-size:17px;font-weight:650}
+.vn-chip{font-size:12px;color:var(--dg-texto-2);background:var(--dg-superficie-2);border-radius:999px;padding:3px 9px}
+.vn-x{width:32px;height:32px;border:0;border-radius:50%;background:transparent;color:var(--dg-texto-3);display:grid;place-items:center;cursor:pointer}
+.vn-x:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
+.vn-nova{display:flex;align-items:center;gap:8px;margin:14px 0 12px;padding:10px 12px;border-radius:12px;font-size:14px;
+  background:var(--dg-entrega-fundo);border:1px solid var(--dg-entrega-borda);color:var(--dg-entrega-texto)}
+.vn-nova b{font-weight:650}
+.vn-rot{font-size:11px;letter-spacing:.06em;font-weight:700;color:var(--dg-texto-3);text-transform:uppercase;margin:4px 0 6px}
+.vn-itens{list-style:none;margin:0 0 10px;padding:0}
+.vn-itens li{display:flex;gap:10px;padding:5px 0;font-size:14px;line-height:1.4}
+.vn-itens li svg{flex:0 0 auto;margin-top:2px;color:var(--dg-texto-2)}
+.vn-notas{display:inline-flex;align-items:center;gap:6px;margin-bottom:12px;color:var(--dg-azul-forte);font-size:13.5px;text-decoration:none}
+.vn-notas:hover{text-decoration:underline}
+.vn-seg{display:flex;gap:10px;padding:10px 12px;border-radius:12px;background:var(--dg-superficie-2);color:var(--dg-texto-2);font-size:13px;line-height:1.45}
+.vn-seg svg{flex:0 0 auto}
+.vn-chave{display:flex;align-items:center;gap:10px;margin:14px 0 4px;font-size:14px;cursor:pointer;position:relative}
+.vn-chave input{position:absolute;opacity:0;width:36px;height:20px;margin:0}
+.vn-sw{width:36px;height:20px;flex:0 0 36px;border-radius:999px;background:var(--dg-borda);position:relative;transition:background .15s}
+.vn-sw::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:var(--dg-superficie);transition:left .15s}
+.vn-chave input:checked + .vn-sw{background:var(--dg-azul)}
+.vn-chave input:checked + .vn-sw::after{left:18px}
+.vn-chave input:focus-visible + .vn-sw{outline:2px solid var(--dg-azul);outline-offset:2px}
+.vn-msg{margin:10px 0 0;font-size:13px;color:var(--dg-texto-2)}
+.vn-msg.erro{color:var(--dg-erro-texto)}
+.vn-bts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.vn-b{min-height:40px;padding:0 16px;border-radius:999px;font:inherit;font-size:14px;font-weight:600;display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+.vn-sec{background:transparent;border:1px solid var(--dg-borda);color:var(--dg-texto)}
+.vn-sec:hover{background:var(--dg-superficie-2)}
+.vn-pri{background:var(--dg-azul);border:0;color:#fff}
+.vn-pri:hover{background:var(--dg-azul-forte)}
+.vn-b:disabled{opacity:.6;cursor:default}

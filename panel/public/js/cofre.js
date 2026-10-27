@@ -7,7 +7,7 @@
 //
 // TRÊS COISAS QUE ESTA TELA PRECISA DIZER, e que não são detalhe de implementação:
 //
-//   1. A CHAVE É DE QUEM CADASTRA, E A FATURA TAMBÉM. Foi decisão do Danilo em
+//   1. A CHAVE É DE QUEM CADASTRA, E A FATURA TAMBÉM. Foi decisão do mantenedor em
 //      07/09/2026, e ela resolveu de graça o pior cenário: chave dele num agente
 //      de terceiro, com um limite de gasto mal configurado, viraria prejuízo dele
 //      por uso alheio. Quem gera a chave é o dono do agente, na conta dele.
@@ -109,8 +109,8 @@
       {
         chave: 'api',
         alvo: '#cofre-root .cofre-api',
-        titulo: 'Quem pode guardar chaves aqui por API',
-        corpo: 'Uma chave de API é uma senha comprida que você entrega a outro assistente (por exemplo a assistente principal ou o Admin) para ele guardar chaves neste agente sem abrir esta tela. Você cria a chave aqui, copia o token na hora e entrega a quem você confia. Cada chave tem um nome, e a lista mostra quem criou, quando e a última vez que foi usada.',
+        titulo: 'Chaves de acesso à API',
+        corpo: 'Estas chaves deixam outro programa ou agente usar a API. Não é aqui que se guarda senha ou token de serviço (OpenAI, Hostinger...): para isso use o formulário Guardar uma chave. Uma chave de acesso é uma senha comprida que você entrega a outro assistente (por exemplo a assistente principal ou o Admin) para ele guardar chaves neste agente sem abrir esta tela. Você cria a chave aqui, copia o token na hora e entrega a quem você confia. Cada chave tem um nome, e a lista mostra quem criou, quando e a última vez que foi usada.',
         porque: 'Sem isto, toda chave nova precisaria ser colada por uma pessoa nesta tela. Com isto, quem cuida da instalação coloca a chave por conta própria, e você continua mandando: cada chave é só deste agente, não consegue ler o que já está guardado, não consegue criar outras chaves e some no instante em que você clica em revogar.',
       },
       {
@@ -272,7 +272,7 @@
   function blocoNova() {
     const provedores = (dados && dados.provedores) || [];
     const opcoes = provedores.map((p) => `<option value="${esc(p.id)}" data-sugestao="${esc(p.sugestao || '')}" data-onde="${esc(p.onde || '')}" data-dica="${esc(p.dica || '')}">${esc(p.nome)}</option>`).join('');
-    return `<div class="cartao cofre-nova">
+    return `<div class="cartao cofre-nova" id="cofre-nova">
         <div class="section-title">Guardar uma chave
           <button type="button" class="app-ajuda-secao" data-tutorial="nova"
                   aria-label="Como guardar uma chave" title="Como guardar uma chave">?</button>
@@ -387,10 +387,10 @@
     const lista = chavesApi.lista || [];
     let corpo;
     if (!chavesApi.ok) {
-      corpo = `<div class="app-erro"><strong>Não consegui abrir a lista de chaves de API.</strong><p>${esc(chavesApi.erro)}</p></div>`;
+      corpo = `<div class="app-erro"><strong>Não consegui abrir a lista de chaves de acesso.</strong><p>${esc(chavesApi.erro)}</p></div>`;
     } else if (!lista.length) {
-      corpo = `<div class="app-vazio"><strong>Nenhuma chave de API criada ainda.</strong>
-          <p>Sem chave de API, só quem entra nesta tela guarda chaves aqui. Crie uma quando outro assistente precisar
+      corpo = `<div class="app-vazio"><strong>Nenhuma chave de acesso criada ainda.</strong>
+          <p>Sem chave de acesso, só quem entra nesta tela guarda chaves aqui. Crie uma quando outro assistente precisar
              fazer isso por conta própria.</p></div>`;
     } else {
       corpo = `<table class="pixel-table cofre-tabela">
@@ -406,10 +406,13 @@
         </table>`;
     }
     return `<div class="cartao cofre-api">
-        <div class="section-title">Quem pode guardar chaves aqui por API
+        <div class="section-title">Chaves de acesso à API
           <button type="button" class="app-ajuda-secao" data-tutorial="api"
-                  aria-label="O que é uma chave de API" title="O que é uma chave de API">?</button>
+                  aria-label="O que é uma chave de acesso à API" title="O que é uma chave de acesso à API">?</button>
         </div>
+        <p class="ajuda-secao cofre-api-aviso"><b>Estas chaves deixam outro programa ou agente usar a API.</b> Não é aqui
+          que se guarda senha ou token de serviço (OpenAI, Hostinger...): para isso use o formulário
+          <a href="#cofre-nova" class="cofre-ir-guardar">Guardar uma chave</a> do Cofre.</p>
         <p class="ajuda-secao">É o jeito de <b>outro assistente</b> (a assistente principal, ou o Admin, por exemplo)
           colocar chaves neste agente <b>sem ver esta tela</b>. Você cria uma chave de API, copia o token na hora e
           entrega a quem você confia. Ela só serve para guardar chaves <b>neste</b> agente: não lê o que já está
@@ -417,12 +420,12 @@
         ${blocoTokenNovo()}
         ${corpo}
         <div class="cofre-campo cofre-api-nova">
-          <label for="cofre-api-nome" title="Um nome que lembre quem vai usar esta chave, por exemplo Admin.">Nome da nova chave de API</label>
+          <label for="cofre-api-nome" title="Um nome que lembre quem vai usar esta chave, por exemplo Admin.">Nome da nova chave de acesso</label>
           <input type="text" id="cofre-api-nome" maxlength="60" spellcheck="false" autocomplete="off" placeholder="Admin">
         </div>
         <div class="cofre-botoes">
           <button type="button" class="btn-principal" id="cofre-api-criar"
-                  title="Cria a chave de API e mostra o token uma única vez.">criar chave de API</button>
+                  title="Cria a chave de acesso e mostra o token uma única vez.">criar chave de acesso</button>
         </div>
       </div>`;
   }
@@ -445,6 +448,16 @@
   }
 
   function ligarCorpo() {
+    // Âncora do aviso das chaves de acesso: leva ao formulário sem mudar o endereço da página.
+    document.querySelectorAll('#cofre-corpo .cofre-ir-guardar').forEach((a) => {
+      a.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        const alvo = document.getElementById('cofre-nova');
+        if (alvo) alvo.scrollIntoView({ block: 'start' });
+        const campo = document.getElementById('cofre-nome');
+        if (campo) campo.focus({ preventScroll: true });
+      });
+    });
     document.querySelectorAll('#cofre-corpo .app-ajuda-secao[data-tutorial]').forEach((el) => {
       el.addEventListener('click', () => abrirTutorial(el.dataset.tutorial));
     });
@@ -606,7 +619,7 @@
     if (ocupado) return;
     const nome = ((document.getElementById('cofre-api-nome') || {}).value || '').trim();
     ocupado = true;
-    mostrarAviso('andando', 'Criando a chave de API...');
+    mostrarAviso('andando', 'Criando a chave de acesso...');
     const r = await chamar('/api/chaves-api', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -622,13 +635,13 @@
   async function revogarChaveApi(id, nome) {
     if (ocupado || !id) return;
     const certeza = window.confirm(
-      `Revogar a chave de API "${nome}"?\n\n` +
+      `Revogar a chave de acesso "${nome}"?\n\n` +
       'Ela deixa de valer agora. Quem a usa passa a receber recusa até você criar outra. ' +
       'As chaves de serviço que ela já guardou neste cofre continuam onde estão.',
     );
     if (!certeza) return;
     ocupado = true;
-    mostrarAviso('andando', 'Revogando a chave de API...');
+    mostrarAviso('andando', 'Revogando a chave de acesso...');
     const r = await chamar(`/api/chaves-api?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
     ocupado = false;
     if (!r.ok) { await recarregar({ tipo: 'erro', texto: motivoDoErro(r) }); return; }

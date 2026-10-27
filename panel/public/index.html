@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="{{BASE}}/css/leitura.css">
   <link rel="stylesheet" href="{{BASE}}/css/wm-status.css">
   <link rel="stylesheet" href="{{BASE}}/css/provedor.css">
+  <link rel="stylesheet" href="{{BASE}}/css/uso.css">
   {{CASCA}}
   <link rel="stylesheet" href="{{BASE}}/css/sem-zoom.css">
   <script src="{{BASE}}/js/sem-zoom.js"></script>
@@ -58,7 +59,7 @@
         <button class="tab active" data-tab="conversa"><span class="ico">◔</span>Conversa</button>
         <button class="tab" data-tab="status"><span class="ico">◉</span>Status</button>
         <button class="tab" data-tab="memory"><span class="ico">▤</span>Memória</button>
-        <!-- Operações e Pulso viraram UMA aba em 01/10/2026: nem o Danilo sabia
+        <!-- Operações e Pulso viraram UMA aba em 01/10/2026: nem o mantenedor sabia
              dizer a diferença entre as duas. Ver panel/docs/OPERACOES.md. -->
         <button class="tab" data-tab="operations"><span class="ico">⚙</span>Operações</button>
         <!-- Sessões (12/10/2026): nasce escondida; js/sessoes.js mostra quando /api/sessoes-config diz ligado:true. -->
@@ -230,6 +231,15 @@
             </div>
           </section>
 
+          <!-- Uso da assinatura (19/10/2026): quanto da janela de 5 horas e da semana já foi gasto.
+               O js/uso.js preenche; o número vem do runner (GET /api/uso), nunca é calculado aqui. -->
+          <section class="cartao uso-cartao">
+            <div class="section-title" title="Quanto da sua assinatura o agente já gastou: na janela de 5 horas e na semana. Quando chega a 100%, o agente espera a janela zerar.">Uso da assinatura</div>
+            <div id="uso-assinatura" class="uso-lista" aria-live="polite">
+              <p class="uso-fraco">Conferindo o uso...</p>
+            </div>
+          </section>
+
           <!-- Faixa de cima: os números que respondem "está tudo bem?" -->
           <div class="faixa">
             <div class="destaque" data-ext="alive">
@@ -256,7 +266,7 @@
 
           <div class="home-operacoes" id="home-operacoes">Conferindo as operações do sistema...</div>
 
-          <!-- A memória de trabalho, em uma olhada (Danilo, 05/10/2026): ele abriu o painel e
+          <!-- A memória de trabalho, em uma olhada (05/10/2026): ele abriu o painel e
                achou que o agente não tinha working memory. O conteúdo fica no raio-X logo
                abaixo e na aba Memória; aqui fica o estado dela (js/wm-status.js). -->
           <section class="cartao wms-cartao">
@@ -536,6 +546,7 @@
   <script src="{{BASE}}/js/operacoes.js"></script>
   <script src="{{BASE}}/js/cerebro.js"></script>
   <script src="{{BASE}}/js/wm-status.js"></script>
+  <script src="{{BASE}}/js/uso.js"></script>
   <script src="{{BASE}}/js/provedor.js"></script>
   <script src="{{BASE}}/js/app.js"></script>
   <script src="{{BASE}}/js/apps.js"></script>

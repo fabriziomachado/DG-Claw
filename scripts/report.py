@@ -408,8 +408,9 @@ def main():
         fh.write(bundle)
     try:
         os.chmod(out_path, 0o600)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"report: nao consegui restringir a permissao de {out_path} a 600: {e}. "
+              f"O relatorio pode conter dados sensiveis; rode: chmod 600 {out_path}", file=sys.stderr)
 
     meta = {
         'bundle_path': out_path,
@@ -422,7 +423,7 @@ def main():
 
     # destinos (so com consentimento)
     endpoint = env_or_cfg(cfg, 'DGCLAW_REPORT_ENDPOINT')
-    repo = env_or_cfg(cfg, 'DGCLAW_REPORT_GITHUB_REPO') or 'DGatoM/DG-Claw'
+    repo = env_or_cfg(cfg, 'DGCLAW_REPORT_GITHUB_REPO') or 'fabriziomachado/DG-Claw'
     contact = env_or_cfg(cfg, 'DGCLAW_AUTHOR_CONTACT')
 
     print(f'bundle salvo em: {out_path}  ({meta["bytes"]} bytes)')

@@ -188,3 +188,40 @@ test('para-admin desenha o botão só com data válida, sem texto do agente', ()
   assert.match(dgui.blocoParaHtml(bloco({ tipo: 'para-admin', relatorio: '2026-10-23"><img' })), /dgui-aviso/);
   assert.match(dgui.blocoParaHtml(bloco({ tipo: 'para-admin' })), /dgui-aviso/);
 });
+
+test('kpi com foto: só endereço do próprio S2 Bot vira a foto redonda ao lado do título', () => {
+  const ok = dgui.blocoParaHtml(bloco({ tipo: 'kpi', titulo: 'Ana', valor: '51%', foto: '/api/v1/agents/smartsau/pasta/imagem?caminho=equipe/ana.jpg' }));
+  assert.match(ok, /<img class="dgui-kpi-foto"[^>]*src="\/api\/v1\/agents\/smartsau\/pasta\/imagem\?caminho=equipe\/ana.jpg"/);
+  for (const ruim of ['https://x.com/a.jpg', '//x.com/a.jpg', 'javascript:alert(1)', 'data:image/png;base64,AA']) {
+    assert.doesNotMatch(dgui.blocoParaHtml(bloco({ tipo: 'kpi', titulo: 'X', valor: '1', foto: ruim })), /dgui-kpi-foto/, ruim);
+  }
+  assert.doesNotMatch(dgui.blocoParaHtml(bloco({ tipo: 'kpi', titulo: 'X', valor: '1' })), /dgui-kpi-cab/);
+});
+
+test('kpi com progresso desenha a barra que enche, limitada de 0 a 100', () => {
+  const h = dgui.blocoParaHtml(bloco({ tipo: 'kpi', titulo: 'Meta', valor: '0,25%', progresso: '0,25' }));
+  assert.match(h, /dgui-kpi-barra" role="progressbar"[^>]*aria-valuenow="0.25"><i style="width:0.25%">/);
+  assert.match(dgui.blocoParaHtml(bloco({ tipo: 'kpi', valor: 'x', progresso: 140 })), /width:100%/);
+  assert.doesNotMatch(dgui.blocoParaHtml(bloco({ tipo: 'kpi', valor: 'x' })), /dgui-kpi-barra/);
+});
+
+test('imagem na largura toda: só endereço do próprio S2 Bot, sem contador de carrossel', () => {
+  const src = '/api/v1/agents/smartsau/pasta/imagem?caminho=regioes/mapa.png';
+  const h = dgui.blocoParaHtml(bloco({ tipo: 'painel', itens: [{ tipo: 'imagem', titulo: 'Mapa por região', src, proporcao: '4/5' }] }));
+  assert.match(h, /<figure class="dgui-imagem">/);
+  assert.match(h, /style="aspect-ratio:4\/5"/);
+  assert.doesNotMatch(h, /1 de 1/);
+  assert.match(dgui.blocoParaHtml(bloco({ tipo: 'imagem', src: 'https://fora.com/x.png' })), /dgui-aviso/);
+  assert.match(dgui.blocoParaHtml(bloco({ tipo: 'imagem', src: '//fora.com/x.png' })), /dgui-aviso/);
+});
+
+test('série com "cor" da paleta: Ana vermelho, Bruno azul; sem cor pega a próxima livre', () => {
+  const g = (series) => dgui.blocoParaHtml(bloco({ tipo: 'grafico', forma: 'colunas', categorias: ['Norte', 'Sul'], series }));
+  const h = g([{ nome: 'Ana', cor: 'vermelho', valores: [60, 40] }, { nome: 'Bruno', cor: 'Azul', valores: [40, 60] }]);
+  assert.match(h, /data-dgui-serie="4"[^>]*><i class="dgui-c4"><\/i>Ana/);
+  assert.match(h, /data-dgui-serie="0"[^>]*><i class="dgui-c0"><\/i>Bruno/);
+  const h2 = g([{ nome: 'A', cor: 'azul', valores: [1, 2] }, { nome: 'B', valores: [2, 1] }, { nome: 'C', cor: '#ff0000', valores: [3, 3] }]);
+  assert.match(h2, /dgui-c0"><\/i>A/);
+  assert.match(h2, /dgui-c1"><\/i>B/);
+  assert.match(h2, /dgui-c2"><\/i>C/);
+});

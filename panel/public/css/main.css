@@ -498,7 +498,7 @@ body.menu-aberto .veu{opacity:1;visibility:visible}
    * colunas espremidas numa faixa que rola na horizontal. Num celular isso quer
    * dizer que as colunas da direita (na de Custos, justamente Duração e CUSTO)
    * ficam fora da tela, e ninguém rola uma tabela para o lado sem saber que
-   * existe algo lá. O padrão de construção do Danilo é explícito: sem rolagem
+   * existe algo lá. O padrão de construção do mantenedor é explícito: sem rolagem
    * horizontal, tabela vira cartão.
    *
    * O rótulo de cada campo vem do `data-rot` que o `rotularTabelas()` do
@@ -561,6 +561,7 @@ body.menu-aberto .veu{opacity:1;visibility:visible}
   border-radius:12px;padding:16px}
 .dgv-audio audio{width:100%}
 .dgv-pdf{width:min(1000px,90vw);height:calc(100vh - 130px);border:0;border-radius:10px;background:#fff}
+.dgv-pagina{width:min(1000px,94vw);height:calc(100vh - 110px);border:0;border-radius:10px;background:var(--fundo)}
 /* O formato que nenhum navegador abre. Diz isso com todas as letras, em vez de
  * mostrar um quadro cinza que a pessoa confunde com o painel travado. */
 .dgv-sem-previa{background:var(--painel);border:1px solid var(--linha);border-radius:12px;
@@ -572,6 +573,7 @@ body.menu-aberto .veu{opacity:1;visibility:visible}
   .dgv-fundo{padding:10px}
   .dgv-midia{max-height:calc(100vh - 96px)}
   .dgv-pdf{width:100%;height:calc(100vh - 110px)}
+  .dgv-pagina{width:100%;height:calc(100vh - 96px)}
   /* No celular o nome inteiro nao cabe ao lado dos dois botoes: ele quebra para
      a linha de cima e os controles ficam onde o dedo espera, na direita. */
   .dgv-topo{flex-wrap:wrap}
@@ -601,7 +603,7 @@ body.menu-aberto .veu{opacity:1;visibility:visible}
 
 /* ── Texto rico (12/10/2026) ────────────────────────────────────────────────
  * POR QUE: o pensamento do agente chegava como um bloco cru, com asteriscos e
- * crases à mostra, endereço enorme e "- " grudado (Danilo, 12/10). Agora todo
+ * crases à mostra, endereço enorme e "- " grudado (12/10). Agora todo
  * texto livre curto passa por DGMarkdown.rico/ricoLinha (js/markdown.js) e cai
  * aqui. Regra de ouro: nada rola na horizontal em 390 px, então tudo quebra. */
 .rt{white-space:normal;overflow-wrap:anywhere;word-break:break-word;max-width:100%;min-width:0;line-height:1.55}
@@ -667,3 +669,4 @@ html.casca .btn-tutorial-aba{display:none!important}
 .btn-icone[disabled],.cofre-revogar[disabled],.cofre-api-revogar[disabled]{opacity:.45;cursor:default}
 html.casca .saude-frase{display:none}
 html.casca .app-tutorial-abrir{display:none!important}
+.dgv-janela:has(.dgv-pagina){width:100%}

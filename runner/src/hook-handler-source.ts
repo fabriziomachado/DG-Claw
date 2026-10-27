@@ -30,9 +30,9 @@ const nonce = arg("--nonce") || "";
 
 // Lê o JSON do evento do stdin (best-effort; pode vir vazio no Stop).
 let stdin = "";
-try { stdin = fs.readFileSync(0, "utf8"); } catch {}
+try { stdin = fs.readFileSync(0, "utf8"); } catch { /* stdin fechado ou vazio: o evento segue só com os argumentos */ }
 let ev = {};
-try { ev = JSON.parse(stdin) || {}; } catch {}
+try { ev = JSON.parse(stdin) || {}; } catch { /* corpo que não é JSON: segue sem os campos extras do evento */ }
 
 const payload = JSON.stringify({
   agentId,
@@ -41,7 +41,10 @@ const payload = JSON.stringify({
   cwd: ev.cwd || null,
   sessionId: ev.session_id || process.env.CLAUDE_CODE_SESSION_ID || null,
   toolName: ev.tool_name || null,
+  toolUseId: typeof ev.tool_use_id === "string" ? ev.tool_use_id : null,
   source: ev.source || null,
+  error: ev.error || null,
+  lastAssistantMessage: typeof ev.last_assistant_message === "string" ? ev.last_assistant_message.slice(0, 500) : null,
 });
 
 // Sem destino válido, não faz nada e sai limpo.
@@ -69,7 +72,7 @@ function enviar(tentativa) {
     },
   );
   const falhou = () => {
-    try { req.destroy(); } catch {}
+    try { req.destroy(); } catch { /* a conexão já caiu: não há o que destruir */ }
     if (tentativa === 1) setTimeout(() => enviar(2), 300);
     else process.exit(0);
   };

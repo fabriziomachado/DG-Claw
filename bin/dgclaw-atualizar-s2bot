@@ -44,11 +44,11 @@ espera_imagem() {
     # o "construir" sobe uma unidade que roda o podman build; acaba quando o build some
     local ate=$((SECONDS + 3600))
     sleep 5
-    while pgrep -x podman -a | grep -q ' build '; do
+    while pgrep -x podman -a | grep ' build ' >/dev/null; do
         [ $SECONDS -lt $ate ] || return 1
         sleep 10
     done
-    dgclaw imagem status 2>&1 | grep -q 'imagem dos agentes pronta'
+    dgclaw imagem status 2>&1 | grep 'imagem dos agentes pronta' >/dev/null
 }
 
 web_de_pe() {
@@ -159,7 +159,9 @@ for a in $(agentes); do
     dgclaw agente recriar "$a" >>"$LOG" 2>&1 || desfaz "o agente $a não subiu com a versão nova."
     dgclaw agente identidade "$a" >>"$LOG" 2>&1 || info "não regravei as instruções de $a (confira depois)"
     sleep 10
-    dgclaw status 2>&1 | grep -q "agente $a: de pe" || desfaz "o agente $a não respondeu com a versão nova."
+    # sem grep -q: com o pipefail, o grep -q fecha o cano no primeiro achado e o status sai com SIGPIPE
+    # (141), o que parecia falha e voltava a atualização com o agente de pé (27/10/2026, v1.4.1)
+    dgclaw status 2>&1 | grep "agente $a: de pe" >/dev/null || desfaz "o agente $a não respondeu com a versão nova."
 done
 
 systemd-run --unit="dgclaw-admin-atualizacao-$(date +%s)" --on-active=8 systemctl restart dgclaw-admin >>"$LOG" 2>&1

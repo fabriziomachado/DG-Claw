@@ -3402,8 +3402,11 @@ function ativaZoomImagem(img) {
 function abreLightbox(mid, opt) {
   const md = midias[mid];
   if (!md) return;
-  // visual (vis-*.html) abre desenhado, em tela cheia; `texto` pede o visor de arquivo
-  if (ehVisual(md) && !(opt && opt.texto)) { abreTelaVisual(md); return; }
+  // visual (vis-*.html) e qualquer outro .html (relatório de agente, 24/10/2026) abrem desenhados, em tela
+  // cheia, no mesmo quadro isolado do visual; `texto` pede o visor de arquivo
+  if ((ehVisual(md) || (md.kind === 'document' && /\.html?$/i.test(md.nome || ''))) && !(opt && opt.texto)) {
+    abreTelaVisual(md); return;
+  }
   const jaAberto = visorAberto();
   lbCorpo.innerHTML = '';
   lbMid = mid;

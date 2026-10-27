@@ -5446,7 +5446,15 @@ function pintaFilaLeitura() {
     row.classList.remove('fila-tocando', 'fila-espera', 'fila-pausada');
   }
   for (const s of wrap.querySelectorAll('.selo-fila')) s.remove();
-  const marca = (id, classe, texto) => {
+  // ícone de traço do design system no lugar do emoji (26/10/2026, pedido do dono)
+  const ico = d => '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
+  const ICO_FILA = {
+    tocando: ico('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>'),
+    pausada: ico('<path d="M9 6v12M15 6v12"/>'),
+    espera: ico('<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>'),
+  };
+  const marca = (id, classe, icone, texto) => {
     if (id == null) return;
     const row = wrap.querySelector('.row[data-msg="' + CSS.escape(String(id)) + '"]');
     const bub = row && row.querySelector('.bub');
@@ -5454,12 +5462,13 @@ function pintaFilaLeitura() {
     row.classList.add(classe);
     const s = document.createElement('span');
     s.className = 'selo-fila';
-    s.textContent = texto;
+    s.innerHTML = icone;
+    s.appendChild(document.createTextNode(texto));
     bub.appendChild(s);
   };
-  marca(e.tocando, 'fila-tocando', '🔊 tocando agora');
-  marca(e.pausada, 'fila-pausada', '⏸ continua quando você enviar');
-  e.fila.forEach((id, i) => marca(id, 'fila-espera', '⏳ na fila (' + (i + 1) + ')'));
+  marca(e.tocando, 'fila-tocando', ICO_FILA.tocando, 'tocando agora');
+  marca(e.pausada, 'fila-pausada', ICO_FILA.pausada, 'continua quando você enviar');
+  e.fila.forEach((id, i) => marca(id, 'fila-espera', ICO_FILA.espera, 'na fila (' + (i + 1) + ')'));
 }
 
 function falaNovas() {

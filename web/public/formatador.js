@@ -36,12 +36,31 @@ function formata(htmlSeguro, fmt) {
     .replace(/\[([^\]\n]+)\]\((<a href="([^"]+)"[^>]*>[^<]*<\/a>)\)/g,
              '<a href="$3" target="_blank" rel="noopener">$1</a>')
     .replace(/`([^`\n]+)`/g, '<code>$1</code>');
+  if (fmt === 'arquivo') s = linksDaPasta(s);
   if (fmt === 'markdownv2') {
     s = s.replace(/(^|[\s(])\*([^*\n]+)\*(?=[\s).,!?:;]|$)/g, '$1<b>$2</b>')
          .replace(/(^|[\s(])_([^_\n]+)_(?=[\s).,!?:;]|$)/g, '$1<i>$2</i>')
          .replace(/\\([_*\[\]()~`>#+\-=|{}.!\\])/g, '$1');
   }
   return s;
+}
+
+/* Links entre arquivos da Pasta (27/10/2026, pedido do dono: a pasta do agente é um wiki). Só no visor
+   da Pasta (fmt 'arquivo'): [texto](outro.md), [[outro]] e o nome solto de um .md viram link que a tela
+   /ver-arquivo abre ali mesmo (data-pasta, relativo ao arquivo aberto). Endereço com esquema (http:,
+   javascript:) não entra aqui: o http já virou <a> no linkify e o resto fica como texto. */
+const RX_ESQUEMA = /^[a-z][a-z0-9+.-]*:/i;
+const lnkPasta = (alvo, txt) => `<a href="#" class="lnk-pasta" data-pasta="${alvo}">${txt}</a>`;
+function linksDaPasta(s) {
+  s = s
+    .replace(/\[([^\]\n]+)\]\(([^)\s<>"]+)\)/g, (m, txt, alvo) => RX_ESQUEMA.test(alvo) || alvo.startsWith('#') ? m : lnkPasta(alvo, txt))
+    .replace(/\[\[([^\]|\n]+)(?:\|([^\]\n]+))?\]\]/g, (m, alvo, txt) => {
+      const a = alvo.trim();
+      return lnkPasta(/\.[a-z0-9]{1,8}$/i.test(a) ? a : a + '.md', (txt || alvo).trim());
+    });
+  // nome solto (indicadores-comercial.md, ../../erp/COMO-ESTUDAR.md), fora de link e de `código`
+  return s.split(/(<a\b[\s\S]*?<\/a>|<code>[\s\S]*?<\/code>)/).map((p, i) => i % 2 ? p
+    : p.replace(/(^|[\s(])((?:\.{1,2}\/)*[\w-]+(?:\/[\w.-]+)*\.(?:md|html?))(?=[\s).,;:!?]|$)/g, (m, ant, alvo) => ant + lnkPasta(alvo, alvo))).join('');
 }
 
 /* ```diff (18/10/2026, pedido do dono): o que mudou num código, linha a linha, como no GitHub.
@@ -172,11 +191,29 @@ function paragrafos(txt, fmt) {
 /* No visor, o .md vira documento: títulos (# a ###), listas, citação (>) e linha (---), que a
    conversa não usa. Parágrafos e tabelas seguem o mesmo paragrafos() das mensagens, e cada
    linha passa pelo mesmo esc + linkify + formata, então negrito, `código` e link funcionam. */
-function mdComTitulos(t) {
-  const linha = x => formata(linkify(esc(x)), 'markdown');
+const RX_ITEM = /^\s*([-*+]|\d+[.)])\s+/;
+const recuo = x => /^\s*/.exec(x)[0].replace(/\t/g, '    ').length;
+function mdComTitulos(t, fmt = 'markdown') {
+  const linha = x => formata(linkify(esc(x)), fmt);
+  /* Lista com sublista (27/10/2026: os "-" recuados de um "4." viravam 5, 6, 7...): linha mais recuada
+     que o item é dele, como sublista (se tiver marcador) ou como continuação do texto. */
+  const lista = bloco => {
+    const base = recuo(bloco[0]), itens = [];
+    for (const x of bloco) {
+      if (recuo(x) <= base && RX_ITEM.test(x)) itens.push({ txt: x.replace(RX_ITEM, ''), sub: [] });
+      else if (itens.length) itens[itens.length - 1].sub.push(x);
+    }
+    const tag = /^\s*\d/.test(bloco[0]) ? 'ol' : 'ul';
+    const li = it => {
+      const k = it.sub.findIndex(x => RX_ITEM.test(x));
+      const cont = (k < 0 ? it.sub : it.sub.slice(0, k)).map(x => x.trim());
+      return `<li>${linha([it.txt, ...cont].join(' '))}${k < 0 ? '' : lista(it.sub.slice(k))}</li>`;
+    };
+    return `<${tag} class="lb-lista">${itens.map(li).join('')}</${tag}>`;
+  };
   const blocoTexto = linhas => {
     let html = '', resto = [], i = 0;
-    const solta = () => { const r = resto.join('\n'); if (r.trim()) html += paragrafos(r, 'markdown'); resto = []; };
+    const solta = () => { const r = resto.join('\n'); if (r.trim()) html += paragrafos(r, fmt); resto = []; };
     while (i < linhas.length) {
       const l = linhas[i];
       let m;
@@ -189,28 +226,24 @@ function mdComTitulos(t) {
         solta(); const q = [];
         while (i < linhas.length && /^\s*>/.test(linhas[i])) q.push(linhas[i++].replace(/^\s*>\s?/, ''));
         html += `<blockquote class="lb-cita">${blocoTexto(q)}</blockquote>`;
-      } else if (/^\s*([-*+]|\d+[.)])\s+/.test(l)) {
-        solta(); const ord = /^\s*\d/.test(l), itens = [];
-        while (i < linhas.length && (/^\s*([-*+]|\d+[.)])\s+/.test(linhas[i]) || (/^\s{2,}\S/.test(linhas[i]) && itens.length))) {
-          const x = linhas[i++];
-          if (/^\s*([-*+]|\d+[.)])\s+/.test(x)) itens.push(x.replace(/^\s*([-*+]|\d+[.)])\s+/, ''));
-          else itens[itens.length - 1] += ' ' + x.trim();
-        }
-        const tag = ord ? 'ol' : 'ul';
-        html += `<${tag} class="lb-lista">${itens.map(x => `<li>${linha(x)}</li>`).join('')}</${tag}>`;
+      } else if (RX_ITEM.test(l)) {
+        solta(); const bloco = [];
+        while (i < linhas.length && (RX_ITEM.test(linhas[i]) || (/^\s{2,}\S/.test(linhas[i]) && bloco.length))) bloco.push(linhas[i++]);
+        html += lista(bloco);
       } else { resto.push(l); i++; }
     }
     solta();
     return html;
   };
-  return String(t).split(/(```[\s\S]*?```)/).map((p, i) => i % 2 ? paragrafos(p, 'markdown') : blocoTexto(p.split('\n'))).join('');
+  return String(t).split(/(```[\s\S]*?```)/).map((p, i) => i % 2 ? paragrafos(p, fmt) : blocoTexto(p.split('\n'))).join('');
 }
 
-/* Arquivo inteiro para o visor: .md vira documento; o resto vira bloco de código com a língua. */
+/* Arquivo inteiro para o visor: .md vira documento; o resto vira bloco de código com a língua.
+   { pasta: true } (tela /ver-arquivo) liga os links entre arquivos da Pasta. */
 const LINGUA_DA_EXT = { txt: 'text', log: 'text', csv: 'text', tsv: 'text', env: 'ini', yml: 'yaml', htm: 'html', mjs: 'javascript', js: 'javascript', ts: 'typescript', py: 'python', sh: 'bash' };
-function arquivoParaHtml(texto, nome) {
+function arquivoParaHtml(texto, nome, opcoes) {
   const ext = ((/\.([a-z0-9]+)$/i.exec(nome || '') || [])[1] || '').toLowerCase();
-  if (ext === 'md' || ext === 'markdown') return `<div class="lb-md">${mdComTitulos(texto)}</div>`;
+  if (ext === 'md' || ext === 'markdown') return `<div class="lb-md">${mdComTitulos(texto, opcoes && opcoes.pasta ? 'arquivo' : 'markdown')}</div>`;
   const lingua = LINGUA_DA_EXT[ext] || ext;
   return `<div class="lb-md">${paragrafos('```' + lingua + '\n' + String(texto).replace(/```/g, 'ˋˋˋ') + '\n```', 'markdown')}</div>`;
 }

@@ -11,7 +11,8 @@
 //   vídeo   → <video controls>
 //   áudio   → <audio controls>
 //   pdf     → <iframe>
-//   pagina  → <iframe> da tela /ver-arquivo do app (texto, .md, .html com a cara da conversa)
+//   pagina  → <iframe> da tela /ver-arquivo do app (texto, .md, .html com a cara da conversa),
+//             em tela cheia e com a barra da própria tela (27/10/2026)
 //   o resto → a frase que diz que aquele formato não abre no navegador, mais o
 //             botão de baixar.
 //
@@ -63,10 +64,6 @@
     if (item.tipo === 'audio') {
       return `<div class="dgv-audio"><audio src="${url}" controls preload="metadata"></audio></div>`;
     }
-    if (item.tipo === 'pagina' && item.ver) {
-      // texto, .md e .html na tela de leitura do app, com a cara da conversa (25/10/2026)
-      return `<iframe class="dgv-pagina" src="${esc(item.ver)}" title="${nome}"></iframe>`;
-    }
     if (item.tipo === 'pdf') {
       // O PDF do agente é lido pelo leitor do próprio navegador. Em celular alguns
       // navegadores ignoram o iframe e não desenham nada, e é para isso que o
@@ -92,6 +89,7 @@
     if (!item || !item.url) return;
     const voltarFoco = document.activeElement;
     fechar();
+    if (item.tipo === 'pagina' && item.ver) return abrirCheia(item, voltarFoco);
 
     const fundo = document.createElement('div');
     fundo.className = 'dgv-fundo';
@@ -116,6 +114,35 @@
 
     estado = { fundo, tecla, voltarFoco };
   }
+
+  /**
+   * Texto, .md e .html em tela cheia (27/10/2026, pedido do dono: igual ao visor de arquivos do chat).
+   * A barra (fechar, voltar, abrir em outra aba, baixar) é da própria tela /ver-arquivo, porque o link
+   * para outra página do wiki troca o arquivo lá dentro. O X e o Esc de lá chegam aqui por mensagem.
+   */
+  function abrirCheia(item, voltarFoco) {
+    const fundo = document.createElement('div');
+    fundo.className = 'dgv-fundo dgv-cheia';
+    fundo.setAttribute('role', 'dialog');
+    fundo.setAttribute('aria-modal', 'true');
+    fundo.setAttribute('aria-label', item.nome || 'Arquivo');
+    const quadro = document.createElement('iframe');
+    quadro.className = 'dgv-pagina-cheia';
+    quadro.title = item.nome || 'Arquivo';
+    quadro.src = item.ver;
+    fundo.appendChild(quadro);
+    document.body.appendChild(fundo);
+
+    const tecla = (ev) => { if (ev.key === 'Escape') fechar(); };
+    document.addEventListener('keydown', tecla);
+    quadro.addEventListener('load', () => { try { quadro.contentWindow.focus(); } catch (_) { /* fechou */ } });
+    estado = { fundo, tecla, voltarFoco, quadro };
+  }
+
+  window.addEventListener('message', (ev) => {
+    if (!estado || !estado.quadro || ev.source !== estado.quadro.contentWindow || ev.origin !== location.origin) return;
+    if (ev.data && ev.data.dgver === 'fechar') fechar();
+  });
 
   window.DGVisualizador = { abrir, fechar, BASE };
 })();

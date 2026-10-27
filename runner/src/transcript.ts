@@ -159,6 +159,14 @@ export function turnoEncerradoNoTranscript(
       continue;
     }
     const rotulo = `${o.type ?? "?"}${o.subtype ? "/" + o.subtype : ""}`;
+    // Esc (o parar da tela): o Claude Code grava "[Request interrupted by user]" e NÃO dispara o Stop.
+    // Sem isto o agente parado ficava "working", a fila não soltava e o segundo parar oferecia reiniciar
+    // (26/10/2026, Tech parado no meio da atualização do Dokploy).
+    if (o.type === "user" && RX_INTERROMPIDO.test(textoDoConteudo((o as { message?: { content?: unknown } }).message?.content).trim())) {
+      const quando = o.timestamp ? Date.parse(o.timestamp) : NaN;
+      if (Number.isFinite(quando) && quando > desdeMs) return { encerrado: true, motivo: "turno interrompido pela pessoa (Esc)" };
+      return { encerrado: false, motivo: "interrupção anterior ao começo do turno atual" };
+    }
     if (o.type !== "system" || (o.subtype !== "turn_duration" && o.subtype !== "stop_hook_summary")) {
       return { encerrado: false, motivo: `última linha é ${rotulo}` };
     }
@@ -169,6 +177,9 @@ export function turnoEncerradoNoTranscript(
   }
   return { encerrado: false, motivo: "nenhuma linha JSON válida no fim do transcript" };
 }
+
+/** A linha que o Claude Code grava quando a pessoa aperta Esc no meio do turno. */
+const RX_INTERROMPIDO = /^\[Request interrupted by user/;
 
 /** O texto que o Claude Code mostra (e devolve em `claude -p`) quando o OAuth da conta morreu. */
 export const RX_LOGIN_EXPIRADO =

@@ -58,6 +58,26 @@ export function vigiarStopPerdido(s: Sessao, esteProc: pty.IPty): void {
   s.vigiaDoStopPerdido.unref();
 }
 
+/** Esc da tela (o botão parar): o Claude Code grava a interrupção no transcript e não manda o Stop.
+ *  Em vez de esperar o terminal ficar mudo (QUIETO_PARA_OLHAR_TRANSCRIPT_MS), confere logo depois da
+ *  tecla e libera o agente e a fila assim que a interrupção aparecer (26/10/2026, pedido do dono:
+ *  "parar na hora", como no Claude). */
+export function conferirFimDepoisDoEsc(s: Sessao): void {
+  if (!s.motor.usaHooks || s.estado.status !== "working") return;
+  const turno = s.turnoComecouEm;
+  for (const ms of [700, 1_500, 3_000, 6_000]) {
+    setTimeout(() => {
+      if (s.estado.status !== "working" || s.turnoComecouEm !== turno || !s.estado.sessionId) return;
+      const prova = turnoEncerradoNoTranscript(s.estado.sessionId, turno, s.estado.config.envExtra?.CLAUDE_CONFIG_DIR);
+      if (!prova.encerrado) return;
+      log.info(s.a("estado"), `parado pela pessoa (Esc): ${prova.motivo}; marquei idle e vou soltar a fila`);
+      cancelarStopPendente(s);
+      s.mudar({ status: "idle", hookLatched: true, currentTool: null, statusReason: "transcript:interrompido pela pessoa (Esc)" });
+      talvezSoltarFila(s);
+    }, ms).unref();
+  }
+}
+
 export function pararVigiaDoStopPerdido(s: Sessao): void {
   if (s.vigiaDoStopPerdido) {
     clearInterval(s.vigiaDoStopPerdido);

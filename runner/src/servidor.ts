@@ -24,6 +24,7 @@ import { LoginAssistido } from "./provedores/login.js";
 import { tratarRotasDeProvedor } from "./provedores/rotas.js";
 import { MOTIVO_SEM_MEDICAO, deStatusline, paraResposta } from "./uso.js";
 import { nonceConfere } from "./sessao/telas.js";
+import { conferirFimDepoisDoEsc } from "./sessao/vigias.js";
 import { acharRolloutPorId, mensagensDoRollout } from "./provedores/codex-rollout.js";
 
 /** O estado de uma sessão como o painel e a API o veem. A paralela leva o campo
@@ -369,6 +370,7 @@ export function criarServidor(gerente: GerenteDeSessoes): http.Server {
             await sessao.digitarEEnviar(texto);
           } else {
             sessao.escrever(texto);
+            if (texto === "\u001b") conferirFimDepoisDoEsc(sessao);
           }
           json(res, { success: true, data: { enviado: true, submit: enviar, chars: texto.length } });
           return;

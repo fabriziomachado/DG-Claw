@@ -5,7 +5,7 @@ import path from "node:path";
 import { pastaTemporaria, prepararAmbiente } from "./apoio-teste.js";
 
 prepararAmbiente("transcript");
-const { loginExpiradoNoFimDoTranscript } = await import("./transcript.js");
+const { loginExpiradoNoFimDoTranscript, turnoEncerradoNoTranscript } = await import("./transcript.js");
 
 const config = pastaTemporaria("transcript-config");
 const ID = "11111111-2222-3333-4444-555555555555";
@@ -55,4 +55,16 @@ test("sem arquivo ou com linha truncada no fim: não afirma nada, e diz por quê
   assert.equal(loginExpiradoNoFimDoTranscript("nao-existe", 0, config).expirado, false);
   fs.writeFileSync(arquivo, JSON.stringify(pedido(T0)) + "\n" + JSON.stringify(sintetica(T0 + 1000)) + "\n{\"type\":\"assis");
   assert.equal(loginExpiradoNoFimDoTranscript(ID, 0, config).expirado, true, "a linha cortada no fim é ignorada");
+});
+
+test("Esc no meio do turno: a linha de interrupção conta como fim do turno (o Stop não vem)", () => {
+  const usoDeFerramenta = { type: "assistant", timestamp: ts(T0 + 1000), message: { role: "assistant", content: [{ type: "tool_use", id: "t1", name: "Bash", input: {} }] } };
+  const interrompido = (ms: number) => ({ type: "user", timestamp: ts(ms), message: { role: "user", content: [{ type: "text", text: "[Request interrupted by user]" }] } });
+  gravar([pedido(T0), usoDeFerramenta, interrompido(T0 + 2000)]);
+  assert.equal(turnoEncerradoNoTranscript(ID, T0, config).encerrado, true);
+  // interrupção velha (de antes do turno atual) não encerra o turno novo
+  assert.equal(turnoEncerradoNoTranscript(ID, T0 + 5000, config).encerrado, false);
+  // pedido comum no fim continua sendo "trabalhando"
+  gravar([pedido(T0), usoDeFerramenta, pedido(T0 + 3000)]);
+  assert.equal(turnoEncerradoNoTranscript(ID, T0, config).encerrado, false);
 });

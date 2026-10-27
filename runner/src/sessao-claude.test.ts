@@ -10,6 +10,7 @@ import {
 const amb = prepararAmbiente("sessao-claude");
 const { Sessao, nonceConfere, textoNaCaixa } = await import("./sessao.js");
 const { gravarProvedorJson } = await import("./provedores/escolha.js");
+const { conferirFimDepoisDoEsc } = await import("./sessao/vigias.js");
 
 const OAI = chaveFalsaOpenai();
 const ANT = chaveFalsa();
@@ -568,4 +569,18 @@ test("login expirado: reiniciar SEM renovar a credencial não conta recado e dei
   assert.ok(lerTexto(amb.logDoRunner).includes("sem que a credencial tenha sido renovada"));
   await dormir(1_000);
   assert.equal(recados(), antes, "nenhum recado novo");
+});
+
+test("parar (Esc): a interrupção no transcript libera o agente e a fila em segundos, sem esperar o terminal mudo", async () => {
+  // rede de segurança longa (60 s): quem libera aqui tem que ser a conferência do Esc
+  const { s, hook, transcript } = await novaComRedeCurta(60_000);
+  hook("UserPromptSubmit");
+  assert.equal(s.estado.status, "working");
+  transcript([[{ type: "assistant" }, 100], [{ type: "user", message: { role: "user", content: [{ type: "text", text: "[Request interrupted by user]" }] } }, 200]]);
+  const antes = lerLinhasJson(amb.logDosClis).filter((l) => l.modo === "prompt").length;
+  s.enfileirarQuandoOcioso("o pedido certo, depois do parar");
+  conferirFimDepoisDoEsc(s);
+  await esperarAte(() => s.estado.status === "idle", 4_000, "o Esc liberar o agente");
+  assert.equal(s.estado.statusReason, "transcript:interrompido pela pessoa (Esc)");
+  await esperarAte(() => lerLinhasJson(amb.logDosClis).filter((l) => l.modo === "prompt").length > antes, 12_000, "a fila soltar o texto no CLI");
 });

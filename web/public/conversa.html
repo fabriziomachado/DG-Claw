@@ -254,9 +254,23 @@ if (navigator.standalone === true ||
     var tela = deitado ? Math.min(screen.width, screen.height) : Math.max(screen.width, screen.height);
     var f = Math.round(tela - window.innerHeight);
     var ok = f > 0 && f < 120 && !raiz.classList.contains('vv');
+    /* 24/10/2026: depois do teclado o iOS deixa a janela do app instalado presa curta até fechar
+       o app de vez. Esconder e mostrar o corpo num reflow só faz o WebKit medir de novo e a tela
+       volta a ir até o pé (o WhatsApp usa essa faixa). Tenta uma vez por encurtada. */
+    if (ok && !curando && !(document.activeElement && document.activeElement.matches('input,textarea,select,[contenteditable]'))) {
+      curando = true;
+      var st = chat ? chat.scrollTop : 0;
+      document.body.style.display = 'none';
+      void document.body.offsetHeight;
+      document.body.style.display = '';
+      if (chat) chat.scrollTop = st;
+      setTimeout(function(){ falta(); curando = false; }, 80);
+      return;
+    }
     raiz.style.setProperty('--app-falta', (ok ? f : 0) + 'px');
     raiz.classList.toggle('pwa-falta', ok);
   }
+  var curando = false;
   falta();
   window.addEventListener('resize', function(){ setTimeout(falta, 60); });
   window.addEventListener('orientationchange', function(){ setTimeout(falta, 350); });

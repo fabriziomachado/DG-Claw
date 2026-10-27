@@ -6813,6 +6813,22 @@ window.addEventListener('resize', posicionaAlertas);
   reiniciaSessao = dispara;   // o pop-up de login expirado usa o mesmo reinício e a mesma faixa
 })();
 
+/* Ponte para a conversa por voz (voz-modo.js, 26/10/2026): o modo de voz fica num arquivo
+   separado e usa daqui a gravação, a transcrição e a fila de leitura, sem copiar nada. */
+window.DGConversaVoz = {
+  estado: () => ({ gravando, micAbrindo, pedindoMic, transcrevendo, esperando, falando,
+                   fila: drenoAtivo || filaTemTrabalho(), stream: (gravacao && gravacao.stream) || null,
+                   trabalhando: window.atividadeFoto?.agentes?.[AGENTE.id]?.estado === 'trabalhando' }),
+  agente: AGENTE, caps,
+  audio: () => ctxAudio,
+  get continua() { return continua; },
+  set continua(v) { continua = !!v; pintaContinua(); },
+  get ler() { return lerRespostas; },
+  set ler(v) { lerRespostas = !!v; pintaLer(); },
+  destravarAudio, comecaGravar, paraEEnvia, cancelaGravacao, cancelaFala,
+};
+document.dispatchEvent(new Event('dgconversa-voz'));
+
 }   // fim de iniciaTela
 
 boot();

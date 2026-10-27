@@ -3018,7 +3018,7 @@ window.addEventListener('popstate', () => {
   }
 });
 document.addEventListener('keydown', ev => {
-  if (ev.key === 'Escape' && visTelaAberta() && !visorAberto()) fechaTelaVisual();
+  if (ev.key === 'Escape' && visTelaAberta() && !visorAberto()) { ev.preventDefault(); fechaTelaVisual(); }
 });
 
 wrap.addEventListener('click', ev => {
@@ -3436,6 +3436,7 @@ async function abreTextoNoVisor(md) {
     const t = (await r.text()).slice(0, 512 * 1024);
     if (!caixa.isConnected) return;
     caixa.innerHTML = window.DGFormatador.arquivoParaHtml(t, md.nome);
+    if (window.DGMermaid) window.DGMermaid.desenha(caixa, temaApp());   // ```mermaid vira desenho (27/10/2026)
   } catch (e) {
     if (caixa.isConnected) lbCorpo.innerHTML = cartaoDoc(md);
   }
@@ -3562,7 +3563,7 @@ lightbox.addEventListener('click', ev => {
   if (ev.target === lightbox || ev.target === lbCorpo) fechaLightbox();
 });
 document.addEventListener('keydown', ev => {
-  if (ev.key === 'Escape' && visorAberto()) fechaLightbox();
+  if (ev.key === 'Escape' && visorAberto()) { ev.preventDefault(); fechaLightbox(); }
 });
 
 /* Link pra um arquivo do próprio app (o agente escreveu a URL na mensagem):
@@ -6441,7 +6442,8 @@ $('who').addEventListener('click', () => abreAcervo());
 $('who').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abreAcervo(); } });
 $('av').addEventListener('click', () => abreAcervo());
 $('acervoFechar').onclick = fechaAcervo;
-document.addEventListener('keydown', e => { if (e.key === 'Escape') fechaAcervo(); });
+// o Esc que fechou o arquivo aberto por cima da lista não fecha a lista junto (27/10/2026)
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !e.defaultPrevented) fechaAcervo(); });
 acPainel.querySelector('nav').onclick = e => { const b = e.target.closest('[data-aba]'); if (b) { acLista.scrollTop = 0; abreAcervo(b.dataset.aba); } };
 acLista.addEventListener('scroll', () => {
   if (cacheMidias && acLista.scrollHeight - acLista.scrollTop - acLista.clientHeight < 250) cacheMidias.mais(acAba);

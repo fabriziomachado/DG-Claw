@@ -1112,6 +1112,9 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 
 /* visor de arquivos no design system (19/10/2026): fundo do tema, ícones de traço; foto e vídeo num fundo escuro */
 #lightbox{background:var(--dg-fundo);color:var(--dg-texto)}
+/* arquivo aberto da lista de Compartilhados (z 90) abre por cima dela; fechar devolve à lista (27/10/2026) */
+#lightbox.abre{z-index:94}
+#visTela.abre{z-index:93}
 #lightbox.lb-midia{background:color-mix(in srgb,var(--dg-fundo) 12%,#000)}
 #lightbox .lbtopo{color:var(--dg-texto);border-bottom:1px solid var(--dg-borda);background:var(--dg-fundo)}
 #lightbox.lb-midia .lbtopo{background:transparent;border-color:transparent;color:#ececec}
@@ -1150,6 +1153,16 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 .lb-md .lb-cita > :last-child{margin-bottom:0}
 .lb-md .lb-hr{border:0;border-top:1px solid var(--dg-borda);margin:20px 0}
 .lb-md .lb-tit code{font-size:.9em}
+/* ```mermaid desenhado no visor (mermaid-desenho.js, 27/10/2026); o quadro do desenho não tem script */
+.lb-md .va-mermaid{margin:10px 0 6px;border:1px solid var(--dg-borda);border-radius:12px;overflow:hidden;background:var(--dg-superficie)}
+.lb-md .va-mermaid[hidden],.lb-md .cod[hidden]{display:none}
+.lb-md .va-mermaid-corpo{padding:12px}
+.lb-md .va-alterna{margin-left:auto;height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:5px;border:0;border-radius:7px;
+  background:transparent;color:var(--dg-texto-2);font:500 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;cursor:pointer}
+.lb-md .va-alterna:hover{background:var(--dg-superficie);color:var(--dg-texto)}
+.lb-md .cod .va-alterna + .codcopia{margin-left:0}
+.lb-md .va-mermaid iframe,.lbcorpo .va-mermaid iframe{display:block;width:100%;height:auto;border:0;border-radius:0;background:transparent}
+.lb-md .va-mermaid-erro{margin:10px 0 0;font-size:13px;color:var(--dg-texto-3)}
 
 /* Sessão em paralelo (19/10/2026, proposta B): dica acima do campo enquanto o agente trabalha, folha
    rápida para abrir a sessão e chip com o estado dela (sessao-paralela.js) */

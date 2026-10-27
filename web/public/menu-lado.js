@@ -29,7 +29,7 @@
      sozinho e o menu lembra o que a pessoa abriu. Item que não está aqui (poderes do painel) vai para
      Trabalho; "Como funciona" sai da lista e vira ícone no rodapé do menu. */
   const GRUPOS = [
-    { id: 'trabalho', nome: 'Trabalho', chaves: ['caixa', 'conversa', 'mesa', 'sessoes', 'lembretes', 'avisos'] },
+    { id: 'trabalho', nome: 'Trabalho', chaves: ['caixa', 'conversa', 'mesa', 'sessoes', 'lembretes', 'referencias', 'avisos'] },
     { id: 'agente', nome: 'O agente', chaves: ['identity', 'personality', 'skills', 'rotinas', 'memory', 'arquivos'] },
     { id: 'conexoes', nome: 'Conexões', chaves: ['integracoes', 'apps', 'cofre'] },
     { id: 'saude', nome: 'Saúde', chaves: ['saude-servidor', 'status', 'operations', 'costs', 'socorro'] },
@@ -47,6 +47,8 @@
   const LINK_INTEGRACOES = { nome: 'Integrações', ico: '⧉', href: '/integracoes' };
 
   const LINK_AVISOS = { nome: 'Avisos', ico: '🔔', href: '/avisos' };
+  /* Referências (25/10/2026): os links que o dono guarda, resumidos pelo Tech. */
+  const LINK_REFERENCIAS = { nome: 'Referências', ico: '🔖', href: '/referencias' };
   /* Caixa de entrada (19/10/2026): tudo que espera o dono, de todos os agentes; o número em vermelho é o do ícone do app. */
   const LINK_CAIXA = { nome: 'Caixa de entrada', ico: '📥', href: '/caixa' };
   /* Saúde do servidor (20/10/2026): só no menu do Admin, que não tem painel e ficava sem o grupo Saúde. */
@@ -77,6 +79,7 @@
     const caminho = h.split(/[?#]/)[0].replace(/\/+$/, '');
     if (caminho === '/mesa') return 'mesa';
     if (caminho === '/lembretes') return 'lembretes';
+    if (caminho === '/referencias') return 'referencias';
     if (caminho === '/integracoes') return 'integracoes';
     if (caminho === '/avisos') return 'avisos';
     if (caminho === '/caixa') return 'caixa';
@@ -641,6 +644,8 @@
     painel.hidden = !links.length;
     $('mlTabs').insertAdjacentHTML('beforeend', `<div data-tour="gm-lembretes"><a class="ml-tab" href="${comAgente(LINK_LEMBRETES.href, ag.id)}">` +
       `<span class="ml-ico" aria-hidden="true">${LINK_LEMBRETES.ico}</span>${LINK_LEMBRETES.nome}</a></div>` +
+      `<div data-tour="gm-referencias"><a class="ml-tab" href="${comAgente(LINK_REFERENCIAS.href, ag.id)}">` +
+      `<span class="ml-ico" aria-hidden="true">${LINK_REFERENCIAS.ico}</span>${LINK_REFERENCIAS.nome}</a></div>` +
       `<div data-tour="gm-integracoes"><a class="ml-tab" href="${comAgente(LINK_INTEGRACOES.href, ag.id)}">` +
       `<span class="ml-ico" aria-hidden="true">${LINK_INTEGRACOES.ico}</span>${LINK_INTEGRACOES.nome}</a></div>`);
     $('mlTabs').insertAdjacentHTML('afterbegin', `<div data-tour="gm-caixa"><a class="ml-tab" id="mlCaixa" href="${comAgente(LINK_CAIXA.href, ag.id)}">` +
@@ -1237,6 +1242,7 @@
     '•': ico('<circle cx="12" cy="12" r="2.5"/>'),
     '🔔': ico('<path d="M4 10v4h3l6 4V6L7 10z"/><path d="M16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11"/>'),
     '🖥': ico('<rect x="3.5" y="4.5" width="17" height="11.5" rx="2"/><path d="M9 20h6M12 16v4"/>'),
+    '🔖': ico('<path d="M7 4h10a1.5 1.5 0 0 1 1.5 1.5V20L12 15.5 5.5 20V5.5A1.5 1.5 0 0 1 7 4z"/>'),
     '📥': ico('<path d="M4 13h4l1.5 2.5h5L16 13h4"/><path d="M5.5 5h13L20 13v5.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5V13z"/>'),
   };
   // o tema usa ◐ também: lá vira sol e lua, não carinha

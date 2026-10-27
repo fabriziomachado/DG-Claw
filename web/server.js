@@ -47,6 +47,7 @@ const { criarEstados } = require('./lib/estados');
 const { criarPrefsAtencao } = require('./lib/prefs-atencao');
 const { criarVigiaAtencao } = require('./lib/vigia-atencao');
 const { criarMesa } = require('./lib/mesa');
+const { criarReferencias } = require('./lib/referencias');
 const { arquivoDaPasta, imagemDaPasta } = require('./lib/pasta-ver');
 const { criarAvisos } = require('./lib/avisos');
 const { criarIntegracoes } = require('./lib/integracoes');
@@ -130,6 +131,12 @@ function criarServidor(opcoes) {
   const mesa = criarMesa({ arquivo: path.join(config.dataDir, 'mesa', 'tarefas.json'), registro, runner, log, agora: opcoes.agora, tz: config.tz, avisarDono: (aviso) => boasVindas.avisar(aviso, 'pedido') });
   // O agente fala com a Mesa pelo dgclaw-mesa, que passa pela caixa: a rota precisa estar liberada.
   caixa.permitir('/api/v1/tarefas');
+  // endereços do próprio servidor (IPs das placas e nomes do Caddyfile): link para eles não vira leitura do curador
+  const proprios = Object.values(require('node:os').networkInterfaces()).flat().map(i => i && i.address).filter(Boolean);
+  try { proprios.push(...(fs.readFileSync('/etc/caddy/Caddyfile', 'utf8').match(/^[^\s#{][^\s{]*(?=\s*\{)/gm) || []).map(x => x.replace(/^https?:\/\//, '').replace(/:\d+$/, '').toLowerCase())); } catch (_) { /* sem Caddy: ficam só os IPs */ }
+  const referencias = criarReferencias({ pasta: path.join(config.dataDir, 'referencias'), registro, runner, log, curador: config.referenciasCurador, agora: opcoes.agora, proprios });
+  // o curador (tech) lê a lista e grava título, resumo e assuntos pelo dgclaw-api
+  caixa.permitir('/api/v1/referencias');
   const naoLidas = criarNaoLidas({ arquivo: path.join(config.dataDir, 'nao-lidas.json'), conversa, registro, log, relogio: opcoes.agora, lerThread: conversa.threadCompartilhada });
   const uso = criarUso({ registro, runner, log, timeoutMs: opcoes.timeoutUsoMs });
   // O agente consulta o uso da PRÓPRIA assinatura pela caixa (dgclaw-api GET /api/v1/uso); a rota
@@ -379,6 +386,7 @@ function criarServidor(opcoes) {
     const p = url.pathname;
     const m = req.method;
     if (p.startsWith('/api/v1/tarefas') && await mesa.rota(req, res, url, sessao)) return undefined;
+    if (p === '/api/v1/referencias' || p.startsWith('/api/v1/referencias/')) return referencias.rota(req, res, url, sessao);
     // Pasta do agente aberta com a cara da conversa (25/10/2026): o arquivo de <casa>/arquivos vira mídia,
     // e a tela /ver-arquivo usa o formatador e o visual isolado da conversa (lib/pasta-ver.js)
     const mPasta = /^\/api\/v1\/agents\/([^/]+)\/pasta\/abrir$/.exec(p);
@@ -1001,6 +1009,9 @@ function criarServidor(opcoes) {
       return H.erroJson(res, 403, `A rota ${p.slice(0, 120)} não está liberada para agentes. Só as rotas que a frente liberou com caixa.permitir() respondem pela caixa.`);
     }
 
+    // Porta do Atalho do compartilhar (iPhone): sem sessão nem Origin, só com a chave dele no Authorization.
+    if (p === '/api/referencias/entrada' && m === 'POST' && !slugCaixa) return referencias.entrada(req, res, H.ipDoPedido(req, config.proxiesConfiaveis));
+
     // CSRF: toda escrita exige Origin igual à do próprio Web (a caixa não vem de navegador).
     if (ehMutacao(req) && !slugCaixa && !origemOk(req)) {
       const visto = req.headers.origin ? String(req.headers.origin).slice(0, 80) : '(sem Origin)';
@@ -1118,6 +1129,13 @@ function criarServidor(opcoes) {
       return undefined;
     }
 
+    if ((p === '/referencias' || p === '/referencias/') && (m === 'GET' || m === 'HEAD')) {
+      if (!sessao) return semSessaoPagina(req, res, url);
+      if (!servirArquivo(req, res, path.join(config.publicDir, 'referencias.html'), 'no-store')) {
+        H.paginaErro(res, 500, 'Tela não instalada', 'O arquivo da tela de Referências não foi encontrado no servidor. Reinstale o DG Claw Web.');
+      }
+      return undefined;
+    }
     if (p === '/ver-arquivo' && (m === 'GET' || m === 'HEAD')) {
       if (!sessao) return semSessaoPagina(req, res, url);
       if (!servirArquivo(req, res, path.join(config.publicDir, 'ver-arquivo.html'), 'no-store')) {

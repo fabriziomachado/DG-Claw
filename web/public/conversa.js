@@ -4369,6 +4369,8 @@ try {
     entrada.value = pronto.slice(0, 2000);
     entrada.dispatchEvent(new Event('input'));
     entrada.focus();
+    // cursor no fim: quem chega das Referências completa com a pergunta logo depois do link
+    try { entrada.setSelectionRange(entrada.value.length, entrada.value.length); } catch (_) { /* campo sem seleção */ }
     u.searchParams.delete('texto');
     history.replaceState(null, '', u.pathname + u.search + u.hash);
   }

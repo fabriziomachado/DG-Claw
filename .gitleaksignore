@@ -1,0 +1,4 @@
+# Falso positivo do gitleaks (27/10/2026): 'keyCount' dentro do Mermaid 12.1.0 minificado, biblioteca
+# de terceiros. O gitleaks 8.24 ignora [[allowlists]] quando o .gitleaks.toml estende o padrão, por isso
+# a liberação vai aqui, pela impressão digital exata (commit:arquivo:regra:linha).
+c298c347d3ecc86e8c714dc672e8dac7b83aa507:web/public/vendor/mermaid-12.1.0.min.js:generic-api-key:636

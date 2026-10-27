@@ -457,6 +457,8 @@ gerar_identidade() {
     # ajudantes leves no Haiku (pesquisador e leitor), 20/10/2026: a leitura pesada sai do limite caro
     if [ -d "$tpl/ajudantes" ]; then
         for f in "$tpl"/ajudantes/*.md; do
+            # lê o modelo e grava na casa do agente: arquivos diferentes, o SC2094 é alarme falso
+            # shellcheck disable=SC2094
             [ -f "$f" ] && escrever_se_novo "$h/.claude/agents/$(basename "$f")" 644 "$ug" < "$f"
         done
         [ "$ENSAIO" = 1 ] || { [ -d "$h/.claude/agents" ] && dono "$ug" "$h/.claude" "$h/.claude/agents"; }

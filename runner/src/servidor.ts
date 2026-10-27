@@ -25,6 +25,7 @@ import { tratarRotasDeProvedor } from "./provedores/rotas.js";
 import { MOTIVO_SEM_MEDICAO, deStatusline, paraResposta } from "./uso.js";
 import { nonceConfere } from "./sessao/telas.js";
 import { conferirFimDepoisDoEsc } from "./sessao/vigias.js";
+import { cancelarDaFila } from "./sessao/fila.js";
 import { acharRolloutPorId, mensagensDoRollout } from "./provedores/codex-rollout.js";
 
 /** O estado de uma sessão como o painel e a API o veem. A paralela leva o campo
@@ -437,6 +438,20 @@ export function criarServidor(gerente: GerenteDeSessoes): http.Server {
             await sessao.subir("retomar");
           }
           json(res, { success: true, data: visao(sessao, false) });
+          return;
+        }
+
+        // Cancelar um texto que ainda espera na fila (26/10/2026). `marca` é o id da mensagem
+        // (msg="w..." do envelope), sem aspas nem espaço, para não casar com texto de outra pessoa.
+        if (acao === "/fila-cancelar" && metodo === "POST") {
+          const corpo = (await lerCorpo(req).catch(() => ({}))) as { marca?: unknown };
+          const marca = typeof corpo.marca === "string" && /^[A-Za-z0-9_-]{4,64}$/.test(corpo.marca) ? corpo.marca : null;
+          if (!marca) {
+            json(res, { success: false, error: 'Corpo precisa de "marca": o id da mensagem (4 a 64 letras, números, "-" ou "_").', code: "MARCA_INVALIDA" }, 400);
+            return;
+          }
+          const r = cancelarDaFila(sessao, `msg="${marca}"`);
+          json(res, { success: r === "cancelado", data: { resultado: r } }, r === "cancelado" ? 200 : 409);
           return;
         }
 

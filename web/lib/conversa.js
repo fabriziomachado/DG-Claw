@@ -537,9 +537,10 @@ function criarConversa({ config, runner, leitor, leitorRollout, midia, log, agor
   /** Entrega o texto (já com marcadores de anexo) ao agente. Devolve { status, corpo }. */
   async function entregar(agente, textoFinal, { cru, voz }) {
     sequencia += 1;
+    const msgId = `w${relogio().toString(36)}${sequencia}`;
     const payload = cru
       ? textoFinal
-      : montarEnvelope({ from: 'pessoa', chat: agente.chat_id, msg: `w${relogio().toString(36)}${sequencia}`, ts: new Date(relogio()).toISOString(), text: textoFinal, voz });
+      : montarEnvelope({ from: 'pessoa', chat: agente.chat_id, msg: msgId, ts: new Date(relogio()).toISOString(), text: textoFinal, voz });
     const epEnviado = relogio() / 1000 - 2;
     // O runner responde 202 "enfileirado" sempre; quem sabe se vai esperar é o estado de AGORA (sem o cache de 2 s).
     const antes = await runner.estado(agente);
@@ -559,7 +560,8 @@ function criarConversa({ config, runner, leitor, leitorRollout, midia, log, agor
     }
     log('info', `Mensagem entregue a ${agente.slug} (${cru ? 'comando cru' : `${textoFinal.length} caracteres`}).`);
     const corpo = { ok: true, ep_enviado: epEnviado, agente: agente.slug };
-    if (motivoFila) corpo.fila = { motivo: motivoFila };
+    // o id da mensagem na fila: com ele a tela cancela o pedido antes de ele chegar (POST .../cancelar-fila)
+    if (motivoFila) corpo.fila = cru ? { motivo: motivoFila } : { motivo: motivoFila, msg: msgId };
     return { status: 200, corpo };
   }
 

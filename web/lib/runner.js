@@ -110,6 +110,14 @@ function criarRunner({ log, timeoutMs }) {
      * { ok, status, corpo, texto } quando o runner respondeu, ou { ok:false, erro } quando nem chegou lá.
      */
     pedir(agente, metodo, caminho, corpo, timeoutPedido) { return chamar(agente, metodo, caminho, corpo, timeoutPedido); },
+    /** Tira da fila do runner a mensagem `msg` que ainda não chegou ao agente. { ok, resultado } ou { ok:false, ... }. */
+    async cancelarFila(agente, msg) {
+      const r = await chamar(agente, 'POST', `/api/agents/${encodeURIComponent(agente.agente_id)}/fila-cancelar`, { marca: msg });
+      if (!r.ok && r.erro) return r;
+      const resultado = r.corpo && r.corpo.data && r.corpo.data.resultado;
+      if (r.status === 404 && !resultado) return { ok: false, status: 404, erro: `O runner de ${agente.nome} não sabe cancelar mensagem da fila (versão antiga).` };
+      return { ok: r.status === 200, status: r.status, resultado: resultado || null };
+    },
     /** Digita no agente. Devolve { ok, status, enfileirado } ou { ok:false, status, erro }. */
     async input(agente, corpo) {
       const r = await chamar(agente, 'POST', `/api/agents/${encodeURIComponent(agente.agente_id)}/input`, corpo);

@@ -11,6 +11,7 @@ const amb = prepararAmbiente("sessao-claude");
 const { Sessao, nonceConfere, textoNaCaixa } = await import("./sessao.js");
 const { gravarProvedorJson } = await import("./provedores/escolha.js");
 const { conferirFimDepoisDoEsc } = await import("./sessao/vigias.js");
+const { cancelarDaFila } = await import("./sessao/fila.js");
 
 const OAI = chaveFalsaOpenai();
 const ANT = chaveFalsa();
@@ -583,4 +584,17 @@ test("parar (Esc): a interrupção no transcript libera o agente e a fila em seg
   await esperarAte(() => s.estado.status === "idle", 4_000, "o Esc liberar o agente");
   assert.equal(s.estado.statusReason, "transcript:interrompido pela pessoa (Esc)");
   await esperarAte(() => lerLinhasJson(amb.logDosClis).filter((l) => l.modo === "prompt").length > antes, 12_000, "a fila soltar o texto no CLI");
+});
+
+test("cancelar da fila: o texto que ainda espera sai pela marca e não chega ao CLI; o outro continua", async () => {
+  const { s, hook } = await novaComRedeCurta(60_000);
+  hook("UserPromptSubmit");
+  s.enfileirarQuandoOcioso('<dgchat from="pessoa" msg="wabc1">pedido escrito errado</dgchat>');
+  s.enfileirarQuandoOcioso('<dgchat from="pessoa" msg="wabc2">pedido certo</dgchat>');
+  assert.equal(cancelarDaFila(s, 'msg="wabc1"'), "cancelado");
+  assert.equal(cancelarDaFila(s, 'msg="wabc1"'), "nao_achei");
+  assert.equal(s.tamanhoDaFila(), 1);
+  hook("Stop");
+  await esperarAte(() => lerLinhasJson(amb.logDosClis).some((l) => String(l.texto ?? l.text ?? JSON.stringify(l)).includes("pedido certo")), 12_000, "o pedido certo chegar");
+  assert.ok(!lerLinhasJson(amb.logDosClis).some((l) => JSON.stringify(l).includes("escrito errado")), "o cancelado não chega");
 });

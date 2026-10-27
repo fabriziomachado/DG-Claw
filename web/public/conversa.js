@@ -1783,7 +1783,8 @@ function metaPendente(p) {
     if (p.fila && TR) {
       const est = window.atividadeFoto && window.atividadeFoto.agentes ? window.atividadeFoto.agentes[AGENTE.id] : null;
       const t = TR.textoFila(p.fila, !!est && est.alerta === 'permissao');
-      if (t) return `<span class="meta fila" title="entregue ao agente, que ainda não chegou nela">✓ ${esc(p.hhmm)} · ${esc(t)}</span>`;
+      if (t) return `<span class="meta fila" title="entregue ao agente, que ainda não chegou nela">✓ ${esc(p.hhmm)} · ${esc(t)}` +
+        (p.filaMsg ? ` <button class="mini cancelar-fila" data-pend="${p.n}"${p.cancelando ? ' disabled' : ''}>cancelar</button>` : '') + '</span>';
     }
     return `<span class="meta" title="entregue">✓ ${esc(p.hhmm)}</span>`;
   }
@@ -4964,7 +4965,7 @@ async function mandaTexto(pend, semEsperar) {
     pend.casa = d.marca || null;   // o que vai aparecer na thread, para o balão otimista sumir
     pend.anexos = null;
   }
-  if (d && d.fila && d.fila.motivo) pend.fila = d.fila.motivo;
+  if (d && d.fila && d.fila.motivo) { pend.fila = d.fila.motivo; pend.filaMsg = d.fila.msg || null; }
   const ficou = entregue(pend, d);
   avisaEntrega(pend, true);
   if (!ficou) return true;
@@ -5019,7 +5020,21 @@ wrap.addEventListener('click', ev => {
   if (!p) return;
   if (bt.classList.contains('reenviar')) reenviar(p);
   else if (bt.classList.contains('descartar')) descartar(p);
+  else if (bt.classList.contains('cancelar-fila')) cancelaDaFila(p);
 });
+/* Cancelar um pedido que ainda espera na fila do agente (26/10/2026, pedido do dono): sai da fila e
+   o balão some. Se já chegou ao agente, avisa e o balão fica (aí o caminho é o parar). */
+async function cancelaDaFila(p) {
+  if (!p.filaMsg || p.cancelando) return;
+  p.cancelando = true; render();
+  try {
+    await api(API + '/cancelar-fila', { method: 'POST', body: { msg: p.filaMsg } });
+    descartar(p);
+  } catch (e) {
+    p.cancelando = false; p.filaMsg = null; render();
+    mostraErro(e.message || 'Não consegui cancelar o pedido.');
+  }
+}
 
 const LIMITE_ESPERA_MS = 180000;   // 3 minutos, com botão de parar
 

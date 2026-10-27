@@ -697,6 +697,18 @@ function criarServidor(opcoes) {
         if (!parou) log('aviso', `${agente.slug}: não reagiu ao Esc em 8 s (registro parado e runner em working); a tela oferece reiniciar.`);
         return H.enviaJson(res, 200, { ok: true, parou, travado: !parou });
       }
+      // Cancelar um pedido que ainda espera na fila do agente (26/10/2026, pedido do dono). Só o dono.
+      if (acao === 'cancelar-fila' && m === 'POST') {
+        if (sessao && sessao.via === 'caixa') return H.erroJson(res, 403, 'Só o dono cancela um pedido, pelo painel.');
+        const corpo = await lerEnvio(req, res);
+        if (!corpo) return undefined;
+        const msg = String(corpo.msg || '');
+        if (!/^[A-Za-z0-9_-]{4,64}$/.test(msg)) return H.erroJson(res, 400, 'Mande em "msg" o id da mensagem na fila. Nada foi cancelado.');
+        const r = await runner.cancelarFila(agente, msg);
+        if (r.ok) { log('info', `${agente.slug}: o dono cancelou um pedido que estava na fila.`); return H.enviaJson(res, 200, { ok: true, cancelado: true }); }
+        if (r.resultado === 'ja_saiu' || r.resultado === 'nao_achei') return H.enviaJson(res, 409, { ok: false, cancelado: false, motivo: r.resultado, erro: `O pedido já chegou a ${agente.nome}. Use o parar, se ele ainda estiver trabalhando nele.` });
+        return H.erroJson(res, 502, `Não consegui cancelar: ${r.erro || 'o runner não respondeu'}.`);
+      }
       // Agente congelado: reinicia a sessão no runner (a mesma conversa; a fila de mensagens continua).
       if (acao === 'destravar' && m === 'POST') {
         if (sessao && sessao.via === 'caixa') return H.erroJson(res, 403, 'Só o dono reinicia um agente, pelo painel.');
@@ -780,7 +792,7 @@ function criarServidor(opcoes) {
       if (acao === 'upload' && m === 'POST') return upload(req, res, agente);
       if (acao === 'comandos' && m === 'GET') return H.enviaJson(res, 200, Object.assign({ ok: true, agente: agente.slug }, await comandos.catalogo(agente)));
       if (acao === 'comando' && m === 'POST') return comandoPost(req, res, agente);
-      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'interromper', 'destravar', 'cota', 'mencao', 'aviso', 'pedido', 'upload', 'permissao', 'pergunta', 'reiniciar', 'lido', 'nao-lido', 'vendo', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
+      return H.erroJson(res, ['messages', 'stream', 'wait', 'send', 'interromper', 'cancelar-fila', 'destravar', 'cota', 'mencao', 'aviso', 'pedido', 'upload', 'permissao', 'pergunta', 'reiniciar', 'lido', 'nao-lido', 'vendo', 'comandos', 'comando', ''].includes(acao) ? 405 : 404, `Não existe ${m} ${p}.`);
     }
 
     mm = /^\/api\/v1\/media\/([0-9a-f]{16})\/visual$/.exec(p);

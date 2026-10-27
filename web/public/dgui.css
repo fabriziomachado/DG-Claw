@@ -13,12 +13,21 @@
 .dgui-kpi{border:1px solid var(--dg-borda);border-radius:14px;padding:12px 14px;background:var(--dg-superficie);min-width:0}
 .dgui-painel .dgui-kpi{background:var(--dg-fundo)}
 .dgui-kpi-tit{font-size:12.5px;color:var(--dg-texto-2);margin-bottom:4px;overflow-wrap:anywhere}
+/* foto redonda ao lado do título do número (25/10/2026) */
+.dgui-kpi-cab{display:flex;align-items:center;gap:10px;margin-bottom:6px;min-width:0}
+.dgui-kpi-cab .dgui-kpi-tit{margin-bottom:0;font-size:13.5px;font-weight:600;color:var(--dg-texto)}
+.dgui-kpi-foto{width:44px;height:44px;border-radius:50%;object-fit:cover;flex:none;background:var(--dg-superficie-2);border:1px solid var(--dg-borda)}
 .dgui-kpi-valor{font-size:26px;font-weight:700;line-height:1.15;letter-spacing:-.01em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
 .dgui-kpi-var{font-size:13px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
 .dgui-kpi-var.bom{color:var(--dg-entrega-texto)}
 .dgui-kpi-var.ruim{color:var(--dg-erro-texto)}
 .dgui-kpi-var.neutro{color:var(--dg-texto-2)}
 .dgui-kpi-leg{font-size:12px;color:var(--dg-texto-3);margin-top:4px}
+.dgui-kpi-barra{height:8px;border-radius:999px;background:var(--dg-superficie-2);margin-top:10px;overflow:hidden}
+.dgui-kpi-barra i{display:block;height:100%;min-width:2px;border-radius:inherit;background:var(--dg-entrega-texto);transition:width .4s ease}
+.dgui-imagem{margin:0;min-width:0}
+.dgui-imagem img{display:block;width:100%;height:auto;object-fit:contain;border:1px solid var(--dg-borda);border-radius:14px;background:var(--dg-superficie)}
+.dgui-imagem figcaption{font-size:12px;color:var(--dg-texto-3);margin-top:6px}
 
 /* Tabela */
 .dgui-tabela-rola{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--dg-borda);border-radius:10px}

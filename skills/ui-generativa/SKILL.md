@@ -54,12 +54,13 @@ A frase antes do bloco é obrigatória: no Telegram e no WhatsApp o bloco não �
 
 | tipo | campos | observações |
 |---|---|---|
-| `kpi` | `titulo`, `valor` (texto já formatado, ex. `"65,3%"`, `"R$ 12,7 mil"`), `variacao`, `tendencia` (`alta`, `baixa`, `neutra`), `bom` (`alta` ou `baixa`: qual direção é boa), `legenda` | KPIs seguidos ficam lado a lado. Evasão, custo, atraso: `"bom":"baixa"` (subir fica vermelho). |
+| `kpi` | `titulo`, `valor` (texto já formatado, ex. `"65,3%"`, `"R$ 12,7 mil"`), `variacao`, `tendencia` (`alta`, `baixa`, `neutra`), `bom` (`alta` ou `baixa`: qual direção é boa), `legenda`, `progresso` (0 a 100: barra que vai enchendo, ex. meta atingida) | KPIs seguidos ficam lado a lado. Evasão, custo, atraso: `"bom":"baixa"` (subir fica vermelho). |
 | `tabela` | `titulo`, `colunas` (textos, ou `{"nome","alinha":"direita|centro"}`), `linhas` (lista de listas), `ordenavel` (padrão `true`) | Números alinham à direita sozinhos. Até 300 linhas. |
-| `grafico` | `forma` (`barras`, `colunas`, `linhas`, `pizza`), `titulo`, `unidade` (`"%"`, `"R$"`, `"alunos"`), `categorias`, `series` (`[{"nome","valores":[...]}]`) | Até 6 séries e 80 categorias. Pizza usa só a primeira série. |
+| `grafico` | `forma` (`barras`, `colunas`, `linhas`, `pizza`), `titulo`, `unidade` (`"%"`, `"R$"`, `"alunos"`), `categorias`, `series` (`[{"nome","valores":[...],"cor"}]`) | Até 6 séries e 80 categorias. `cor` opcional por série, só nomes da paleta: `azul`, `verde`, `laranja`, `violeta`, `vermelho`, `ciano` (hex é ignorado). Use para manter a mesma cor de uma pessoa ou marca em todos os gráficos e no mapa. Pizza usa só a primeira série. |
 | `leitura` | `titulo` (padrão "Leitura do especialista"), `destaques` (3 frases curtas, ou `{"tipo":"alerta|queda|alta|ideia|ok","texto"}`), `detalhe` (texto com `**negrito**`, parágrafos e itens `- `) | A interpretação dos dados. Os destaques ficam à vista; o detalhe abre em "Ver análise completa". |
 | `escolha` | `pergunta`, `opcoes` (textos, ou `{"texto","detalhe","recomendada":true}`) | Para uma decisão do dono (junto do `[PEDIDO]`): lista A, B, C para tocar e "Outra resposta". A opção tocada chega como a resposta dele. |
 | `painel` | `titulo`, `itens` (lista de componentes), `fonte`, `atualizado`, `sugestoes` | Um painel por resposta costuma bastar. |
+| `imagem` | `src` (endereço do próprio S2 Bot, ex. a sua Pasta), `titulo`, `legenda`, `alt`, `proporcao` (ex. `"4/5"`) | Uma imagem só, na largura toda (mapa, diagrama, foto). Para várias imagens ou opções lado a lado, use o carrossel. |
 
 ## Interpretação: no componente `leitura`, não em textão
 
@@ -171,3 +172,23 @@ fina e mostra cada código no bloco padrão (língua no topo, Copiar, cores de s
 
 - `codigo` e `lingua` são opcionais (passo só de texto também vale). Quebras de linha no código como `\n`.
 - Um comando solto, sem etapas: bloco de código comum na mensagem (```bash ... ```).
+
+## Foto no número (KPI)
+
+Um `kpi` pode ter `"foto"`: uma imagem redonda ao lado do título (pessoa, candidato, produto). Vale na
+conversa e no app (painel vivo). O endereço precisa ser do próprio S2 Bot: guarde a imagem (JPG, PNG,
+WEBP ou GIF, até 5 MB) na sua Pasta e use
+`"/api/v1/agents/<seu-slug>/pasta/imagem?caminho=<pasta>/<arquivo>"`, com o caminho relativo a
+`~/arquivos`. Exemplo: `{"tipo":"kpi","titulo":"Ana Souza","valor":"R$ 48,2 mil","foto":"/api/v1/agents/smartsau/pasta/imagem?caminho=equipe/ana.jpg"}`.
+Endereço de fora (https://...) é ignorado.
+
+## Imagem na largura toda e barra de progresso
+
+Uma imagem sozinha (mapa, diagrama, foto) vai no componente `imagem`, que ocupa a largura toda do painel,
+sem contador nem moldura de carrossel. Mesmas regras de endereço da foto do kpi:
+`{"tipo":"imagem","titulo":"Alunos por região","src":"/api/v1/agents/<seu-slug>/pasta/imagem?caminho=<pasta>/mapa.png"}`.
+Não use carrossel de um item só para mostrar uma imagem.
+
+Para "quanto já foi" (meta do mês, etapa de um projeto), ponha `"progresso"` no próprio `kpi`, de 0 a 100: sai
+uma barra única que enche em verde sobre o fundo vazio de 100%. Não monte isso com gráfico de barras.
+`{"tipo":"kpi","titulo":"Meta de matrículas","valor":"64%","progresso":64,"legenda":"1.284 de 2.000"}`.

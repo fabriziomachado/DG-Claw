@@ -148,7 +148,7 @@ function criarServidor(opcoes) {
   const feedback = criarFeedback({ config, conversa, log });
   const threadTela = async (agente) => mencoes.junta(agente.slug, arquivoConversa.visivel(agente.slug, await conversa.thread(agente)));
   const historico = criarHistorico({ registro, log, conversa, arquivoConversa });
-  const paineisVivos = opcoes.paineisVivos || criarPaineisVivos({ registro, log });
+  const paineisVivos = opcoes.paineisVivos || criarPaineisVivos({ registro, log, chavesDe: (ag) => cofreAgente.variaveis(ag) });
   // Foto trocada pelo dono no menu: vale por cima da foto da criação e do avatar do registro.
   const avatares = criarAvatares({ dataDir: config.dataDir, registro, log });
   caixa.permitir('/api/v1/avisos');

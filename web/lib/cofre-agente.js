@@ -395,7 +395,17 @@ function criarCofreAgente({ config, log, reiniciar }) {
     return { ok: true, unidade: UNIDADE, chaves: n, falhas: [], feito: `O agente foi reiniciado e leu o cofre. ${quanto}` };
   }
 
-  return { estado, guardar, revogar, aplicar, listar, ativas, copiar };
+  /** As chaves do cofre como { NOME: valor }, para o script de um painel vivo (25/10/2026). Erro ou sem cofre = {}. */
+  function variaveis(agente) {
+    if (!agente || !agente.cofre_arquivo) return {};
+    const r = lerCofreEnv(agente);
+    if (r.erro) return {};
+    const out = {};
+    for (const i of r.itens) if (i.tipo === 'chave') out[i.nome] = i.valor;
+    return out;
+  }
+
+  return { estado, guardar, revogar, aplicar, listar, ativas, copiar, variaveis };
 }
 
 module.exports = { criarCofreAgente, gravaArquivoSeguro, ErroGravacao };

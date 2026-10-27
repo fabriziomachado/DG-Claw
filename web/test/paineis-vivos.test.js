@@ -35,3 +35,17 @@ test('paineis vivos: lê pela caixa, atualiza rodando o script como agente, recu
   assert.equal((await s.pede('GET', '/api/v1/paineis/ana/..%2Fetc')).status, 404);
   assert.equal((await s.pede('GET', '/api/v1/paineis/admin/x')).status, 404);
 });
+
+test('paineis vivos: o script recebe as chaves do cofre pelo ambiente, nunca na linha de comando', async () => {
+  const chamadas = [];
+  const registro = { estado: () => ({ ok: true, agentes: [{ slug: 'ana', container: 'dgclaw-ana', cofre_arquivo: '/x/cofre.env' }] }) };
+  const roda = async (cmd, args, op) => { chamadas.push({ args, env: op && op.env }); return { ok: true, saida: '1\n{}' }; };
+  const pv = criarPaineisVivos({ registro, roda, chavesDe: () => ({ DOKPLOY_API_KEY: 'segredo-123', 'nome ruim': 'x' }) });
+  const r = { writeHead() {}, end() {} };
+  await pv.tratar({ method: 'POST', resume() {} }, r, new URL('http://x/api/v1/paineis/ana/dokploy/atualizar'), { usuario: 'dono' });
+  const c = chamadas[0];
+  assert.ok(c.args.includes('-e') && c.args[c.args.indexOf('-e') + 1] === 'DOKPLOY_API_KEY');
+  assert.ok(!c.args.join(' ').includes('segredo-123'), 'o valor não vai nos argumentos');
+  assert.ok(!c.args.includes('nome ruim'));
+  assert.equal(c.env.DOKPLOY_API_KEY, 'segredo-123');
+});

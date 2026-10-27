@@ -2048,6 +2048,8 @@ const ICONE_ACAO = {
   copiar: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2.5"/><path d="M16 8V6.5A2.5 2.5 0 0 0 13.5 4h-7A2.5 2.5 0 0 0 4 6.5v7A2.5 2.5 0 0 0 6.5 16H8"/></svg>',
   ok:     '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
   ouvir:  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
+  // o mesmo alto-falante com as ondas separadas: enquanto a resposta toca, elas pulsam (conversa.css)
+  tocando: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="onda1" d="M15.5 9a4 4 0 0 1 0 6"/><path class="onda2" d="M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
   bom: '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 10v10H4.5a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1zM7 10l4-7a2.2 2.2 0 0 1 2.6 2.6L13 9h5.4a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.2 20H7"/></svg>',
   ruim: '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 14V4h2.5a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1zM17 14l-4 7a2.2 2.2 0 0 1-2.6-2.6L11 15H5.6a2 2 0 0 1-2-2.3l1.2-7A2 2 0 0 1 6.8 4H17"/></svg>',
   responder: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H12"/></svg>'
@@ -2168,6 +2170,9 @@ wrap.addEventListener('click', async ev => {
     } catch (e) {
       mostraAviso('Não consegui copiar: ' + e.message);
     }
+  } else if (b.dataset.ac === 'ouvir' && b.classList.contains('tocando')) {
+    // tocar de novo no alto-falante da resposta que está tocando cala a voz (27/10/2026, pedido do dono)
+    btnParar.onclick();
   } else if (b.dataset.ac === 'ouvir') {
     // a mesma leitura em pedaços do fone: toca esta resposta e segue pelas seguintes
     destravarAudio();
@@ -3018,7 +3023,7 @@ window.addEventListener('popstate', () => {
   }
 });
 document.addEventListener('keydown', ev => {
-  if (ev.key === 'Escape' && visTelaAberta() && !visorAberto()) fechaTelaVisual();
+  if (ev.key === 'Escape' && visTelaAberta() && !visorAberto()) { ev.preventDefault(); fechaTelaVisual(); }
 });
 
 wrap.addEventListener('click', ev => {
@@ -3436,6 +3441,7 @@ async function abreTextoNoVisor(md) {
     const t = (await r.text()).slice(0, 512 * 1024);
     if (!caixa.isConnected) return;
     caixa.innerHTML = window.DGFormatador.arquivoParaHtml(t, md.nome);
+    if (window.DGMermaid) window.DGMermaid.desenha(caixa, temaApp());   // ```mermaid vira desenho (27/10/2026)
   } catch (e) {
     if (caixa.isConnected) lbCorpo.innerHTML = cartaoDoc(md);
   }
@@ -3562,7 +3568,7 @@ lightbox.addEventListener('click', ev => {
   if (ev.target === lightbox || ev.target === lbCorpo) fechaLightbox();
 });
 document.addEventListener('keydown', ev => {
-  if (ev.key === 'Escape' && visorAberto()) fechaLightbox();
+  if (ev.key === 'Escape' && visorAberto()) { ev.preventDefault(); fechaLightbox(); }
 });
 
 /* Link pra um arquivo do próprio app (o agente escreveu a URL na mensagem):
@@ -5446,6 +5452,13 @@ function pintaFilaLeitura() {
     row.classList.remove('fila-tocando', 'fila-espera', 'fila-pausada');
   }
   for (const s of wrap.querySelectorAll('.selo-fila')) s.remove();
+  for (const b of wrap.querySelectorAll('.ac-ouvir.tocando')) {
+    b.classList.remove('tocando');
+    b.innerHTML = ICONE_ACAO.ouvir;
+    b.title = 'Ouvir em voz alta';
+    b.setAttribute('aria-label', 'Ouvir a resposta em voz alta');
+    b.removeAttribute('aria-pressed');
+  }
   // ícone de traço do design system no lugar do emoji (26/10/2026, pedido do dono)
   const ico = d => '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" ' +
     'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + '</svg>';
@@ -5466,7 +5479,19 @@ function pintaFilaLeitura() {
     s.appendChild(document.createTextNode(texto));
     bub.appendChild(s);
   };
-  marca(e.tocando, 'fila-tocando', ICO_FILA.tocando, 'tocando agora');
+  // o alto-falante da resposta que toca fica animado e vira o parar (no lugar do "parar de falar"
+  // do alto e do selo "tocando agora", 27/10/2026, pedido do dono)
+  const bOuvir = e.tocando == null ? null :
+    wrap.querySelector('.acoes[data-acoes="' + CSS.escape(String(e.tocando)) + '"] .ac-ouvir');
+  if (bOuvir) {
+    bOuvir.classList.add('tocando');
+    bOuvir.innerHTML = ICONE_ACAO.tocando;
+    bOuvir.title = 'Parar de falar';
+    bOuvir.setAttribute('aria-label', 'Parar de falar');
+    bOuvir.setAttribute('aria-pressed', 'true');
+  }
+  // resposta sem a linha de ações (raro): o selo escrito continua sendo o aviso
+  if (!bOuvir) marca(e.tocando, 'fila-tocando', ICO_FILA.tocando, 'tocando agora');
   marca(e.pausada, 'fila-pausada', ICO_FILA.pausada, 'continua quando você enviar');
   e.fila.forEach((id, i) => marca(id, 'fila-espera', ICO_FILA.espera, 'na fila (' + (i + 1) + ')'));
 }
@@ -5705,8 +5730,7 @@ async function tocarMensagemNaFila(item, desde) {
   }
 
   falando = true;
-  btnParar.style.display = '';
-  btnParar.textContent = 'parar de falar';
+  // o parar fica no alto-falante da própria resposta (27/10/2026); o botão do alto não aparece mais
   setEstado('falando…');
   const total = atual.partes;
   let inicio = desde.tempo || 0;
@@ -6441,7 +6465,8 @@ $('who').addEventListener('click', () => abreAcervo());
 $('who').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); abreAcervo(); } });
 $('av').addEventListener('click', () => abreAcervo());
 $('acervoFechar').onclick = fechaAcervo;
-document.addEventListener('keydown', e => { if (e.key === 'Escape') fechaAcervo(); });
+// o Esc que fechou o arquivo aberto por cima da lista não fecha a lista junto (27/10/2026)
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !e.defaultPrevented) fechaAcervo(); });
 acPainel.querySelector('nav').onclick = e => { const b = e.target.closest('[data-aba]'); if (b) { acLista.scrollTop = 0; abreAcervo(b.dataset.aba); } };
 acLista.addEventListener('scroll', () => {
   if (cacheMidias && acLista.scrollHeight - acLista.scrollTop - acLista.clientHeight < 250) cacheMidias.mais(acAba);

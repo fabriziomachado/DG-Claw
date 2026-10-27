@@ -561,7 +561,6 @@ body.menu-aberto .veu{opacity:1;visibility:visible}
   border-radius:12px;padding:16px}
 .dgv-audio audio{width:100%}
 .dgv-pdf{width:min(1000px,90vw);height:calc(100vh - 130px);border:0;border-radius:10px;background:#fff}
-.dgv-pagina{width:min(1000px,94vw);height:calc(100vh - 110px);border:0;border-radius:10px;background:var(--fundo)}
 /* O formato que nenhum navegador abre. Diz isso com todas as letras, em vez de
  * mostrar um quadro cinza que a pessoa confunde com o painel travado. */
 .dgv-sem-previa{background:var(--painel);border:1px solid var(--linha);border-radius:12px;
@@ -573,7 +572,6 @@ body.menu-aberto .veu{opacity:1;visibility:visible}
   .dgv-fundo{padding:10px}
   .dgv-midia{max-height:calc(100vh - 96px)}
   .dgv-pdf{width:100%;height:calc(100vh - 110px)}
-  .dgv-pagina{width:100%;height:calc(100vh - 96px)}
   /* No celular o nome inteiro nao cabe ao lado dos dois botoes: ele quebra para
      a linha de cima e os controles ficam onde o dedo espera, na direita. */
   .dgv-topo{flex-wrap:wrap}
@@ -669,4 +667,6 @@ html.casca .btn-tutorial-aba{display:none!important}
 .btn-icone[disabled],.cofre-revogar[disabled],.cofre-api-revogar[disabled]{opacity:.45;cursor:default}
 html.casca .saude-frase{display:none}
 html.casca .app-tutorial-abrir{display:none!important}
-.dgv-janela:has(.dgv-pagina){width:100%}
+/* texto, .md e .html em tela cheia (27/10/2026): a barra é a da tela /ver-arquivo, igual ao visor do chat */
+.dgv-fundo.dgv-cheia{padding:0;background:var(--fundo)}
+.dgv-pagina-cheia{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;background:var(--fundo)}

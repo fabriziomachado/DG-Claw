@@ -838,6 +838,11 @@ body{background:var(--dg-fundo)}
 .acoes .ac:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}
 .acoes .ac.feito{color:#2f9e5e}
 .sem-voz .acoes .ac-ouvir{display:none}
+.acoes .ac-ouvir.tocando{color:var(--accent)}
+.acoes .ac-ouvir.tocando .onda1{animation:ondaFala 1.1s ease-in-out infinite}
+.acoes .ac-ouvir.tocando .onda2{animation:ondaFala 1.1s ease-in-out .25s infinite}
+@keyframes ondaFala{0%,100%{opacity:.25}50%{opacity:1}}
+@media (prefers-reduced-motion:reduce){.acoes .ac-ouvir.tocando path{animation:none}}
 
 /* botões do topo no estilo do ChatGPT: ícone de traço fino + texto, sem moldura (17/10/2026) */
 header .btn,header .tools a.btn{background:transparent;border:0;color:var(--dg-texto);font-weight:500;font-size:14px;

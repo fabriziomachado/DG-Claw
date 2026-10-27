@@ -26,6 +26,8 @@ const PURO = window.DGConversaPuro || (() => {
     avisoDescansando: () => false,
     registraFechamento: mapa => mapa || {},
     separaAudio: texto => ({ audio: false, texto: String(texto == null ? '' : texto) }),
+    separaCorrigido: texto => ({ corrigido: false, texto: String(texto == null ? '' : texto) }),
+    marcaCorrigido: texto => '[pedido corrigido] ' + String(texto),
     textoDaFala: texto => String(texto),
     avaliaVolta: () => ({ acao: 'indeterminado' }),
   };
@@ -1846,7 +1848,7 @@ const CHECK_2 = '<svg viewBox="0 0 20 11" width="18" height="11" aria-hidden="tr
 function htmlHora(m, extra) {
   if (!m || m.pendente || typeof m.ep !== 'number') return '';
   const hora = `<span class="hora" data-ep="${m.ep}" title="${esc(m.dia + ' ' + m.hhmm)}">` +
-               `${m.editada ? 'editada · ' : ''}${esc(m.hhmm)}</span>`;
+               `${m.editada ? 'editada · ' : ''}${ehDono(m) && PURO.separaCorrigido(PURO.separaAudio(m.text || '').texto).corrigido ? 'corrigido · ' : ''}${esc(m.hhmm)}</span>`;
   const lido = ehDono(m) ? lidoAteEp >= m.ep : vistoAteEp >= m.ep;
   if (!ehDono(m)) {
     return `<span class="hora-cx">${hora}<span class="checks${lido ? ' lido' : ''}" data-ep-chk="${m.ep}" title="${lido ? 'você viu' : 'chegou, você ainda não viu'}" ` +
@@ -1869,7 +1871,8 @@ function horaHumana(ep, agora) {
 function humanizaHoras() {
   const agora = Date.now();
   for (const el of wrap.querySelectorAll('.hora[data-ep]')) {
-    const txt = (el.textContent.startsWith('editada · ') ? 'editada · ' : '') + horaHumana(Number(el.dataset.ep), agora);
+    const pre = (el.textContent.match(/^(editada · )?(corrigido · )?/) || [''])[0];
+    const txt = pre + horaHumana(Number(el.dataset.ep), agora);
     if (el.textContent !== txt) el.textContent = txt;
   }
 }
@@ -1928,6 +1931,7 @@ function htmlCorpo(m) {
     const sa = PURO.separaAudio(leg);
     viaAudio = sa.audio;
     leg = sa.texto;
+    leg = PURO.separaCorrigido(leg).texto;   // a marca vira "corrigido" junto da hora (htmlHora)
   }
   // tarefa da Mesa citada (19/10/2026, ideia 4): a linha "📋 Tarefa #N da Mesa: ..." vira cartão, e todo
   // link /mesa#tN do texto ganha o cartão embaixo
@@ -2241,9 +2245,86 @@ function horaLocal(m) {
   m.dia = f.dia; m.hhmm = f.hhmm;
 }
 
+/* Editar pedido no próprio balão (26/10/2026, pedido do dono, como no Claude): o último pedido do dono
+   vira um campo com Cancelar e Salvar. O agente já recebeu o original, então o Salvar manda o texto novo
+   com a marca de pedido corrigido (a regra dos agentes manda ignorar o anterior); o original fica na
+   conversa. Só o texto: anexo não entra. */
+var ICO_LAPIS = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/></svg>';
+var editando = null;          // { id, original, texto } (var: o render pode rodar antes desta linha)
+var ultimoEditavel = null;    // id do último pedido do dono que dá para editar
+function textoDoPedido(m) {
+  const sa = PURO.separaAudio(m.text || '').texto;
+  return PURO.separaCorrigido(sa).texto.trim();
+}
+function ultimaDoDonoEditavel() {
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    const m = msgs[i];
+    if (!ehDono(m)) continue;
+    const t = typeof m.text === 'string' ? m.text.trim() : '';
+    return t && !/^\/[a-z]/i.test(t) && !m.media ? m : null;
+  }
+  return null;
+}
+function htmlEditor(troca) {
+  return `<div class="row me edita${troca}"><div class="bub bub-edita">` +
+    `<textarea id="edPedido" rows="3" aria-label="Editar o pedido">${esc(editando.original)}</textarea>` +
+    `<div class="ed-acoes"><span class="ed-nota">Vai como pedido corrigido</span>` +
+    `<button type="button" class="ed-bt" data-ed="cancelar">Cancelar</button>` +
+    `<button type="button" class="ed-bt pri" data-ed="salvar">Salvar</button></div></div></div>`;
+}
+function restauraEditor() {
+  const ta = editando && document.getElementById('edPedido');
+  if (ta && ta.value !== editando.texto) ta.value = editando.texto;
+}
+function abreEditor() {
+  const m = ultimaDoDonoEditavel();
+  if (!m) { mostraErro('Não achei um pedido seu para editar.'); return; }
+  const t = textoDoPedido(m);
+  editando = { id: m.id, original: t, texto: t };
+  render({ semRolar: true });
+  const ta = document.getElementById('edPedido');
+  if (ta) {
+    ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight + 2, 260) + 'px';
+    ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+    ta.closest('.row').scrollIntoView({ block: 'nearest' });
+  }
+}
+function fechaEditor() { editando = null; render({ semRolar: true }); }
+wrap.addEventListener('input', ev => {
+  if (ev.target.id !== 'edPedido' || !editando) return;
+  editando.texto = ev.target.value;
+  ev.target.style.height = 'auto'; ev.target.style.height = Math.min(ev.target.scrollHeight + 2, 260) + 'px';
+});
+wrap.addEventListener('keydown', ev => {
+  if (ev.target.id !== 'edPedido') return;
+  if (ev.key === 'Escape') { ev.preventDefault(); fechaEditor(); }
+});
+wrap.addEventListener('click', ev => {
+  const b = ev.target.closest ? ev.target.closest('[data-ed]') : null;
+  if (!b) return;
+  if (b.dataset.ed === 'abrir') { abreEditor(); return; }
+  if (b.dataset.ed === 'cancelar') { fechaEditor(); return; }
+  if (b.dataset.ed === 'salvar' && editando) {
+    const t = editando.texto.trim();
+    if (!t) { mostraErro('O pedido corrigido está vazio.'); return; }
+    if (t === editando.original) { fechaEditor(); return; }
+    fechaEditor();
+    enviarTexto(PURO.marcaCorrigido(t));
+  }
+});
+
 function render(opt) {
   opt = opt || {};
   for (const m of msgs) horaLocal(m);
+  const ue = ultimaDoDonoEditavel(); ultimoEditavel = ue ? ue.id : null;
+  // o pedido que um "pedido corrigido" substituiu fica apagado e riscado (26/10/2026, pedido do dono)
+  const substituidos = new Set();
+  { let antes = null;
+    for (const m of msgs) {
+      if (!ehDono(m)) continue;
+      if (antes && PURO.separaCorrigido(PURO.separaAudio(m.text || '').texto).corrigido) substituidos.add(antes.id);
+      antes = m;
+    } }
   const todas = msgs.slice();
   // o pendente entra na posição cronológica dele (hora local da criação), e
   // não colado no fim, por baixo das respostas que chegaram depois
@@ -2332,8 +2413,13 @@ function render(opt) {
         continue;
       }
     }
-    itens.push([m.id, `<div class="row ${lado}${ehVisual(m.media) ? ' vis' : ''}${troca}" data-msg="${esc(m.id)}">` +
-                      `<div class="bub">${m.mencaoPergunta ? destacaMencao(htmlCorpo(m), m) : destacaNomes(htmlCorpo(m))}</div>${lado === 'her' ? htmlAcoes(m, htmlHora(m)) : htmlHora(m)}</div>`]);
+    if (editando && editando.id === m.id) { itens.push([m.id + '~ed', htmlEditor(troca)]); anterior = lado; continue; }
+    const horaDono = lado === 'me' && m.id === ultimoEditavel
+      ? htmlHora(m).replace('<span class="hora-cx">', `<span class="hora-cx"><button type="button" class="ed-lapis" data-ed="abrir" title="Editar pedido" aria-label="Editar este pedido">${ICO_LAPIS}</button>`)
+      : htmlHora(m);
+    const subst = substituidos.has(m.id) ? ' substituido" title="Substituído pelo pedido corrigido logo abaixo' : '';
+    itens.push([m.id, `<div class="row ${lado}${ehVisual(m.media) ? ' vis' : ''}${troca}${subst}" data-msg="${esc(m.id)}">` +
+                      `<div class="bub">${m.mencaoPergunta ? destacaMencao(htmlCorpo(m), m) : destacaNomes(htmlCorpo(m))}</div>${lado === 'her' ? htmlAcoes(m, htmlHora(m)) : horaDono}</div>`]);
     anterior = lado;
   }
   if (!itens.length && carregouUmaVez) itens.push(['vazio', htmlVazio()]);
@@ -2361,6 +2447,7 @@ function render(opt) {
   const atuais = wrap.children;
   const igual = atuais.length === nos.length && nos.every((el, i) => atuais[i] === el);
   if (igual) { pintaFilaLeitura(); return; }
+  restauraEditor();
   // Mensagens antigas entrando no topo, mensagem nova no fim, balão refeito: a posição
   // fica por conta do observador de rolagem (no fim acompanha, lendo mais acima não mexe).
   aplicaNos(nos);
@@ -3845,20 +3932,31 @@ const ICO_CARTAO_PARAR = {
   ok: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4.5 4.5L19 7"/></svg>',
   alerta: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4 2.5 20h19z"/><path d="M12 10v4M12 17h.01"/></svg>',
   x: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>',
+  info: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>',
 };
+/* Depois do parar (26/10/2026, pedido do dono, como no Claude): "Editar pedido" devolve o último pedido
+   ao campo para corrigir; "Tentar novamente" manda o mesmo texto de novo. Só o texto: anexo não volta. */
+let pedidoInterrompido = '';
+function ultimoPedidoDoDono() {
+  const m = ultimaDoDonoEditavel();
+  return m ? textoDoPedido(m) : '';
+}
 function pintaCartaoParar(estado, texto, acao) {
   clearTimeout(pararTimer);
   if (!estado) { pararEl.hidden = true; pararEl.innerHTML = ''; return; }
   pararEl.className = 'pa-' + estado;
-  pararEl.innerHTML = `<span class="pa-ic">${estado === 'andando' ? ICO_CARTAO_PARAR.gira : estado === 'ok' ? ICO_CARTAO_PARAR.ok : ICO_CARTAO_PARAR.alerta}</span>` +
-    `<span class="pa-tx">${texto}</span>` + (acao ? `<button type="button" class="pa-bt" data-pa="${acao.id}">${esc(acao.rotulo)}</button>` : '') +
-    (estado === 'travado' || estado === 'erro' ? `<button type="button" class="pa-x" data-pa="fechar" title="Fechar" aria-label="Fechar">${ICO_CARTAO_PARAR.x}</button>` : '');
+  const acoes = Array.isArray(acao) ? acao : acao ? [acao] : [];
+  pararEl.innerHTML = `<span class="pa-ic">${estado === 'andando' ? ICO_CARTAO_PARAR.gira : estado === 'ok' ? ICO_CARTAO_PARAR.ok : estado === 'interrompido' ? ICO_CARTAO_PARAR.info : ICO_CARTAO_PARAR.alerta}</span>` +
+    `<span class="pa-tx">${texto}</span>` + acoes.map(a => `<button type="button" class="pa-bt${a.leve ? ' leve' : ''}" data-pa="${a.id}">${esc(a.rotulo)}</button>`).join('') +
+    (estado === 'travado' || estado === 'erro' || estado === 'interrompido' ? `<button type="button" class="pa-x" data-pa="fechar" title="Fechar" aria-label="Fechar">${ICO_CARTAO_PARAR.x}</button>` : '');
   pararEl.hidden = false;
   if (estado === 'ok') pararTimer = setTimeout(() => pintaCartaoParar(null), 3500);
 }
 pararEl.addEventListener('click', async ev => {
   const b = ev.target.closest('[data-pa]'); if (!b) return;
   if (b.dataset.pa === 'fechar') { pintaCartaoParar(null); return; }
+  if (b.dataset.pa === 'editar') { pintaCartaoParar(null); abreEditor(); return; }
+  if (b.dataset.pa === 'repetir') { pintaCartaoParar(null); enviarTexto(pedidoInterrompido); return; }
   if (b.dataset.pa === 'destravar') {
     pintaCartaoParar('andando', `Reiniciando ${esc(AGENTE.nome)}…`);
     try {
@@ -3873,7 +3971,12 @@ async function interrompe() {
   try {
     const r = await api(API + '/interromper', { method: 'POST', body: {}, timeoutMs: 20000 });
     if (r && r.travado) pintaCartaoParar('travado', `<b>${esc(AGENTE.nome)} não reagiu.</b> Parece travado.`, { id: 'destravar', rotulo: 'Reiniciar' });
-    else pintaCartaoParar('ok', `Parado. A conversa e o que ${esc(AGENTE.nome)} já fez continuam.`);
+    else {
+      pedidoInterrompido = ultimoPedidoDoDono();
+      if (pedidoInterrompido) pintaCartaoParar('interrompido', `A resposta de ${esc(AGENTE.nome)} foi interrompida.`,
+        [{ id: 'editar', rotulo: 'Editar pedido', leve: true }, { id: 'repetir', rotulo: 'Tentar novamente', leve: true }]);
+      else pintaCartaoParar('ok', `Parado. A conversa e o que ${esc(AGENTE.nome)} já fez continuam.`);
+    }
   } catch (e) { pintaCartaoParar('erro', 'Não consegui parar: ' + esc(e.message)); }
   finally { btnEnviar.disabled = false; }
 }

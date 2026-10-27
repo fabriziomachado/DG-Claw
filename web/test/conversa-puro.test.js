@@ -107,3 +107,9 @@ test('avaliaVolta: login_expirado só falha depois dos 3 s (antes pode ser retra
   // retrato anterior ao pedido nunca conta
   assert.equal(P.avaliaVolta(Object.assign({}, base, { decorridoMs: 4000, foto: foto(90, exp) })).acao, 'esperar');
 });
+
+test('pedido corrigido: a marca sai do balão e o resto volta igual', () => {
+  assert.deepEqual(P.separaCorrigido('[pedido corrigido] faz só o backup'), { corrigido: true, texto: 'faz só o backup' });
+  assert.deepEqual(P.separaCorrigido('faz o backup'), { corrigido: false, texto: 'faz o backup' });
+  assert.equal(P.marcaCorrigido('x'), '[pedido corrigido] x');
+});

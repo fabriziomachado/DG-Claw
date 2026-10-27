@@ -1256,6 +1256,9 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 #pararCartao .pa-tx{flex:1;min-width:0}
 #pararCartao .pa-tx b{font-weight:600}
 #pararCartao .pa-bt{font:inherit;font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;border:0;background:var(--dg-azul);color:#fff;cursor:pointer;white-space:nowrap}
+#pararCartao .pa-bt.leve{background:var(--dg-superficie-2);color:var(--dg-texto);border:1px solid var(--dg-borda)}
+#pararCartao .pa-bt.leve:hover{border-color:var(--dg-texto-3)}
+@media (max-width:520px){#pararCartao.pa-interrompido{flex-wrap:wrap}#pararCartao.pa-interrompido .pa-tx{flex-basis:calc(100% - 70px)}}
 #pararCartao .pa-x{width:28px;height:28px;flex:0 0 28px;border:0;border-radius:50%;background:transparent;color:inherit;opacity:.7;display:grid;place-items:center;cursor:pointer}
 #pararCartao .pa-x:hover{opacity:1}
 .pa-gira{display:block;width:14px;height:14px;border-radius:50%;border:2px solid var(--dg-borda);border-top-color:var(--dg-texto-2);animation:paGira .8s linear infinite}
@@ -1301,3 +1304,17 @@ body:not(.ler-on) .fone{display:none}
 /* a fileira de baixo da original não aparece no S2 Bot (23/10/2026): a barra volta à altura de antes */
 .troca-baixo,.troca-baixo:not(:empty){display:none!important}
 @media (max-width:600px){:root{--barra-h:104px}}
+
+/* Editar pedido no balão (26/10/2026) */
+.ed-lapis{border:0;background:transparent;color:var(--dg-texto-3);padding:2px 4px;margin-right:2px;cursor:pointer;display:inline-flex;align-items:center;vertical-align:middle;border-radius:6px}
+.ed-lapis:hover{color:var(--dg-texto);background:var(--dg-superficie-2)}
+.row.me.edita{justify-content:flex-end}
+.row.me .bub.bub-edita{width:min(560px,100%);padding:10px;box-sizing:border-box}
+#edPedido{width:100%;box-sizing:border-box;border:1px solid var(--dg-borda);border-radius:12px;background:var(--dg-superficie);color:var(--dg-texto);font:inherit;font-size:15px;line-height:1.45;padding:10px 12px;resize:none;min-height:64px;outline:none}
+#edPedido:focus{border-color:var(--dg-azul)}
+.ed-acoes{display:flex;align-items:center;gap:8px;margin-top:8px;justify-content:flex-end}
+.ed-nota{flex:1;font-size:12px;color:var(--dg-texto-3);display:flex;align-items:center;gap:4px}
+.ed-bt{font:inherit;font-size:13px;font-weight:600;padding:6px 12px;border-radius:999px;border:1px solid var(--dg-borda);background:var(--dg-superficie);color:var(--dg-texto);cursor:pointer}
+.ed-bt.pri{background:var(--dg-azul);border-color:var(--dg-azul);color:#fff}
+.row.me.substituido .bub{opacity:.5;text-decoration:line-through;text-decoration-color:var(--dg-texto-3)}
+.row.me.substituido .hora-cx{opacity:.6}

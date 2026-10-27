@@ -38,6 +38,16 @@
   /** O que vai ao agente depois de uma transcrição: marcado no envio direto, cru quando vai ao campo para revisar. */
   const textoDaFala = (texto, manda) => (manda ? marcaAudio(texto) : String(texto));
 
+  /* Pedido corrigido (26/10/2026, Editar pedido no balão): o texto novo vai ao agente com esta marca, e a
+     regra dos agentes manda ignorar o pedido anterior. O balão esconde a marca e mostra um lápis discreto. */
+  const MARCA_CORRIGIDO = '[pedido corrigido] ';
+  const marcaCorrigido = texto => MARCA_CORRIGIDO + String(texto == null ? '' : texto);
+  function separaCorrigido(texto) {
+    const t = String(texto == null ? '' : texto);
+    if (t.startsWith(MARCA_CORRIGIDO)) return { corrigido: true, texto: t.slice(MARCA_CORRIGIDO.length) };
+    return { corrigido: false, texto: t };
+  }
+
   /** { audio, texto }: tira a marca do começo, se houver. Mensagem sem marca volta igual. */
   function separaAudio(texto) {
     const t = String(texto == null ? '' : texto);
@@ -66,5 +76,5 @@
     return { acao: n >= 2 ? 'voltou' : 'esperar', vivas: n, ultimoAgora: foto.agora };
   }
 
-  return { avaliaVolta, AVISO_DESCANSO_MS, MARCA_AUDIO, assinaturaAviso, avisoDescansando, registraFechamento, marcaAudio, textoDaFala, separaAudio };
+  return { avaliaVolta, AVISO_DESCANSO_MS, MARCA_AUDIO, assinaturaAviso, avisoDescansando, registraFechamento, marcaAudio, textoDaFala, separaAudio, MARCA_CORRIGIDO, marcaCorrigido, separaCorrigido };
 });

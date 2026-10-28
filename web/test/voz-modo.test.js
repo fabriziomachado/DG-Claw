@@ -52,3 +52,13 @@ test('trocar de agente com o microfone silenciado: o modo reabre ainda silenciad
   assert.match(v, /mudo = silenciado === true/);
   assert.match(v, /if \(!mudo && !semToque/, 'silenciado não abre o microfone sozinho');
 });
+
+test('reabrir o app com o modo de voz ligado: destravar fora de um gesto não trava o som', () => {
+  const c = pub('conversa.js');
+  const ini = c.indexOf('function destravarAudio() {');
+  const corpo = c.slice(ini, c.indexOf('\n}\n', ini));
+  const espera = corpo.indexOf('!navigator.userActivation.isActive) return');
+  assert.ok(espera > 0, 'fora de um gesto precisa esperar o toque');
+  assert.ok(espera < corpo.indexOf('audioDestravado = true'), 'não marca destravado antes do gesto');
+  assert.match(corpo, /ctxAudio\.state === 'suspended'\) ctxAudio\.resume\(\)/);
+});

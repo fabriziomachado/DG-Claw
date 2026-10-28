@@ -48,7 +48,12 @@
   async function carrega(recarregar) {
     $('igRecarregar').disabled = true;
     try {
-      dados = await api('/api/v1/integracoes' + (recarregar ? '?recarregar=1' : ''));
+      const [d, g] = await Promise.all([
+        api('/api/v1/integracoes' + (recarregar ? '?recarregar=1' : '')),
+        api('/api/v1/github').catch(() => ({ agentes: {} })),
+      ]);
+      dados = d; dados.github = g.agentes || {};
+      for (const [slug, gh] of Object.entries(dados.github)) if (gh && gh.reiniciar) precisaReiniciar.add(slug);
       if (!aba) aba = new URLSearchParams(location.search).get('a') || (dados.agentes.find((a) => a.tipo !== 'admin') || {}).slug || 'plataforma';
       pinta();
     } catch (e) {
@@ -95,6 +100,25 @@
         `<div class="ig-acoes">${c.ligada ? est('configurado') : '<span class="ig-est">não configurada</span>'}</div></li>`).join('') + '</ul>');
   }
 
+  /* GitHub como app do agente (lib/github-app.js): conta, organização e repositórios se escolhem no GitHub. */
+  const SVG = (d) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+  const LOGO_GH = '<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.2 19.5c.5.1.7-.2.7-.5v-1.7c-2.8.6-3.4-1.3-3.4-1.3-.5-1.1-1.1-1.4-1.1-1.4-.9-.6.1-.6.1-.6 1 .1 1.5 1 1.5 1 .9 1.5 2.3 1.1 2.9.8.1-.6.3-1.1.6-1.3-2.2-.3-4.6-1.1-4.6-5 0-1.1.4-2 1-2.7-.1-.3-.4-1.3.1-2.7 0 0 .8-.3 2.8 1a9.6 9.6 0 0 1 5 0c1.9-1.3 2.8-1 2.8-1 .5 1.4.2 2.4.1 2.7.6.7 1 1.6 1 2.7 0 3.9-2.3 4.7-4.6 5 .4.3.7.9.7 1.9V21c0 .3.2.6.7.5A10 10 0 0 0 12 2z"/></svg>';
+  const conectarGh = (slug) => '/github/' + encodeURIComponent(slug) + '/conectar';
+  function cartaoGithub(a) {
+    const g = dados.github && dados.github[a.slug];
+    if (!g || (!g.instalacoes.length && !g.pedido_pendente)) return '';
+    const mais = `<a class="ig-ic" href="${conectarGh(a.slug)}" title="Conectar outra conta ou organização" aria-label="Conectar outra conta ou organização">${SVG('<path d="M12 5v14M5 12h14"/>')}</a>`;
+    if (!g.instalacoes.length) {
+      return `<div class="ig-gh" data-busca="github"><div class="ig-gh-cab"><span class="ig-ico ig-ico-gh">${LOGO_GH}</span><b>GitHub</b>${est('pendente')}</div>` +
+        `<p class="ig-dica">O pedido foi para os donos da organização. Assim que alguém aprovar no GitHub, ${esc(a.nome)} conecta sozinho.</p></div>`;
+    }
+    const linhas = g.instalacoes.map((i) => `<div class="ig-gh-linha"><span>${i.tipo === 'organizacao' ? 'Organização' : 'Conta'}</span><span class="ig-gh-onde">${esc(i.conta)}` +
+      `<a class="ig-ic" href="${esc(i.ajustar)}" target="_blank" rel="noopener" title="Ajustar repositórios no GitHub" aria-label="Ajustar repositórios de ${esc(i.conta)} no GitHub">${SVG('<path d="M7 17L17 7M9 7h8v8"/>')}</a></span></div>` +
+      `<div class="ig-gh-repos">${i.repos === 'todos' ? '<span class="ig-gh-repo">todos os repositórios</span>' : i.repos.map((r) => `<span class="ig-gh-repo">${esc(r)}</span>`).join('')}</div>`).join('');
+    return `<div class="ig-gh" data-busca="github ${esc(g.instalacoes.map((i) => i.conta).join(' ').toLowerCase())}"><div class="ig-gh-cab"><span class="ig-ico ig-ico-gh">${LOGO_GH}</span><b>GitHub</b>${est('conectado')}</div>` +
+      `<div class="ig-gh-linha"><span>Aparece como</span><b>${esc(g.bot)}</b></div>${linhas}<div class="ig-gh-acoes">${mais}</div></div>`;
+  }
+
   function pintaAgente(a) {
     const so = a.somente_leitura;
     const reinicia = precisaReiniciar.has(a.slug) ? `<p class="ig-msg">Há mudanças esperando ${esc(a.nome)} reiniciar. <button type="button" class="ig-btn pri peq" data-reiniciar="${esc(a.slug)}">Reiniciar agora</button></p>` : '';
@@ -115,13 +139,14 @@
         `<div class="ig-acoes">${est(c.estado)}${acoes.join('')}</div></li>`;
     };
     const ja = new Set(a.conectores.map((c) => c.nome.toLowerCase()));
+    ja.delete('github');   // o GitHub do catálogo é o app do agente: sempre dá para conectar (outra conta, inclusive)
     const catalogo = so ? '' : '<details class="ig-det-cat"><summary class="ig-btn peq" style="display:inline-flex;align-items:center;list-style:none">+ Catálogo de integrações</summary><div class="ig-catalogo">' +
       CATALOGO.map((c) => `<button type="button" class="ig-cat" data-catalogo="${esc(c.nome)}" data-agente="${esc(a.slug)}"${ja.has(c.nome) ? ' disabled title="já adicionado"' : ''}>` +
-        `<span class="ig-ico">${esc(c.titulo.slice(0, 1))}</span><span><b>${esc(c.titulo)}</b><small>${ja.has(c.nome) ? 'já adicionado' : esc(c.sobre)}</small></span></button>`).join('') + '</div></details>';
+        `<span class="ig-ico">${esc(c.titulo.slice(0, 1))}</span><span><b>${esc(c.titulo)}</b><small>${ja.has(c.nome) ? 'já adicionado' : c.nome === 'github' ? 'conectar como app' : esc(c.sobre)}</small></span></button>`).join('') + '</div></details>';
     let html = reinicia + aviso;
     html += sec('Conectores (MCP)', a.conectores.length,
       'Serviços que ' + esc(a.nome) + ' consegue usar direto: e-mail, agenda, planilhas, sistemas da empresa.' + (a.erro_conectores ? ' <b>' + esc(a.erro_conectores) + '</b>' : ''),
-      (conectores.length ? '<ul class="ig-lista">' + conectores.map(linhaCon).join('') + '</ul>' : '<p class="ig-vazio">Nenhum conector ainda.</p>') + catalogo,
+      cartaoGithub(a) + (conectores.length ? '<ul class="ig-lista">' + conectores.map(linhaCon).join('') + '</ul>' : '<p class="ig-vazio">Nenhum conector ainda.</p>') + catalogo,
       so ? '' : `<button type="button" class="ig-btn pri peq" data-adicionar="${esc(a.slug)}">+ Adicionar conector</button>`);
 
     html += sec('Plugins', a.plugins.length, 'Pacotes que trazem conectores, comandos e skills de uma vez.',
@@ -213,6 +238,7 @@
       if (b.dataset.aba) { aba = b.dataset.aba; msg(''); pinta(); return; }
       if (b.id === 'igRecarregar') { msg(''); await carrega(true); return; }
       if (b.dataset.adicionar) { formConector(b.dataset.adicionar); return; }
+      if (b.dataset.catalogo === 'github') { location.href = conectarGh(b.dataset.agente); return; }
       if (b.dataset.catalogo) { const c = CATALOGO.find((x) => x.nome === b.dataset.catalogo); formConector(b.dataset.agente, c.nome, c.endereco); return; }
       if (b.dataset.remover) {
         if (!confirm(`Remover o conector ${b.dataset.remover}?`)) return;
@@ -229,7 +255,9 @@
       if (b.dataset.reiniciar) {
         b.disabled = true; b.textContent = 'Reiniciando…';
         const r = await api(`/api/v1/integracoes/${encodeURIComponent(b.dataset.reiniciar)}/reiniciar`, { method: 'POST' });
-        precisaReiniciar.delete(b.dataset.reiniciar); await carrega(true); msg(r.mensagem); return;
+        precisaReiniciar.delete(b.dataset.reiniciar);
+        if (dados.github && dados.github[b.dataset.reiniciar]) await api(`/api/v1/github/${encodeURIComponent(b.dataset.reiniciar)}/reiniciado`, { method: 'POST' }).catch(() => {});
+        await carrega(true); msg(r.mensagem); return;
       }
       if (b.dataset.chave !== undefined && b.dataset.agente) { formChave(b.dataset.agente, b.dataset.chave); return; }
       if (b.dataset.tirachave) {
@@ -249,5 +277,14 @@
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && !$('igModal').hidden) fecha(); });
   $('igBusca').addEventListener('input', filtra);
 
-  carrega(false);
+  // Volta do GitHub (lib/github-app.js): o resultado vira a faixa de aviso e sai do endereço.
+  const voltaGh = new URLSearchParams(location.search).get('github');
+  carrega(false).then(() => {
+    if (!voltaGh) return;
+    const nome = ((dados && dados.agentes.find((x) => x.slug === aba)) || {}).nome || 'O agente';
+    if (voltaGh === 'ok') msg(`GitHub conectado para ${nome}.`);
+    else if (voltaGh === 'pedido') msg('Pedido enviado aos donos da organização. Quando aprovarem no GitHub, a conexão termina sozinha.');
+    else msg('Não deu certo no GitHub. Toque em GitHub, no catálogo, para tentar de novo; se repetir, peça ao Admin.', true);
+    history.replaceState(null, '', location.pathname + '?a=' + encodeURIComponent(aba));
+  });
 })();

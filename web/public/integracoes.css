@@ -108,3 +108,17 @@ body.ig *{box-sizing:border-box}
   .ig-barra{top:56px}
   .ig-busca{width:100%}
 }
+
+/* GitHub como app do agente (cartão no topo dos conectores) */
+.ig-gh{border:1px solid var(--dg-borda);border-radius:12px;padding:10px 12px;margin:4px 0 10px}
+.ig-gh-cab{display:flex;align-items:center;gap:10px;margin-bottom:4px}
+.ig-gh-cab b{flex:1;font-size:15px}
+.ig-ico-gh{background:var(--dg-texto);color:var(--dg-fundo)}
+.ig-gh-linha{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13.5px;padding:6px 0;border-top:1px solid var(--dg-borda)}
+.ig-gh-linha > span:first-child{color:var(--dg-texto-2)}
+.ig-gh-onde{display:inline-flex;align-items:center;gap:2px}
+.ig-gh-repos{display:flex;flex-wrap:wrap;gap:4px;padding:0 0 8px}
+.ig-gh-repo{font-size:12.5px;background:var(--dg-superficie-2);color:var(--dg-texto);border-radius:999px;padding:2px 10px}
+.ig-gh-acoes{display:flex;justify-content:flex-end;border-top:1px solid var(--dg-borda);padding-top:4px}
+.ig-ic{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;color:var(--dg-texto-2)}
+.ig-ic:hover{background:var(--dg-superficie-2);color:var(--dg-texto)}

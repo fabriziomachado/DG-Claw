@@ -8,6 +8,8 @@ const ELEVEN = 'https://api.elevenlabs.io';
 const TTS_MAX_CHARS = 1200;     // tamanho máximo de cada pedaço de voz (a resposta inteira é lida, em pedaços)
 const TTS_PRIMEIRO_CHARS = 450; // o 1º pedaço é menor: a voz começa a tocar mais cedo
 const TTS_MAX_PARTES = 40;      // trava contra texto absurdo (cota de custo da ElevenLabs)
+// Voz do aparelho (27/10/2026): o Chrome corta fala longa no meio (uns 15 s), então os pedaços são curtos.
+const TTS_NAVEGADOR_CHARS = 220;
 
 /** Tira o que é para o olho e não para o ouvido. Preserva as quebras de parágrafo (o fatiamento precisa delas). */
 function limparParaTts(texto) {
@@ -55,6 +57,13 @@ function fatiarParaTts(textoLimpo, limite = TTS_MAX_CHARS, primeiro = TTS_PRIMEI
   }
   if (atual.trim()) pedacos.push(atual);
   return pedacos.map((p) => p.trim()).filter(Boolean);
+}
+
+/** Pedaços para a voz do aparelho (o navegador fala, o servidor só limpa e fatia). { partes } ou { erro, status }. */
+function pedacosNavegador(texto) {
+  const limpo = limparParaTts(texto);
+  if (!limpo) return { erro: 'Depois de tirar formatação, tabelas e links não sobrou nada para falar.', status: 400 };
+  return { partes: fatiarParaTts(limpo, TTS_NAVEGADOR_CHARS, TTS_NAVEGADOR_CHARS) };
 }
 
 function criarVoz({ env, log }) {
@@ -137,7 +146,7 @@ function criarVoz({ env, log }) {
         body: JSON.stringify({ text: pedaco, model_id: 'eleven_multilingual_v2' }),
       });
       if (r.erro) return r;
-      return { audio: Buffer.from(await r.resposta.arrayBuffer()), chars: pedaco.length, partes: pedacos.length, parte };
+      return { audio: Buffer.from(await r.resposta.arrayBuffer()), texto: pedaco, chars: pedaco.length, partes: pedacos.length, parte };
     },
 
     async cota() {
@@ -153,4 +162,4 @@ function criarVoz({ env, log }) {
   };
 }
 
-module.exports = { criarVoz, limparParaTts, fatiarParaTts, TTS_MAX_CHARS, TTS_PRIMEIRO_CHARS, TTS_MAX_PARTES };
+module.exports = { criarVoz, limparParaTts, fatiarParaTts, pedacosNavegador, TTS_NAVEGADOR_CHARS, TTS_MAX_CHARS, TTS_PRIMEIRO_CHARS, TTS_MAX_PARTES };

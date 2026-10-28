@@ -34,7 +34,7 @@ async function cenario(opRunner, opWeb) {
   return { t, rAdmin, rAna, home, transcripts, agentes, fechar };
 }
 
-test('GET /api/v1/agents: Admin primeiro, formato esperado e voz/microfone falsos sem chave', async () => {
+test('GET /api/v1/agents: Admin primeiro, formato esperado, microfone falso e voz do aparelho sem chave', async () => {
   const s = await cenario();
   try {
     const r = await s.t.c.get('/api/v1/agents');
@@ -43,11 +43,12 @@ test('GET /api/v1/agents: Admin primeiro, formato esperado e voz/microfone falso
     const ana = r.json.agentes[1];
     assert.equal(ana.nome, 'Ana'); assert.equal(ana.avatar, '🌿'); assert.equal(ana.avatar_img, null);
     assert.equal(ana.tipo, 'agente'); assert.equal(ana.provedor, 'claude'); assert.equal(ana.modelo, 'sonnet');
-    assert.equal(r.json.voz, false); assert.equal(r.json.microfone, false);
-    assert.equal(ana.voz, false); assert.equal(ana.microfone, false);
+    // sem chave a voz é a do aparelho (27/10/2026): o servidor só fatia o texto
+    assert.equal(r.json.voz, true); assert.equal(r.json.microfone, false);
+    assert.equal(ana.voz, true); assert.equal(ana.voz_fonte, 'navegador'); assert.equal(ana.voz_elevenlabs, false); assert.equal(ana.microfone, false);
     assert.equal((await s.t.c.post('/api/v1/transcribe', { corpo: 'x' })).status, 503);
-    const tts = await s.t.c.post('/api/v1/tts', { json: { text: 'oi', agent_id: 'ana' } });
-    assert.equal(tts.status, 503); assert.match(tts.json.erro, /ELEVENLABS_API_KEY/);
+    const tts = await s.t.c.post('/api/v1/tts', { json: { text: '**Oi.** Tudo bem?', agent_id: 'ana' } });
+    assert.equal(tts.status, 200); assert.equal(tts.json.navegador, true); assert.deepEqual(tts.json.partes, ['Oi. Tudo bem?']);
     assert.equal((await s.t.c.get('/api/v1/tts/cota')).status, 503);
   } finally { await s.fechar(); }
 });

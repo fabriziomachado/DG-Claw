@@ -155,7 +155,9 @@ async function boot() {
   }
   // voz e microfone: o servidor diz por agente (ou, se preferir, uma vez para todos)
   const cap = nome => (ag[nome] !== undefined ? ag[nome] : d[nome]) === true;
-  iniciaTela(ag, lista, { voz: cap('voz'), microfone: cap('microfone'), conta: d.usuario, limiteUpload: d.limite_upload_bytes });
+  // a voz do aparelho precisa de um navegador que fale; a da ElevenLabs, não
+  const falaAqui = ag.voz_fonte === 'elevenlabs' || !!window.speechSynthesis;
+  iniciaTela(ag, lista, { voz: cap('voz') && falaAqui, microfone: cap('microfone'), conta: d.usuario, limiteUpload: d.limite_upload_bytes });
 }
 
 function iniciaTela(AGENTE, agentesLista, caps) {
@@ -4511,6 +4513,10 @@ function destravarAudio() {
   }
 }
 document.addEventListener('pointerdown', destravarAudio, { once: true, capture: true });
+// marca-texto com a voz da ElevenLabs: a frase acompanha o tempo tocado do pedaço
+player.addEventListener('timeupdate', () => {
+  if (window.DGLeituraDestaque && falando && player.duration > 0) DGLeituraDestaque.progresso(player.currentTime / player.duration);
+});
 document.addEventListener('touchstart', destravarAudio, { once: true, capture: true });
 
 /* ── Gravar e transcrever (só quando o servidor libera o microfone) ───────── */
@@ -5606,6 +5612,8 @@ function pararSomAtual() {
   } catch (e) {
     console.warn('pararSomAtual: player.pause() falhou:', e.message);
   }
+  if (typeof DGVozAparelho !== 'undefined') DGVozAparelho.cala();
+  if (typeof DGLeituraDestaque !== 'undefined') DGLeituraDestaque.limpa();
   if (fimToque) fimToque();
   falando = false;
   btnParar.style.display = 'none';
@@ -5623,7 +5631,8 @@ function posicaoDoPlayer() {
    o texto mais antigo quando o cache enche, e a URL de cada toque é revogada ao fim dele. */
 async function pegaPedacoVoz(texto, i, sinal) {
   let c = vozCache.get(texto);
-  if (c && c.blobs[i]) return { blob: c.blobs[i], partes: c.partes };
+  if (c && c.falas) return { blob: { fala: c.falas[i] || '' }, partes: c.partes, trecho: c.falas[i] };
+  if (c && c.blobs[i]) return { blob: c.blobs[i], partes: c.partes, trecho: c.trechos[i] };
   const r = await fetch('/api/v1/tts', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: sinal,
     body: JSON.stringify({ agent_id: AGENTE.id, text: texto, parte: i }),
@@ -5638,19 +5647,32 @@ async function pegaPedacoVoz(texto, i, sinal) {
     catch (e) { console.warn('tts: a resposta de erro não veio em JSON:', e.message); }
     throw new Error(motivo);
   }
+  // voz do aparelho (27/10/2026): o servidor manda o texto já fatiado e o navegador fala
+  if ((r.headers.get('Content-Type') || '').includes('application/json')) {
+    const d = await r.json();
+    if (d.aviso) mostraAviso(d.aviso);
+    const falas = Array.isArray(d.partes) && d.partes.length ? d.partes : [''];
+    vozCache.set(texto, { partes: falas.length, falas, blobs: [] });
+    if (vozCache.size > VOZ_CACHE_MAX) vozCache.delete(vozCache.keys().next().value);
+    return { blob: { fala: falas[i] || '' }, partes: falas.length, trecho: falas[i] };
+  }
   const partes = parseInt(r.headers.get('X-TTS-Partes') || '1', 10) || 1;
   const blob = await r.blob();
-  if (!c) {
-    c = { partes, blobs: [] };
+  let trecho = null;
+  try { trecho = decodeURIComponent(r.headers.get('X-TTS-Trecho') || '') || null; } catch (e) { /* sem marca-texto */ }
+  if (!c || c.falas) {
+    c = { partes, blobs: [], trechos: [] };
     vozCache.set(texto, c);
     if (vozCache.size > VOZ_CACHE_MAX) vozCache.delete(vozCache.keys().next().value);
   }
   c.blobs[i] = blob;
-  return { blob, partes };
+  c.trechos[i] = trecho;
+  return { blob, partes, trecho };
 }
 
 /* Resolve true se o pedaço tocou até o fim (ou foi parado) e false se o aparelho não tocou. */
 function tocaPedaco(blob, inicio) {
+  if (blob && typeof blob.fala === 'string') return falaNoAparelho(blob.fala);
   return new Promise(resolve => {
     const url = URL.createObjectURL(blob);
     let pronto = false;
@@ -5690,11 +5712,36 @@ function tocaPedaco(blob, inicio) {
   });
 }
 
+/* Marca-texto (27/10/2026, pedido do dono): pinta na resposta o trecho que começa a ser lido. */
+function marcaLeitura(id, trecho) {
+  if (typeof DGLeituraDestaque === 'undefined' || typeof wrap === 'undefined' || !wrap.querySelector) return;
+  const bub = wrap.querySelector('.row[data-msg="' + CSS.escape(String(id)) + '"] .bub');
+  DGLeituraDestaque.comeca(bub, trecho);
+}
+
+/* Pedaço da voz do aparelho: recomeça do início do trecho (a fala do navegador não tem posição). */
+function falaNoAparelho(texto) {
+  return new Promise(resolve => {
+    let pronto = false;
+    const fim = (tocou = true) => {
+      if (pronto) return;
+      pronto = true;
+      fimToque = null;
+      resolve(tocou);
+    };
+    fimToque = fim;
+    window.DGVozAparelho.fala(texto, motivo => {
+      mostraAviso('O aparelho não conseguiu ler a resposta em voz alta (' + motivo + '). O texto está na tela.');
+    }, (pos, tam) => { if (window.DGLeituraDestaque) DGLeituraDestaque.palavra(pos, tam); }).then(fim);
+  });
+}
+
 /* Pedaço já gerado, sem esperar nada: a retomada depois da gravação chama
    player.play() colada no toque, sem await no caminho (o iPhone exige). */
 function pedacoEmCache(texto, i) {
   const c = vozCache.get(texto);
-  return c && c.blobs[i] ? { blob: c.blobs[i], partes: c.partes } : null;
+  if (c && c.falas) return { blob: { fala: c.falas[i] || '' }, partes: c.partes, trecho: c.falas[i] };
+  return c && c.blobs[i] ? { blob: c.blobs[i], partes: c.partes, trecho: c.trechos[i] } : null;
 }
 
 /* Microfone abrindo ou gravando: tocar agora faria o alto-falante entrar na gravação, e a fala
@@ -5746,6 +5793,7 @@ async function tocarMensagemNaFila(item, desde) {
     }
     // aparelho que não toca não gasta mais cota: avisa a fila, que para e cancela o próximo já pedido
     item.tocando = true;
+    marcaLeitura(item.id, atual.trecho);
     const tocou = await tocaPedaco(atual.blob, inicio);
     item.tocando = false;
     if (!tocou) {
@@ -5765,6 +5813,7 @@ async function tocarMensagemNaFila(item, desde) {
     }
   }
   if (!viva()) return;               // pararam ou pausaram: quem fez isso arrumou a tela
+  if (typeof DGLeituraDestaque !== 'undefined') DGLeituraDestaque.limpa();
   faloAbort = null;
   falando = false;
   btnParar.style.display = 'none';
@@ -6513,7 +6562,7 @@ if (emCache) {
 }
 carregar(true).then(() => ligaStream());
 ligaResync();
-if (caps.voz) conferecota();
+if (caps.voz && AGENTE.voz_fonte === 'elevenlabs') conferecota();
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js').catch(e => console.warn('sw:', e.message));
 }

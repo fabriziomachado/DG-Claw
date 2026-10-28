@@ -4491,9 +4491,16 @@ try {
 /* O Safari só deixa tocar som num <audio> que já tocou dentro de um gesto do
    dedo. Então no PRIMEIRO toque da tela eu toco um mp3 em silêncio nesse mesmo
    elemento, e daí pra frente o play() assíncrono do TTS passa. Trocar de
-   elemento quebra tudo, por isso o #player é um só pra toda a sessão. */
+   elemento quebra tudo, por isso o #player é um só pra toda a sessão.
+   Fora de um gesto (a tela de voz reabrindo sozinha com o app) o aparelho recusa: aí não marca
+   destravado e espera o primeiro toque. Antes a marca ficava e o som e a escuta do silêncio
+   ficavam travados até recarregar (28/10/2026). */
 function destravarAudio() {
-  if (audioDestravado) return;
+  if (audioDestravado) {
+    if (ctxAudio && ctxAudio.state === 'suspended') ctxAudio.resume().catch(() => {});
+    return;
+  }
+  if (navigator.userActivation && !navigator.userActivation.isActive) return;
   audioDestravado = true;
   try {
     const AC = window.AudioContext || window.webkitAudioContext;

@@ -205,21 +205,22 @@ function iniciaModoVoz(V) {
   /* ── Abrir, silenciar e encerrar ── */
   /* continuar: veio de outro agente com o modo ligado. Sem um toque nesta página o navegador pode
      barrar o som, então aí a tela abre parada ("Toque na onda para falar") e o toque libera tudo. */
-  function abre(continuar) {
+  /* silenciado: veio de outro agente com o microfone silenciado, e continua assim (28/10/2026). */
+  function abre(continuar, silenciado) {
     if (ativo) return;
     V.destravarAudio();
     if (!V.caps.microfone || !V.caps.voz) return;
-    ativo = true; mudo = false; estado = ''; niveis = [];
+    ativo = true; mudo = silenciado === true; estado = ''; niveis = [];
     lerAntes = V.ler;
     V.ler = true;
-    V.continua = true;
+    V.continua = !mudo;
     document.documentElement.classList.add('modo-voz');
     palco.hidden = false;
     pinta();
     tick = setInterval(() => { confereSilencio(); pinta(); }, 50);
     raf = requestAnimationFrame(desenha);
     const semToque = continuar === true && navigator.userActivation && !navigator.userActivation.hasBeenActive;
-    if (!semToque && !ocupado() && !V.estado().transcrevendo) comecaGravar();
+    if (!mudo && !semToque && !ocupado() && !V.estado().transcrevendo) comecaGravar();
   }
 
   async function encerra() {
@@ -265,16 +266,18 @@ function iniciaModoVoz(V) {
   ondaBtn.onclick = toqueNaOnda;
   document.addEventListener('keydown', ev => { if (ativo && ev.key === 'Escape') { ev.preventDefault(); encerra(); } });
   // sair da tela (trocar de agente, fechar) solta o microfone. Trocar de agente com o modo ligado
-  // reabre o modo no agente novo (27/10/2026, pedido do dono): a marca vale 30 s, só nesta aba.
+  // reabre o modo no agente novo (27/10/2026, pedido do dono): a marca vale 30 s, só nesta aba. O microfone
+  // silenciado vai junto: antes ele voltava ligado sozinho no agente novo e na volta (28/10/2026).
   const CHAVE_MODO = 'dg-modo-voz';
   window.addEventListener('pagehide', () => {
     if (!ativo) return;
-    try { sessionStorage.setItem(CHAVE_MODO, String(Date.now())); } catch (e) { /* sem armazenamento: só não reabre */ }
+    try { sessionStorage.setItem(CHAVE_MODO, JSON.stringify({ em: Date.now(), mudo })); } catch (e) { /* sem armazenamento: só não reabre */ }
     encerra();
   });
-  let marca = 0;
-  try { marca = Number(sessionStorage.getItem(CHAVE_MODO)) || 0; sessionStorage.removeItem(CHAVE_MODO); } catch (e) { /* idem */ }
-  if (marca && Date.now() - marca < 30000) abre(true);
+  let marca = null;
+  try { marca = JSON.parse(sessionStorage.getItem(CHAVE_MODO) || 'null'); sessionStorage.removeItem(CHAVE_MODO); } catch (e) { /* idem */ }
+  if (typeof marca === 'number') marca = { em: marca, mudo: false };   // marca antiga, de antes desta versão
+  if (marca && Date.now() - marca.em < 30000) abre(true, marca.mudo === true);
 
   window.DGModoVoz = { abre, encerra, ativo: () => ativo, estado: () => estado };
 }

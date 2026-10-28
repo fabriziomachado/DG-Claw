@@ -30,7 +30,7 @@
      Trabalho; "Como funciona" sai da lista e vira ícone no rodapé do menu. */
   const GRUPOS = [
     { id: 'trabalho', nome: 'Trabalho', chaves: ['caixa', 'conversa', 'mesa', 'sessoes', 'lembretes', 'referencias', 'avisos'] },
-    { id: 'agente', nome: 'O agente', chaves: ['identity', 'personality', 'skills', 'rotinas', 'memory', 'arquivos'] },
+    { id: 'agente', nome: 'O agente', chaves: ['identity', 'personality', 'voz', 'skills', 'rotinas', 'memory', 'arquivos'] },
     { id: 'conexoes', nome: 'Conexões', chaves: ['integracoes', 'apps', 'cofre'] },
     { id: 'saude', nome: 'Saúde', chaves: ['saude-servidor', 'status', 'operations', 'costs', 'socorro'] },
   ];
@@ -74,6 +74,7 @@
   /* Qual item do menu o link representa: 'mesa', 'lembretes', a chave de #aba=... ou '' (outro). */
   function chaveDoHref(href) {
     const h = String(href || '');
+    if (h === '#voz') return 'voz';
     const aba = /#aba=([^&]*)/.exec(h);
     if (aba) return decodeURIComponent(aba[1]);
     const caminho = h.split(/[?#]/)[0].replace(/\/+$/, '');
@@ -653,6 +654,10 @@
     ligaCaixa();
     $('mlTabs').insertAdjacentHTML('beforeend', `<div data-tour="gm-avisos"><a class="ml-tab" href="${comAgente(LINK_AVISOS.href, ag.id)}">` +
       `<span class="ml-ico" aria-hidden="true">${LINK_AVISOS.ico}</span>${LINK_AVISOS.nome}</a></div>`);
+    // Voz (27/10/2026): abre a folha da voz do agente, não troca de página
+    $('mlTabs').insertAdjacentHTML('beforeend', '<div data-tour="gm-voz"><a class="ml-tab" id="mlVoz" href="#voz" role="button">' +
+      '<span class="ml-ico" aria-hidden="true">🗣</span>Voz</a></div>');
+    $('mlVoz').onclick = ev => { ev.preventDefault(); abreFolhaVoz(agenteAtual || ag); };
     if (ag.tipo === 'admin') {
       $('mlTabs').insertAdjacentHTML('beforeend', `<div data-tour="gm-saude-servidor"><a class="ml-tab" href="${LINK_SAUDE_SERVIDOR.href}">` +
         `<span class="ml-ico" aria-hidden="true">${LINK_SAUDE_SERVIDOR.ico}</span>${LINK_SAUDE_SERVIDOR.nome}</a></div>`);
@@ -1199,6 +1204,159 @@
     document.dispatchEvent(new CustomEvent('dgavatar', { detail: { id: novo.id, avatar: novo.avatar, avatar_img: novo.avatar_img } }));
   }
 
+  /* ── Voz do agente (27/10/2026, pedido do dono): a do aparelho (padrão, grátis) ou a da ElevenLabs.
+     A escolha da fonte fica no servidor (vale em todo aparelho); a voz e a velocidade do aparelho ficam
+     neste aparelho (voz-aparelho.js, carregado só quando a folha abre). ── */
+  const VELOCIDADES = [['0.8', 'Devagar'], ['1', 'Normal'], ['1.2', 'Rápida'], ['1.5', 'Bem rápida']];
+  const vozFolha = { ag: null, estado: null, fonte: 'navegador', ocupado: false, voltaFoco: null };
+  function carregaVozAparelho() {
+    if (raiz.DGVozAparelho) return Promise.resolve(raiz.DGVozAparelho);
+    return new Promise((ok, falha) => {
+      const sc = document.createElement('script');
+      sc.src = '/voz-aparelho.js';
+      sc.onload = () => ok(raiz.DGVozAparelho);
+      sc.onerror = () => falha(new Error('não consegui carregar a voz do aparelho'));
+      document.head.appendChild(sc);
+    });
+  }
+  function folhaVoz() {
+    let veu = $('mlVozVeu');
+    if (veu) return veu;
+    veu = document.createElement('div');
+    veu.id = 'mlVozVeu';
+    veu.className = 'ml-fs-veu';
+    veu.hidden = true;
+    const opcao = (f, tit) => `<button type="button" class="ml-vz-op" data-vz="${f}" role="radio" aria-checked="false">` +
+      `<span class="ml-vz-bola" aria-hidden="true"></span><span class="ml-vz-txt"><b>${tit}</b><small data-vz-sub="${f}"></small></span></button>`;
+    veu.innerHTML = '<div class="ml-fs" role="dialog" aria-modal="true" aria-labelledby="mlVozTit" tabindex="-1">' +
+      `<div class="ml-fs-cab"><h2 id="mlVozTit">Voz</h2><button type="button" class="ml-fs-x" data-fs="fechar" aria-label="Fechar">${ICO_X}</button></div>` +
+      '<p class="ml-fs-sub" id="mlVozSub"></p>' +
+      '<div class="ml-vz-ops" role="radiogroup" aria-labelledby="mlVozTit">' +
+      opcao('navegador', 'Voz do aparelho') + opcao('elevenlabs', 'Voz própria (ElevenLabs)') + '</div>' +
+      '<div class="ml-vz-ajustes" id="mlVozAjustes">' +
+      '<label class="ml-vz-campo"><span>Voz neste aparelho</span><select id="mlVozLista"></select></label>' +
+      '<label class="ml-vz-campo"><span>Velocidade</span><select id="mlVozVel">' +
+      VELOCIDADES.map(([v, n]) => `<option value="${v}">${n}</option>`).join('') + '</select></label>' +
+      // iPhone: a voz do aparelho obedece à chave do silencioso (dono, 27/10/2026)
+      '<p class="ml-vz-dica" id="mlVozIos" hidden>No iPhone, a voz do aparelho fica muda com o silencioso ligado.</p></div>' +
+      '<p class="ml-fs-erro" id="mlVozErro" role="alert" hidden></p>' +
+      '<div class="ml-fs-acoes">' +
+      `<button type="button" class="ml-fs-btn" data-fs="testar" title="Ouvir um teste">${ico('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>')}<span>Testar</span></button>` +
+      '<span class="ml-fs-esp"></span>' +
+      '<button type="button" class="ml-fs-btn" data-fs="fechar">Cancelar</button>' +
+      '<button type="button" class="ml-fs-btn ml-fs-salvar" data-fs="salvar">Salvar</button>' +
+      '</div></div>';
+    document.body.appendChild(veu);
+    veu.addEventListener('click', ev => {
+      if (ev.target === veu) return fechaFolhaVoz();
+      const op = ev.target.closest('[data-vz]');
+      if (op && !op.disabled) { vozFolha.fonte = op.dataset.vz; return pintaVoz(); }
+      const b = ev.target.closest('[data-fs]');
+      if (!b || b.disabled) return;
+      if (b.dataset.fs === 'fechar') fechaFolhaVoz();
+      else if (b.dataset.fs === 'testar') testaVoz();
+      else if (b.dataset.fs === 'salvar') salvaVoz();
+    });
+    veu.addEventListener('keydown', ev => { if (ev.key === 'Escape') fechaFolhaVoz(); });
+    return veu;
+  }
+  function erroVoz(msg) { const e = $('mlVozErro'); e.textContent = msg; e.hidden = !msg; }
+  function pintaVoz() {
+    const st = vozFolha.estado || {}, V = raiz.DGVozAparelho, nome = vozFolha.ag ? vozFolha.ag.nome : 'o agente';
+    for (const b of document.querySelectorAll('#mlVozVeu [data-vz]')) {
+      const on = b.dataset.vz === vozFolha.fonte;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-checked', String(on));
+    }
+    const semEleven = !st.elevenlabs;
+    document.querySelector('#mlVozVeu [data-vz="navegador"]').disabled = vozFolha.ocupado;
+    document.querySelector('#mlVozVeu [data-vz="elevenlabs"]').disabled = semEleven || vozFolha.ocupado;
+    document.querySelector('[data-vz-sub="navegador"]').textContent = V && !V.tem()
+      ? 'Este navegador não tem voz própria. Abra no Edge ou no Chrome.'
+      : 'Grátis. Usa a voz do navegador ou do celular.';
+    document.querySelector('[data-vz-sub="elevenlabs"]').textContent = semEleven
+      ? 'Falta a chave da ElevenLabs ou uma voz no cadastro de ' + nome + '. Peça ao Admin.'
+      : 'A voz exclusiva de ' + nome + '. Gasta a cota; se ela falhar, usa a do aparelho.';
+    $('mlVozAjustes').hidden = vozFolha.fonte !== 'navegador';
+    $('mlVozIos').hidden = !ehIos();
+    document.querySelector('#mlVozVeu [data-fs="testar"]').hidden = vozFolha.fonte !== 'navegador';
+    for (const b of document.querySelectorAll('#mlVozVeu [data-fs]')) b.disabled = vozFolha.ocupado && b.dataset.fs !== 'fechar';
+  }
+  /* Os campos só são preenchidos ao abrir e quando o navegador termina de carregar as vozes. Redesenhar a
+     cada toque devolvia a escolha guardada por cima da que a pessoa acabou de fazer (dono, 27/10/2026). */
+  function preencheCampos(doZero) {
+    const V = raiz.DGVozAparelho, sel = $('mlVozLista'), lista = V ? V.lista() : [];
+    const naTela = doZero ? '' : sel.value, atual = V && V.escolhida();
+    sel.innerHTML = lista.length
+      ? lista.map(v => `<option value="${esc(v.name)}">${esc(v.name.replace(/^(Microsoft|Google)\s+/, ''))}</option>`).join('')
+      : '<option value="">Voz padrão do aparelho</option>';
+    if (naTela && lista.some(v => v.name === naTela)) sel.value = naTela;
+    else if (atual) sel.value = atual.name;
+    if (doZero) $('mlVozVel').value = String((V && V.prefs().velocidade) || '1');
+  }
+  /* Teste e salvar leem o que está nos campos: o teste já soa como vai ficar. */
+  function guardaAparelho() {
+    const V = raiz.DGVozAparelho;
+    if (V) V.guarda({ voz: $('mlVozLista').value || null, velocidade: Number($('mlVozVel').value) || 1 });
+  }
+  function testaVoz() {
+    const V = raiz.DGVozAparelho;
+    if (!V) return;
+    const antes = V.prefs();
+    guardaAparelho();
+    V.cala();
+    V.fala('Oi, eu sou ' + (vozFolha.ag ? vozFolha.ag.nome : 'o seu agente') + '. É assim que eu vou ler as respostas.',
+      motivo => erroVoz('O aparelho não falou (' + motivo + ').'));
+    V.guarda(antes);   // só o Salvar guarda de vez
+  }
+  async function salvaVoz() {
+    vozFolha.ocupado = true; pintaVoz(); erroVoz('');
+    try {
+      const r = await fetch('/api/v1/agents/' + encodeURIComponent(vozFolha.ag.id) + '/voz', {
+        method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fonte: vozFolha.fonte }),
+      });
+      const d = await r.json().catch(() => null);
+      if (!r.ok || !d || !d.ok) throw new Error((d && d.erro) || 'O servidor respondeu ' + r.status + '. Tente de novo.');
+      if (vozFolha.fonte === 'navegador') guardaAparelho();
+      if (agenteAtual && agenteAtual.id === vozFolha.ag.id) agenteAtual.voz_fonte = d.fonte;
+      vozFolha.ocupado = false;
+      fechaFolhaVoz();
+    } catch (e) {
+      vozFolha.ocupado = false; pintaVoz();
+      erroVoz(/fetch|network|rede/i.test(e.message) ? 'Sem conexão com o servidor. Confira a internet e tente de novo.' : e.message);
+    }
+  }
+  async function abreFolhaVoz(ag) {
+    const veu = folhaVoz();
+    Object.assign(vozFolha, { ag, estado: null, fonte: ag.voz_escolhida || ag.voz_fonte || 'navegador', ocupado: false, voltaFoco: document.activeElement });
+    $('mlVozSub').textContent = 'Como ' + ag.nome + ' lê as respostas em voz alta.';
+    erroVoz('');
+    veu.hidden = false;
+    requestAnimationFrame(() => veu.classList.add('aberto'));
+    veu.querySelector('.ml-fs').focus();
+    try {
+      const [V, r] = await Promise.all([carregaVozAparelho(), fetch('/api/v1/agents/' + encodeURIComponent(ag.id) + '/voz', { credentials: 'same-origin' })]);
+      const d = await r.json().catch(() => null);
+      if (!r.ok || !d || !d.ok) throw new Error((d && d.erro) || 'O servidor respondeu ' + r.status + '.');
+      vozFolha.estado = d;
+      vozFolha.fonte = d.fonte;
+      if (!vozFolha.ouveVozes) { vozFolha.ouveVozes = true; V.quandoCarregar(() => { if (!veu.hidden) preencheCampos(false); }); }
+    } catch (e) {
+      erroVoz('Não consegui ler a voz de ' + ag.nome + ': ' + e.message);
+    }
+    preencheCampos(true);
+    pintaVoz();
+  }
+  function fechaFolhaVoz() {
+    const veu = $('mlVozVeu');
+    if (!veu || veu.hidden || vozFolha.ocupado) return;
+    if (raiz.DGVozAparelho) raiz.DGVozAparelho.cala();
+    veu.classList.remove('aberto');
+    veu.hidden = true;
+    if (vozFolha.voltaFoco && vozFolha.voltaFoco.focus) vozFolha.voltaFoco.focus();
+  }
+
   /* Tema em Configurações (18/10/2026): Automático, Claro ou Escuro, pelo tema.js (DGTema). O
      botão de tema antigo ficava no rodapé do menu do painel, que a casca esconde. */
   function pintaTema() {
@@ -1243,6 +1401,7 @@
     '🔔': ico('<path d="M4 10v4h3l6 4V6L7 10z"/><path d="M16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11"/>'),
     '🖥': ico('<rect x="3.5" y="4.5" width="17" height="11.5" rx="2"/><path d="M9 20h6M12 16v4"/>'),
     '🔖': ico('<path d="M7 4h10a1.5 1.5 0 0 1 1.5 1.5V20L12 15.5 5.5 20V5.5A1.5 1.5 0 0 1 7 4z"/>'),
+    '🗣': ico('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/>'),
     '📥': ico('<path d="M4 13h4l1.5 2.5h5L16 13h4"/><path d="M5.5 5h13L20 13v5.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5V13z"/>'),
   };
   // o tema usa ◐ também: lá vira sol e lua, não carinha

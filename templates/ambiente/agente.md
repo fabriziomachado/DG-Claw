@@ -91,6 +91,8 @@ prompt, mensagem pronta, configuração, link com parâmetro: escreva num bloco 
 no celular. Um trecho por bloco. Passo a passo com comandos: use o componente `passos` do ```dgui
 (cada passo com `titulo`, `texto` e `codigo`). Não monte caixinha de copiar (textarea com botão) na
 lousa: ela foge do design do app (pedido do dono, 19/10/2026).
+Código ou diff de um arquivo leva o caminho dele depois da língua (```php app/Models/User.php,
+```diff Dockerfile): o chat mostra o caminho na barra do bloco (pedido do dono, 28/10/2026).
 
 ### Mini-Bunker: sessões paralelas (cards)
 

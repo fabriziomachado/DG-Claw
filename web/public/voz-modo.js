@@ -203,7 +203,9 @@ function iniciaModoVoz(V) {
   }
 
   /* ── Abrir, silenciar e encerrar ── */
-  function abre() {
+  /* continuar: veio de outro agente com o modo ligado. Sem um toque nesta página o navegador pode
+     barrar o som, então aí a tela abre parada ("Toque na onda para falar") e o toque libera tudo. */
+  function abre(continuar) {
     if (ativo) return;
     V.destravarAudio();
     if (!V.caps.microfone || !V.caps.voz) return;
@@ -216,7 +218,8 @@ function iniciaModoVoz(V) {
     pinta();
     tick = setInterval(() => { confereSilencio(); pinta(); }, 50);
     raf = requestAnimationFrame(desenha);
-    if (!ocupado() && !V.estado().transcrevendo) comecaGravar();
+    const semToque = continuar === true && navigator.userActivation && !navigator.userActivation.hasBeenActive;
+    if (!semToque && !ocupado() && !V.estado().transcrevendo) comecaGravar();
   }
 
   async function encerra() {
@@ -256,13 +259,22 @@ function iniciaModoVoz(V) {
     } else if (estado === 'parado') comecaGravar();
   }
 
-  btnVoz.onclick = abre;
+  btnVoz.onclick = () => abre();
   fimBtn.onclick = encerra;
   micBtn.onclick = alternaMudo;
   ondaBtn.onclick = toqueNaOnda;
   document.addEventListener('keydown', ev => { if (ativo && ev.key === 'Escape') { ev.preventDefault(); encerra(); } });
-  // sair da tela (trocar de agente, fechar) solta o microfone
-  window.addEventListener('pagehide', () => { if (ativo) encerra(); });
+  // sair da tela (trocar de agente, fechar) solta o microfone. Trocar de agente com o modo ligado
+  // reabre o modo no agente novo (27/10/2026, pedido do dono): a marca vale 30 s, só nesta aba.
+  const CHAVE_MODO = 'dg-modo-voz';
+  window.addEventListener('pagehide', () => {
+    if (!ativo) return;
+    try { sessionStorage.setItem(CHAVE_MODO, String(Date.now())); } catch (e) { /* sem armazenamento: só não reabre */ }
+    encerra();
+  });
+  let marca = 0;
+  try { marca = Number(sessionStorage.getItem(CHAVE_MODO)) || 0; sessionStorage.removeItem(CHAVE_MODO); } catch (e) { /* idem */ }
+  if (marca && Date.now() - marca < 30000) abre(true);
 
   window.DGModoVoz = { abre, encerra, ativo: () => ativo, estado: () => estado };
 }

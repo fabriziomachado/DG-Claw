@@ -35,7 +35,8 @@ const { criarBoasVindas } = require('./lib/boas-vindas');
 const { criarCaixaEntrada } = require('./lib/caixa-entrada');
 const { criarSaudeServidor } = require('./lib/saude-servidor');
 const { criarFoco } = require('./lib/foco');
-const { criarVoz } = require('./lib/voz');
+const { criarVoz, pedacosNavegador } = require('./lib/voz');
+const { criarVozFonte } = require('./lib/voz-fonte');
 const { criarSigilo } = require('./lib/sigilo');
 const { criarOnboarding } = require('./lib/onboarding');
 const { criarLogin } = require('./lib/login');
@@ -113,6 +114,9 @@ function criarServidor(opcoes) {
   const login = criarLogin({ runner, conversa, log, agora: opcoes.agora, oiPrazoMs: opcoes.loginOiPrazoMs, oiPassoMs: opcoes.loginOiPassoMs });
   const cofreAgente = criarCofreAgente({ config, log, reiniciar: opcoes.reiniciarCofre });
   const voz = opcoes.voz || criarVoz({ env: config.env, log });
+  // voz de cada agente: a do aparelho (padrão, grátis) ou a da ElevenLabs, quando escolhida e disponível
+  const vozFonte = criarVozFonte({ arquivo: path.join(config.dataDir, 'voz', 'fontes.json'), log });
+  const fonteVoz = a => (vozFonte.de(a.slug) === 'elevenlabs' && voz.vozDoAgente(a) ? 'elevenlabs' : 'navegador');
   const sigilo = opcoes.sigilo || criarSigilo({ env: config.env, registro, dataDir: config.dataDir, log, timeoutMs: opcoes.timeoutSigiloMs });
   const cofreRotas = criarCofreRotas({ config, runner, cofre: cofreAgente, voz, log, registro, entregar: (...a) => conversa.entregar(...a), esperaAvisoMs: opcoes.esperaAvisoMs });
   const proxy = criarProxy({ config, registro, log, cofreRotas });
@@ -357,7 +361,8 @@ function criarServidor(opcoes) {
       id: a.slug, nome: a.nome, subtitulo: a.subtitulo || rotulo, cor: a.cor, tipo: a.tipo,
       provedor: a.provedor, modelo: a.modelo, rotulo_provedor: rotulo,
       tem_painel: !!a.porta_painel, painel_url: a.porta_painel ? `/p/${a.slug}/` : null,
-      voz: voz.vozDoAgente(a), tem_voz: voz.vozDoAgente(a), microfone: voz.microfone,
+      voz: true, tem_voz: true, voz_fonte: fonteVoz(a), voz_escolhida: vozFonte.de(a.slug), voz_elevenlabs: voz.vozDoAgente(a),
+      microfone: voz.microfone,
       avatar_sono: avatares.sono(a.slug),
     }, avatarDe(a));
   }
@@ -393,6 +398,22 @@ function criarServidor(opcoes) {
     if (p === '/api/v1/referencias' || p.startsWith('/api/v1/referencias/')) return referencias.rota(req, res, url, sessao);
     // Pasta do agente aberta com a cara da conversa (25/10/2026): o arquivo de <casa>/arquivos vira mídia,
     // e a tela /ver-arquivo usa o formatador e o visual isolado da conversa (lib/pasta-ver.js)
+    const mVoz = /^\/api\/v1\/agents\/([^/]+)\/voz$/.exec(p);
+    if (mVoz) {
+      if (sessao.via === 'caixa') return H.erroJson(res, 403, 'A voz do agente é escolha do dono, pelo menu do app.');
+      const a = agenteOuErro(res, decodeURIComponent(mVoz[1]));
+      if (!a) return undefined;
+      const estado = () => ({ ok: true, fonte: fonteVoz(a), escolhida: vozFonte.de(a.slug), elevenlabs: voz.vozDoAgente(a) });
+      if (m === 'GET') return H.enviaJson(res, 200, estado());
+      if (m !== 'POST') return H.erroJson(res, 405, 'Use GET para ler e POST com {"fonte": "navegador"} ou {"fonte": "elevenlabs"} para mudar.');
+      let corpo;
+      try { corpo = await H.lerJson(req, 1024); } catch (e) { return H.erroJson(res, e.status || 400, e.message); }
+      if (corpo && corpo.fonte === 'elevenlabs' && !voz.vozDoAgente(a)) {
+        return H.erroJson(res, 409, `${a.nome} não tem voz da ElevenLabs: falta a chave ELEVENLABS_API_KEY no web.env ou uma voz no cadastro do agente. A voz continua a do aparelho.`);
+      }
+      try { vozFonte.grava(a.slug, corpo && corpo.fonte); } catch (e) { return H.erroJson(res, e.status || 500, e.message); }
+      return H.enviaJson(res, 200, estado());
+    }
     const mPasta = /^\/api\/v1\/agents\/([^/]+)\/pasta\/abrir$/.exec(p);
     if (mPasta) {
       if (m !== 'GET') return H.erroJson(res, 405, 'Use GET com ?caminho=<arquivo da Pasta>.');
@@ -991,9 +1012,21 @@ function criarServidor(opcoes) {
     if (!Number.isInteger(parte) || parte < 0) {
       return H.erroJson(res, 400, `O campo "parte" precisa ser um número inteiro a partir de 0 (o pedaço de voz pedido). Recebi ${JSON.stringify(parte).slice(0, 40)}. Nada foi falado.`);
     }
-    const r = await voz.falar(agente, corpo.text, typeof corpo.voice_id === 'string' ? corpo.voice_id : null, parte);
+    const vozPedida = typeof corpo.voice_id === 'string' ? corpo.voice_id : null;
+    // voz do aparelho: o servidor só limpa e fatia; quem fala é o navegador
+    const noAparelho = (aviso) => {
+      const n = pedacosNavegador(corpo.text);
+      if (n.erro) return H.erroJson(res, n.status, n.erro);
+      return H.enviaJson(res, 200, Object.assign({ ok: true, navegador: true, partes: n.partes }, aviso ? { aviso } : {}));
+    };
+    if (!vozPedida && fonteVoz(agente) === 'navegador') return noAparelho();
+    const r = await voz.falar(agente, corpo.text, vozPedida, parte);
+    // ElevenLabs fora do ar ou sem cota no começo da fala: lê com a voz do aparelho em vez de ficar mudo
+    if (r.erro && !vozPedida && parte === 0 && r.status >= 429) return noAparelho(`${r.erro} Li com a voz do aparelho.`);
     if (r.erro) return H.erroJson(res, r.status, r.erro);
     const cab = { 'Content-Type': 'audio/mpeg', 'Content-Length': r.audio.length, 'Cache-Control': 'no-store', 'X-TTS-Chars': String(r.chars), 'X-TTS-Partes': String(r.partes), 'X-TTS-Parte': String(r.parte) };
+    // o trecho falado vai junto para a tela pintar o que está sendo lido (marca-texto da leitura)
+    if (r.texto) cab['X-TTS-Trecho'] = encodeURIComponent(r.texto);
     res.writeHead(200, cab);
     return res.end(r.audio);
   }

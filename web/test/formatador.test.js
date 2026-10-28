@@ -47,3 +47,16 @@ test('sublista recuada fica dentro do item (27/10/2026, README do Tech virava 5,
   const h = F.arquivoParaHtml('1. um\n2. dois:\n   - a\n   - b\n3. tres', 'x.md');
   assert.match(h, /<ol class="lb-lista"><li>um<\/li><li>dois:<ul class="lb-lista"><li>a<\/li><li>b<\/li><\/ul><\/li><li>tres<\/li><\/ol>/);
 });
+
+test('bloco de código mostra o caminho do arquivo na barra (28/10/2026, pedido do dono)', () => {
+  const diff = '```diff\n--- a/Dockerfile\n+++ b/Dockerfile\n@@ -1,4 +1,4 @@\n-FROM php:8.2-fpm\n+FROM php:8.5.12-fpm\n```';
+  assert.match(F.paragrafos(diff, 'markdown'), /<span class="cod-lingua">diff<\/span><span class="cod-arq" title="Dockerfile"><bdi>Dockerfile<\/bdi><\/span>/);
+  const php = F.paragrafos('```php app/Models/User.php\n<?php echo 1;\n```', 'markdown');
+  assert.match(php, /cod-lingua">PHP<\/span><span class="cod-arq" title="app\/Models\/User\.php">/);
+  assert.doesNotMatch(php, /app\/Models\/User\.php<\/span>[\s\S]*<pre[^>]*>[\s\S]*app\/Models/);
+  assert.match(F.paragrafos('```js:web/x.js\nlet a = 1;\n```', 'markdown'), /title="web\/x\.js"/);
+  assert.doesNotMatch(F.paragrafos('```bash\nls\n```', 'markdown'), /cod-arq/);
+  // diff de vários arquivos e arquivo novo
+  assert.equal(F.arquivoDoDiff('--- a/x\n+++ b/x\n--- a/y\n+++ b/y'), '');
+  assert.equal(F.arquivoDoDiff('--- /dev/null\n+++ b/novo.txt'), 'novo.txt');
+});

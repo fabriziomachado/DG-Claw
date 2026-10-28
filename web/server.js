@@ -34,6 +34,7 @@ const { criarVigiaAlertas } = require('./lib/vigia-alertas');
 const { criarBoasVindas } = require('./lib/boas-vindas');
 const { criarCaixaEntrada } = require('./lib/caixa-entrada');
 const { criarSaudeServidor } = require('./lib/saude-servidor');
+const { criarRotinasServidor } = require('./lib/rotinas-servidor');
 const { criarFoco } = require('./lib/foco');
 const { criarVoz, pedacosNavegador } = require('./lib/voz');
 const { criarVozFonte } = require('./lib/voz-fonte');
@@ -155,6 +156,8 @@ function criarServidor(opcoes) {
   const arquivoConversa = criarArquivoConversa({ dataDir: config.dataDir, log });
   const caixaEntrada = criarCaixaEntrada({ registro, alertas, corteDe: (slug) => arquivoConversa.ultimoCorte(slug), log });
   const saudeServidor = criarSaudeServidor({ registro, conversa, log });
+  const rotinasServidor = opcoes.rotinasServidor || criarRotinasServidor({ dataDir: config.dataDir, push, log });
+  if (!opcoes.semVigiaAlertas) rotinasServidor.iniciar();
   const cotaVigia = opcoes.cotaVigia || criarCotaVigia({ log });
   const memoriaSemantica = criarMemoriaSemantica({ registro, log, agora: opcoes.agora });
   const limites = criarLimites({ registro, conversa, push, log, dataDir: config.dataDir, tz: config.tz, agora: opcoes.agora, buscarUso: opcoes.buscarUso });
@@ -442,6 +445,7 @@ function criarServidor(opcoes) {
     if ((p === '/api/v1/lembretes' || p.startsWith('/api/v1/lembretes/')) && await lembretes.rotas(req, res, url, sessao)) return undefined;
     if (p === '/api/v1/caixa' && await caixaEntrada.rotas(req, res, url, sessao)) return undefined;
     if (p === '/api/v1/saude-servidor' && await saudeServidor.rotas(req, res, url, sessao)) return undefined;
+    if (p.startsWith('/api/v1/rotinas-servidor') && await rotinasServidor.rotas(req, res, url, sessao)) return undefined;
     if (p.startsWith('/api/v1/limites') && await limites.rotas(req, res, url, sessao)) return undefined;
     if (p.startsWith('/api/v1/memoria') && await memoriaSemantica.rotas(req, res, url, sessao)) return undefined;
 
@@ -1266,7 +1270,7 @@ function criarServidor(opcoes) {
         });
       });
     },
-    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); vigiaAlertas.parar(); boasVindas.parar(); limites.parar(); avisos.parar(); vigiaAtencao.parar(); versaoNova.parar(); githubApp.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
+    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); vigiaAlertas.parar(); boasVindas.parar(); limites.parar(); avisos.parar(); vigiaAtencao.parar(); versaoNova.parar(); githubApp.parar(); rotinasServidor.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
   };
 }
 

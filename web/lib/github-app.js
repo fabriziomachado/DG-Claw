@@ -227,7 +227,7 @@ function criarGithubApp({ dataDir, registro, log, buscar, rodar, agora }) {
   function parar() { if (timer) { clearInterval(timer); timer = null; } }
 
   // ── páginas do fluxo ───────────────────────────────────────────────────────
-  function pagina(res, status, titulo, corpoHtml, extraCab) {
+  function pagina(res, status, titulo, corpoHtml, extraCab, script) {
     const nonce = crypto.randomBytes(12).toString('base64');
     res.writeHead(status, {
       'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
@@ -237,7 +237,7 @@ function criarGithubApp({ dataDir, registro, log, buscar, rodar, agora }) {
     res.end(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(titulo)}</title><style>body{margin:0;font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f7f7f8;color:#202123;display:grid;place-items:center;min-height:100vh;padding:16px;box-sizing:border-box}
 @media (prefers-color-scheme:dark){body{background:#212121;color:#ececec}a{color:#8ab4f8}}main{max-width:360px;text-align:center}button{font:inherit;font-weight:600;min-height:42px;padding:0 18px;border-radius:10px;border:0;background:#2563eb;color:#fff;cursor:pointer}</style></head>
-<body><main>${corpoHtml.replace(/<script>/g, `<script nonce="${nonce}">`)}</main></body></html>`);
+<body><main>${corpoHtml}</main>${script ? `<script nonce="${nonce}">${script}</script>` : ''}</body></html>`);
   }
   const vai = (res, onde) => { res.writeHead(302, { Location: onde, 'Cache-Control': 'no-store' }); res.end(); };
   const deVolta = (slug, extra) => `/integracoes?a=${encodeURIComponent(slug)}&github=${extra}`;
@@ -267,7 +267,7 @@ function criarGithubApp({ dataDir, registro, log, buscar, rodar, agora }) {
       };
       pagina(res, 200, 'Conectar GitHub', `<p>Abrindo o GitHub…</p>
 <form id="f" method="post" action="${GH}/settings/apps/new?state=${state}"><input type="hidden" name="manifest" value="${esc(JSON.stringify(manifesto))}"><noscript><button>Continuar no GitHub</button></noscript></form>
-<script>document.getElementById('f').submit()</script>`);
+`, null, "document.getElementById('f').submit()");
       return true;
     }
 

@@ -51,6 +51,7 @@ const { criarReferencias } = require('./lib/referencias');
 const { arquivoDaPasta, imagemDaPasta } = require('./lib/pasta-ver');
 const { criarAvisos } = require('./lib/avisos');
 const { criarIntegracoes } = require('./lib/integracoes');
+const { criarGithubApp } = require('./lib/github-app');
 const { criarHistorico } = require('./lib/historico');
 const { criarArquivoConversa } = require('./lib/arquivo-conversa');
 const { criarAvatares } = require('./lib/avatar');
@@ -144,6 +145,9 @@ function criarServidor(opcoes) {
   caixa.permitir('/api/v1/uso');
   const avisos = criarAvisos({ config, registro, runner, caixa, log, agora: opcoes.agora });
   const integracoes = criarIntegracoes({ registro, log });
+  // GitHub como app de cada agente: a chave fica aqui; a caixa recebe só a senha de 1 h. NÃO entra em caixa.permitir.
+  const githubApp = opcoes.githubApp || criarGithubApp({ dataDir: config.dataDir, registro, log });
+  if (!opcoes.semVigiaAlertas) githubApp.iniciar();
   const arquivoConversa = criarArquivoConversa({ dataDir: config.dataDir, log });
   const caixaEntrada = criarCaixaEntrada({ registro, alertas, corteDe: (slug) => arquivoConversa.ultimoCorte(slug), log });
   const saudeServidor = criarSaudeServidor({ registro, conversa, log });
@@ -613,6 +617,9 @@ function criarServidor(opcoes) {
     if (p === '/api/v1/integracoes' || p.startsWith('/api/v1/integracoes/')) {
       if (await integracoes.tratar(req, res, url, sessao)) return undefined;
     }
+    if (p === '/api/v1/github' || p.startsWith('/api/v1/github/')) {
+      if (await githubApp.tratarApi(req, res, url, sessao)) return undefined;
+    }
     // Pedido para a equipe (lib/mencoes.js): o agente pega e entrega pela caixa (dgclaw-api)
     const mp = /^\/api\/v1\/pedidos\/([a-f0-9]{16})\/(pegar|entregar)$/.exec(p);
     if (mp) {
@@ -1081,6 +1088,11 @@ function criarServidor(opcoes) {
       return res.end();
     }
 
+    if (p.startsWith('/github/')) {
+      if (!sessao) return semSessaoPagina(req, res, url);
+      if (await githubApp.tratarPagina(req, res, url, sessao, H.origemPropria(req, config.proxiesConfiaveis))) return undefined;
+    }
+
     if (p === '/integracoes' && (m === 'GET' || m === 'HEAD')) {
       if (!sessao) return semSessaoPagina(req, res, url);
       if (!servirArquivo(req, res, path.join(config.publicDir, 'integracoes.html'), 'no-store')) {
@@ -1221,7 +1233,7 @@ function criarServidor(opcoes) {
         });
       });
     },
-    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); vigiaAlertas.parar(); boasVindas.parar(); limites.parar(); avisos.parar(); vigiaAtencao.parar(); versaoNova.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
+    fechar() { return new Promise((resolve) => { caixa.parar(); lembretes.parar(); vigiaAlertas.parar(); boasVindas.parar(); limites.parar(); avisos.parar(); vigiaAtencao.parar(); versaoNova.parar(); githubApp.parar(); proxy.fecharTudo(); servidor.closeAllConnections && servidor.closeAllConnections(); servidor.close(() => resolve()); }); },
   };
 }
 

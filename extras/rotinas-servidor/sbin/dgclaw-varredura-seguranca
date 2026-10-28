@@ -1,0 +1,233 @@
+#!/usr/bin/env python3
+# Varredura diária de segurança do S2 Bot (pedido do dono, 21/10/2026).
+# Robô sem IA: atualiza a lista de pacotes, varre o servidor e a imagem dos agentes com o Trivy,
+# compara com o dia anterior e grava um resumo em JSON na casa do agente Tech, que lê às 7h e
+# manda o relatório ao dono. O Admin nunca lê este resultado (vem de bases de terceiros).
+# Nada é aplicado aqui: só leitura.
+import collections, datetime, json, os, shutil, subprocess, sys, tempfile
+
+SLUG = 'tech'
+CASA = f'/var/lib/dgclaw/agentes/{SLUG}/home'
+DESTINO = os.path.join(CASA, 'seguranca')
+IMAGEM = 'localhost/dgclaw-agente:latest'
+CACHE = '/var/cache/trivy'
+TRABALHO = '/var/tmp'  # o /tmp é tmpfs pequeno e a imagem tem 3 GB
+SEVERIDADES = 'MEDIUM,HIGH,CRITICAL'
+PULAR_HOST = '/proc,/sys,/run,/tmp,/var/tmp,/var/lib/containers,/var/lib/dgclaw,/root/.local/share/containers,/var/backups,/var/cache/trivy'
+DIAS_GUARDADOS = 30
+ORDEM = {'CRITICAL': 0, 'HIGH': 1, 'MEDIUM': 2, 'LOW': 3, 'UNKNOWN': 4}
+
+
+def roda(cmd, **kw):
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=kw.pop('timeout', 1800), **kw)
+
+
+def apt_pendentes():
+    roda(['apt-get', 'update', '-qq'], timeout=600)
+    saida = roda(['apt', 'list', '--upgradable'], env=dict(os.environ, LANG='C')).stdout
+    itens = []
+    for linha in saida.splitlines():
+        if '/' not in linha or 'upgradable from' not in linha:
+            continue
+        nome, resto = linha.split('/', 1)
+        partes = resto.split()
+        itens.append({'pacote': nome, 'origem': partes[0], 'nova': partes[1],
+                      'atual': linha.rsplit('from: ', 1)[-1].rstrip(']'),
+                      'seguranca': '-security' in partes[0]})
+    fase = roda(['apt-get', '-s', 'upgrade'], env=dict(os.environ, LANG='C')).stdout
+    adiados = []
+    if 'deferred due to phasing' in fase:
+        bloco = fase.split('deferred due to phasing:', 1)[1].split('\n')
+        for l in bloco[1:]:
+            if not l.startswith(' '):
+                break
+            adiados += l.split()
+    return {'pendentes': itens, 'adiados_pelo_ubuntu': adiados}
+
+
+def trivy(args):
+    with tempfile.NamedTemporaryFile(dir=TRABALHO, suffix='.json', delete=False) as f:
+        saida = f.name
+    try:
+        r = roda(['trivy', '--cache-dir', CACHE, '--quiet', *args, '--scanners', 'vuln',
+                  '--severity', SEVERIDADES, '--format', 'json', '-o', saida], timeout=3600,
+                 env=dict(os.environ, TMPDIR=TRABALHO))
+        if r.returncode != 0:
+            raise RuntimeError((r.stderr or r.stdout).strip()[-400:])
+        with open(saida) as f:
+            return json.load(f)
+    finally:
+        os.unlink(saida)
+
+
+def achatar(alvo, dados):
+    """Uma linha por (pacote, CVE), sem a descrição longa."""
+    vistos, linhas = set(), []
+    for res in dados.get('Results') or []:
+        for v in res.get('Vulnerabilities') or []:
+            chave = (v['PkgName'], v['VulnerabilityID'])
+            if chave in vistos:
+                continue
+            vistos.add(chave)
+            linhas.append({
+                'alvo': alvo, 'tipo': res.get('Class'), 'onde': (v.get('PkgPath') or res.get('Target') or '')[:160],
+                'pacote': v['PkgName'], 'instalada': v.get('InstalledVersion'),
+                'conserto': v.get('FixedVersion') or None, 'id': v['VulnerabilityID'],
+                'gravidade': v.get('Severity'), 'titulo': (v.get('Title') or '')[:200],
+                'publicada': (v.get('PublishedDate') or '')[:10], 'link': v.get('PrimaryURL'),
+            })
+    return linhas
+
+
+def agrupar(linhas):
+    """Por (alvo, pacote): contagem por gravidade, se há conserto e as 5 piores CVEs."""
+    grupos = collections.defaultdict(list)
+    for l in linhas:
+        grupos[(l['alvo'], l['pacote'])].append(l)
+    saida = []
+    for (alvo, pacote), ls in grupos.items():
+        ls.sort(key=lambda l: (ORDEM.get(l['gravidade'], 9), l['conserto'] is None))
+        cont = collections.Counter(l['gravidade'] for l in ls)
+        saida.append({
+            'alvo': alvo, 'pacote': pacote, 'tipo': ls[0]['tipo'], 'onde': ls[0]['onde'], 'onde_detalhe': ls[0].get('onde_detalhe'),
+            'instalada': ls[0]['instalada'], 'pior': ls[0]['gravidade'],
+            'contagem': dict(cont), 'com_conserto': sum(1 for l in ls if l['conserto']),
+            'versoes_conserto': sorted({l['conserto'] for l in ls if l['conserto']})[:5],
+            'exemplos': [{k: l[k] for k in ('id', 'gravidade', 'conserto', 'titulo', 'link')} for l in ls[:5]],
+        })
+    saida.sort(key=lambda g: (ORDEM.get(g['pior'], 9), -g['com_conserto'], -sum(g['contagem'].values())))
+    return saida
+
+
+# Pacote Python sem caminho no Trivy: confere dentro da imagem se é o do Python dos agentes
+# (/opt/venv) ou só a cópia embutida no pip (pip/_vendor), que roda apenas quando o pip instala algo.
+PY_ONDE = r"""
+import json, importlib.metadata as md, pathlib
+venv = {d.metadata['Name'].lower(): d.version for d in md.distributions()}
+vend = {}
+for f in pathlib.Path('/opt/venv/lib').glob('python3*/site-packages/pip/_vendor/vendor.txt'):
+    for l in f.read_text().splitlines():
+        l = l.split('#')[0].strip()
+        if '==' in l:
+            n, v = l.split('==', 1)
+            vend[n.strip().lower()] = v.strip()
+print(json.dumps({'venv': venv, 'pip_vendor': vend}))
+"""
+
+
+def python_da_imagem():
+    r = roda(['podman', 'run', '--rm', '--network', 'none', '--entrypoint', '/opt/venv/bin/python', IMAGEM, '-I', '-c', PY_ONDE], timeout=300)
+    if r.returncode != 0:
+        raise RuntimeError(r.stderr.strip()[-300:])
+    return json.loads(r.stdout)
+
+
+def detalha_onde(linhas, py):
+    for l in linhas:
+        if l['alvo'] != 'imagem dos agentes' or l['tipo'] != 'lang-pkgs' or l['onde'] not in ('', 'Python'):
+            continue
+        n, v = l['pacote'].lower(), l['instalada']
+        if py['venv'].get(n) == v:
+            l['onde_detalhe'] = 'no Python dos agentes e das skills (/opt/venv)'
+        elif py['pip_vendor'].get(n) == v:
+            usada = py['venv'].get(n)
+            l['onde_detalhe'] = ('cópia embutida no pip (pip/_vendor): só roda quando o pip instala algo; '
+                                 + (f'o Python dos agentes usa a {usada}' if usada else 'o Python dos agentes não tem esse pacote')
+                                 + '; sai quando sair um pip novo')
+
+
+def contexto():
+    ss = roda(['ss', '-Htlnu']).stdout.split('\n')
+    publicas = sorted({l.split()[4] for l in ss if l.split() and not any(x in l.split()[4] for x in ('127.0.0', '[::1]', '%lo'))})
+    return {
+        'kernel_em_uso': os.uname().release,
+        'sistema': roda(['lsb_release', '-ds']).stdout.strip(),
+        'portas_abertas_para_fora': publicas,
+        'firewall': roda(['ufw', 'status']).stdout.strip().split('\n')[0],
+        'modulos_do_kernel_carregados': sorted(l.split()[0] for l in roda(['lsmod']).stdout.splitlines()[1:]),
+        'servicos_rodando': sorted(l.split()[0] for l in roda(['systemctl', 'list-units', '--type=service', '--state=running', '--no-legend', '--plain']).stdout.splitlines() if l.strip()),
+        'reinicio_pendente': os.path.exists('/var/run/reboot-required'),
+        'imagem_dos_agentes_criada': roda(['podman', 'image', 'inspect', IMAGEM, '--format', '{{.Created}}']).stdout.strip()[:19],
+    }
+
+
+def main():
+    agora = datetime.datetime.now().astimezone()
+    dia = agora.strftime('%Y-%m-%d')
+    rel = {'gerado_em': agora.isoformat(timespec='seconds'), 'estado': 'ok', 'erros': []}
+    linhas = []
+    try:
+        rel['atualizacoes_do_sistema'] = apt_pendentes()
+    except Exception as e:
+        rel['erros'].append(f'lista de atualizações: {e}')
+    try:
+        linhas += achatar('servidor', trivy(['rootfs', '--skip-dirs', PULAR_HOST, '/']))
+    except Exception as e:
+        rel['erros'].append(f'varredura do servidor: {e}')
+    pasta = tempfile.mkdtemp(prefix='dgclaw-varredura-', dir=TRABALHO)
+    try:
+        tar = os.path.join(pasta, 'imagem.tar')
+        r = roda(['podman', 'save', '-o', tar, IMAGEM], timeout=1800)
+        if r.returncode != 0:
+            raise RuntimeError(r.stderr.strip()[-300:])
+        linhas += achatar('imagem dos agentes', trivy(['image', '--input', tar]))
+    except Exception as e:
+        rel['erros'].append(f'varredura da imagem: {e}')
+    finally:
+        shutil.rmtree(pasta, ignore_errors=True)
+    try:
+        detalha_onde(linhas, python_da_imagem())
+    except Exception as e:
+        rel['erros'].append(f'onde ficam os pacotes Python da imagem: {e}')
+    try:
+        rel['contexto'] = contexto()
+    except Exception as e:
+        rel['erros'].append(f'contexto: {e}')
+
+    # as chaves (alvo, pacote, CVE) ficam num arquivo à parte: são milhares e o Tech não precisa delas
+    anterior = os.path.join(DESTINO, '.chaves-ultimo.json')
+    antes = set()
+    try:
+        with open(anterior) as f:
+            antes = {tuple(x) for x in json.load(f)}
+    except (OSError, ValueError):
+        pass
+    chaves = sorted({(l['alvo'], l['pacote'], l['id']) for l in linhas})
+    novas = [l for l in linhas if (l['alvo'], l['pacote'], l['id']) not in antes] if antes else []
+    sumiram = sorted(antes - set(chaves))
+    cont = collections.Counter((l['alvo'], l['gravidade'], bool(l['conserto'])) for l in linhas)
+    rel['resumo'] = [{'alvo': a, 'gravidade': g, 'tem_conserto': c, 'quantas': n} for (a, g, c), n in sorted(cont.items(), key=lambda x: (x[0][0], ORDEM.get(x[0][1], 9)))]
+    rel['primeira_varredura'] = not antes
+    rel['novas_desde_ontem'] = sorted(novas, key=lambda l: ORDEM.get(l['gravidade'], 9))[:60]
+    rel['quantas_novas'] = len(novas)
+    rel['corrigidas_desde_ontem'] = [{'alvo': a, 'pacote': p, 'id': i} for a, p, i in sumiram][:60]
+    rel['por_pacote'] = agrupar(linhas)
+    if rel['erros']:
+        rel['estado'] = 'erro' if not linhas else 'parcial'
+
+    os.makedirs(DESTINO, exist_ok=True)
+    dono = os.stat(CASA)
+    os.chown(DESTINO, dono.st_uid, dono.st_gid)
+    texto = json.dumps(rel, ensure_ascii=False, indent=1)
+    for nome, conteudo in ((f'{dia}.json', texto), ('ultimo.json', texto), ('.chaves-ultimo.json', json.dumps(chaves))):
+        alvo = os.path.join(DESTINO, nome)
+        tmp = alvo + '.tmp'
+        with open(tmp, 'w') as f:
+            f.write(conteudo)
+        os.chown(tmp, dono.st_uid, dono.st_gid)
+        os.chmod(tmp, 0o640)
+        os.replace(tmp, alvo)
+    limite = agora - datetime.timedelta(days=DIAS_GUARDADOS)
+    for nome in os.listdir(DESTINO):
+        if nome[:4].isdigit() and nome.endswith('.json'):
+            try:
+                if datetime.datetime.strptime(nome[:10], '%Y-%m-%d').astimezone() < limite:
+                    os.unlink(os.path.join(DESTINO, nome))
+            except ValueError:
+                pass
+    print(f'varredura {rel["estado"]}: {len(linhas)} falhas, {len(novas)} novas, {len(sumiram)} corrigidas; erros: {rel["erros"] or "nenhum"}')
+    return 0 if rel['estado'] != 'erro' else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

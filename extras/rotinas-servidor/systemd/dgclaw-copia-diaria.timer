@@ -1,0 +1,10 @@
+[Unit]
+Description=S2 Bot: cópia de segurança todo dia às 3h30 (Brasília)
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 America/Sao_Paulo
+Persistent=true
+RandomizedDelaySec=5min
+
+[Install]
+WantedBy=timers.target

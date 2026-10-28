@@ -1,0 +1,143 @@
+#!/usr/bin/python3 -I
+"""Chave das cópias diárias do S2 Bot (pedido do dono em 21/10/2026).
+
+As cópias são trancadas com a chave pública do age, que fica no servidor: ela só tranca.
+A chave que abre fica no servidor trancada com uma senha que só o dono sabe (gpg simétrico).
+Assim, quem copiar o disco, um snapshot ou uma cópia leva só caixas trancadas.
+
+A senha chega pela caixinha do Cofre na conversa do Admin: ela grava uma variável no cofre de
+um agente, este script lê de lá (sem mostrar), usa e tira a variável do cofre.
+
+  dgclaw-copia-chave preparar <slug> <VARIAVEL>             cria a chave nova
+  dgclaw-copia-chave conferir <slug> <VARIAVEL>             confere se a senha abre a chave
+  dgclaw-copia-chave abrir <slug> <VARIAVEL> <copia.age> <saida.tar.zst>
+"""
+import json, os, re, subprocess, sys, tempfile
+
+PASTA = '/etc/dgclaw/copia'
+PUBLICA = os.path.join(PASTA, 'destinatario.txt')
+TRANCADA = os.path.join(PASTA, 'chave-que-abre.gpg')
+AGENTES = '/etc/dgclaw/agentes.json'
+MIN_SENHA = 12
+
+
+def sai(msg, cod=1):
+    print('dgclaw-copia-chave: ' + msg, file=sys.stderr)
+    sys.exit(cod)
+
+
+def cofre_do(slug):
+    with open(AGENTES) as f:
+        reg = json.load(f)
+    lista = reg.get('agentes', reg) if isinstance(reg, dict) else reg
+    for a in (lista.values() if isinstance(lista, dict) else lista):
+        if isinstance(a, dict) and a.get('slug') == slug and a.get('cofre_arquivo'):
+            return a['cofre_arquivo']
+    sai(f'não achei o cofre do agente {slug}.')
+
+
+def le_senha(slug, nome):
+    rx = re.compile(r'^\s*(?:export\s+)?' + re.escape(nome) + r'\s*=(.*)$')
+    with open(cofre_do(slug)) as f:
+        for linha in f:
+            m = rx.match(linha.rstrip('\n'))
+            if m:
+                v = m.group(1).strip()
+                if len(v) >= 2 and v[0] == v[-1] and v[0] in '\'"':
+                    v = v[1:-1]
+                return v
+    sai(f'a senha ({nome}) não está no cofre de {slug}.')
+
+
+def gpg(args, entrada, senha):
+    casa = tempfile.mkdtemp(prefix='gpg-copia-')
+    r, w = os.pipe()
+    os.write(w, senha.encode() + b'\n')
+    os.close(w)
+    try:
+        p = subprocess.run(['gpg', '--homedir', casa, '--batch', '--yes', '--quiet', '--pinentry-mode', 'loopback',
+                            '--passphrase-fd', str(r)] + args, input=entrada, capture_output=True, pass_fds=(r,))
+    finally:
+        os.close(r)
+        subprocess.run(['rm', '-rf', casa])
+    return p
+
+
+def abre_chave(senha):
+    with open(TRANCADA, 'rb') as f:
+        p = gpg(['--decrypt'], f.read(), senha)
+    if p.returncode != 0 or not p.stdout.startswith(b'# created') and b'AGE-SECRET-KEY-' not in p.stdout:
+        sai('a senha não abriu a chave das cópias.')
+    return p.stdout
+
+
+def preparar(slug, nome):
+    senha = le_senha(slug, nome)
+    if len(senha) < MIN_SENHA:
+        sai(f'a senha tem menos de {MIN_SENHA} caracteres; peça uma maior.', 2)
+    os.makedirs(PASTA, mode=0o700, exist_ok=True)
+    os.chmod(PASTA, 0o700)
+    if os.path.exists(TRANCADA):
+        os.replace(TRANCADA, TRANCADA + '.anterior')
+    chave = subprocess.run(['age-keygen'], capture_output=True, check=True).stdout
+    publica = subprocess.run(['age-keygen', '-y'], input=chave, capture_output=True, check=True).stdout.decode().strip()
+    p = gpg(['--symmetric', '--cipher-algo', 'AES256', '--s2k-mode', '3', '--s2k-digest-algo', 'SHA512',
+             '--s2k-count', '65011712', '--output', '-'], chave, senha)
+    if p.returncode != 0:
+        sai('o gpg não trancou a chave.')
+    fd = os.open(TRANCADA + '.novo', os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.write(fd, p.stdout)
+    os.close(fd)
+    os.replace(TRANCADA + '.novo', TRANCADA)
+    with open(PUBLICA + '.novo', 'w') as f:
+        f.write(publica + '\n')
+    os.replace(PUBLICA + '.novo', PUBLICA)
+    # volta inteira: tranca um texto com a pública e abre com a chave que a senha destranca
+    teste = subprocess.run(['age', '-r', publica], input=b'ok-copia', capture_output=True, check=True).stdout
+    conferir_volta(senha, teste)
+    print('chave nova pronta: ' + publica)
+
+
+def conferir_volta(senha, trancado):
+    chave = abre_chave(senha)
+    r, w = os.pipe()
+    os.write(w, chave)
+    os.close(w)
+    try:
+        p = subprocess.run(['age', '-d', '-i', f'/dev/fd/{r}'], input=trancado, capture_output=True, pass_fds=(r,))
+    finally:
+        os.close(r)
+    if p.stdout != b'ok-copia':
+        sai('a volta inteira (trancar e abrir) falhou.')
+
+
+def abrir(slug, nome, copia, saida):
+    chave = abre_chave(le_senha(slug, nome))
+    r, w = os.pipe()
+    os.write(w, chave)
+    os.close(w)
+    try:
+        with open(copia, 'rb') as ent, open(saida, 'xb') as out:
+            os.chmod(saida, 0o600)
+            p = subprocess.run(['age', '-d', '-i', f'/dev/fd/{r}'], stdin=ent, stdout=out, pass_fds=(r,))
+    finally:
+        os.close(r)
+    if p.returncode != 0:
+        os.unlink(saida)
+        sai('não consegui abrir a cópia.')
+    print('cópia aberta em ' + saida)
+
+
+if __name__ == '__main__':
+    os.umask(0o077)
+    a = sys.argv[1:]
+    if len(a) == 3 and a[0] == 'preparar':
+        preparar(a[1], a[2])
+    elif len(a) == 3 and a[0] == 'conferir':
+        conferir_volta(le_senha(a[1], a[2]), subprocess.run(
+            ['age', '-R', PUBLICA], input=b'ok-copia', capture_output=True, check=True).stdout)
+        print('a senha abre a chave das cópias.')
+    elif len(a) == 5 and a[0] == 'abrir':
+        abrir(a[1], a[2], a[3], a[4])
+    else:
+        sai(__doc__.strip().split('\n\n')[-1], 2)

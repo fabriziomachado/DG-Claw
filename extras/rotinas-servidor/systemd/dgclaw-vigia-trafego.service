@@ -1,0 +1,7 @@
+[Unit]
+Description=S2 Bot: confere se a saída de dados do servidor passou do limite
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/dgclaw/web.env
+ExecStart=/usr/local/sbin/dgclaw-vigia-trafego

@@ -1,0 +1,10 @@
+[Unit]
+Description=S2 Bot: varredura diaria de seguranca as 6h (hora de Sao Paulo)
+
+[Timer]
+OnCalendar=*-*-* 06:00:00 America/Sao_Paulo
+RandomizedDelaySec=5min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

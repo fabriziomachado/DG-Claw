@@ -1,0 +1,6 @@
+[Unit]
+Description=S2 Bot: cópia de segurança diária (últimos 7 dias em /var/backups/dgclaw/diaria)
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/dgclaw-copia-diaria

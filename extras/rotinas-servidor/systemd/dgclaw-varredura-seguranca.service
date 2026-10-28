@@ -1,0 +1,11 @@
+[Unit]
+Description=S2 Bot: varredura diaria de seguranca (Trivy + apt), resultado para o agente Tech
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/dgclaw-varredura-seguranca
+Nice=15
+IOSchedulingClass=idle
+TimeoutStartSec=2h

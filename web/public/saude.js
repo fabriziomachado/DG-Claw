@@ -21,8 +21,16 @@
     lampada: ico('<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.7 1 1.5 1 2.5h6c0-1 .3-1.8 1-2.5A6 6 0 0 0 12 3z"/>'),
     lupa: ico('<circle cx="11" cy="11" r="6"/><path d="m20 20-4.5-4.5"/>'),
     paralela: ico('<rect x="3.5" y="5" width="7" height="14" rx="2"/><rect x="13.5" y="5" width="7" height="14" rx="2"/>'),
+    caixa: ico('<path d="M4 7h16v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z"/><path d="M3 4h18v3H3zM10 11h4"/>'),
+    escudo: ico('<path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/>'),
+    onda: ico('<path d="M3 12h3l3-7 4 14 3-7h5"/>'),
+    ciclo: ico('<path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/>'),
+    play: ico('<path d="M8 5.5v13l10.5-6.5z"/>'),
+    seta: ico('<path d="m9 6 6 6-6 6"/>'),
+    baixo: ico('<path d="m6 9 6 6 6-6"/>'),
   };
   let mem = null, memAg = '', memPergunta = '', memRes = null, memBusca = false;
+  let rotinas = null; const rotAbertas = new Set(), rotFechadas = new Set();
   let dados = null, periodo = 'dia', agentesInfo = {}, carregando = false, verTudo = false, lim = null, janela = 'semana';
   const CORES = ['var(--dg-serie-0)', 'var(--dg-serie-1)', 'var(--dg-serie-2)', 'var(--dg-serie-3)', 'var(--dg-serie-4)', 'var(--dg-serie-5)'];
   // cor fixa por agente (a mesma nas duas janelas): Admin primeiro, depois os outros em ordem de nome
@@ -131,6 +139,71 @@
     memBusca = false; pinta();
   }
 
+  // Rotinas do servidor (lib/rotinas-servidor.js, 28/10/2026): os roteiros que rodam fora das caixas.
+  // A que falhou abre sozinha, com a causa e o "Pedir ao Admin"; as outras abrem com um toque.
+  const rotQuando = ms => {
+    const d = new Date(ms), hoje = new Date(), ontem = new Date(Date.now() - 86400000);
+    const dia = d.toDateString() === hoje.toDateString() ? 'hoje' : d.toDateString() === ontem.toDateString() ? 'ontem'
+      : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return `${dia} às ${hm(d.toISOString())}`;
+  };
+  const rotProxima = ms => {
+    const d = new Date(ms), amanha = new Date(Date.now() + 86400000);
+    const dia = d.toDateString() === new Date().toDateString() ? 'hoje' : d.toDateString() === amanha.toDateString() ? 'amanhã'
+      : `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+    return `${dia} às ${hm(d.toISOString())}`;
+  };
+  const rotFalhas = () => (rotinas || []).filter(r => r.estado === 'falhou');
+  function rotinasServidor() {
+    if (!rotinas || !rotinas.length) return '';
+    const EST = { ok: ['em dia', ''], falhou: ['falhou', 'fora'], rodando: ['rodando', 'trab'], agendada: ['agendada', 'nunca'], nunca: ['nunca rodou', 'nunca'] };
+    const falhas = rotFalhas().length;
+    const linhas = rotinas.map(r => {
+      const aberta = rotFechadas.has(r.id) ? false : r.estado === 'falhou' || rotAbertas.has(r.id);
+      const u = r.ultima;
+      const ult = r.estado === 'rodando' ? 'rodando agora' : u ? `${u.ok ? 'deu certo' : 'falhou'} ${rotQuando(u.em)}`
+        : r.proxima ? `vai rodar ${rotProxima(r.proxima)}` : 'ainda não rodou';
+      const [rot, cls] = EST[r.estado] || EST.nunca;
+      const lado = r.rodar && !aberta && r.estado !== 'rodando'
+        ? `<button type="button" class="ss-bt ss-bt-p" data-rot-rodar="${esc(r.id)}" title="Rodar agora" aria-label="Rodar ${esc(r.nome)} agora">${I.play}</button>`
+        : `<span class="ss-bt ss-bt-p" aria-hidden="true">${aberta ? I.baixo : I.seta}</span>`;
+      let html = `<div class="ss-li ss-rot" data-rot-abre="${esc(r.id)}" role="button" tabindex="0" aria-expanded="${aberta}"><span class="ss-ic">${I[r.icone] || I.relogio}</span>` +
+        `<span class="ss-optx"><b>${esc(r.nome)}</b><small>${esc(r.frequencia)}</small><small class="${r.estado === 'falhou' ? 'ss-rot-falha' : ''}">${esc(ult)}</small></span>` +
+        `<span class="ss-est ${cls}">${rot}</span>${lado}</div>`;
+      if (aberta) {
+        html += `<div class="ss-rot-det"><p>${esc(r.oque)}</p>` +
+          `<div class="ss-rot-dias">${r.dias.map(d => `<i class="${d.estado}" title="${esc(d.dia.split('-').reverse().join('/'))}: ${d.estado === 'ok' ? 'deu certo' : d.estado === 'falhou' ? 'falhou' : 'não rodou'}"></i>`).join('')}<span>últimos 7 dias</span></div>` +
+          (r.estado === 'falhou' && u ? `<div class="ss-rot-causa"><small>O que aconteceu</small>${esc(u.causa)}</div>` : '') +
+          ((r.estado === 'falhou' || r.rodar) ? `<div class="ss-rot-acoes">${r.estado === 'falhou' ? `<button type="button" class="ss-rot-bt1" data-rot-admin="${esc(r.id)}">Pedir ao Admin para resolver</button>` : ''}` +
+            (r.rodar && r.estado !== 'rodando' ? `<button type="button" class="ss-bt ss-rot-bt2" data-rot-rodar="${esc(r.id)}" title="Rodar agora" aria-label="Rodar ${esc(r.nome)} agora">${I.play}</button>` : '') + '</div>' : '') +
+          '</div>';
+      }
+      return html;
+    }).join('');
+    return `<div class="ss-sec">${I.relogio}Rotinas do servidor<span class="q">${falhas ? `${falhas} ${falhas === 1 ? 'falhou' : 'falharam'}` : `${rotinas.length} ${rotinas.length === 1 ? 'rotina' : 'rotinas'}`}</span></div>` +
+      `<div class="ss-grupo">${linhas}</div><p class="ss-fraco">Rodam no próprio servidor, fora das caixas dos agentes. Se uma falhar, você recebe um aviso no celular.</p>`;
+  }
+  async function rodaRotina(id) {
+    try {
+      const r = await fetch('/api/v1/rotinas-servidor/' + encodeURIComponent(id) + '/rodar', { method: 'POST', credentials: 'same-origin' });
+      const d = await r.json().catch(() => null);
+      if (!r.ok || !d || !d.ok) throw new Error((d && d.erro) || 'o servidor respondeu ' + r.status);
+      const x = rotinas.find(y => y.id === id); if (x) x.estado = 'rodando';
+      pinta(); setTimeout(() => carrega(false), 5000);
+    } catch (e) { alert('Não consegui rodar: ' + e.message); }
+  }
+  async function pedeAoAdmin(id, bt) {
+    const r = (rotinas || []).find(x => x.id === id);
+    if (!r || !r.ultima) return;
+    const texto = `[da Saúde do servidor] a rotina "${r.nome}" falhou ${rotQuando(r.ultima.em)}: ${r.ultima.causa} Confere e resolve?`;
+    bt.disabled = true; bt.textContent = 'Mandando…';
+    try {
+      const x = await fetch('/api/v1/agents/admin/send', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: texto }) });
+      if (!x.ok) throw new Error('o servidor respondeu ' + x.status);
+      location.href = '/a/admin';
+    } catch (e) { bt.disabled = false; bt.textContent = 'Pedir ao Admin para resolver'; alert('Não consegui mandar para o Admin: ' + e.message); }
+  }
+
   async function salva(corpo) {
     try {
       const r = await fetch('/api/v1/limites/config', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(corpo) });
@@ -179,11 +252,16 @@
   function pinta() {
     const d = dados;
     const ruins = d.conferencias.filter(c => c.estado !== 'ok');
+    const rf = rotFalhas();
     const quando = new Date(d.conferido_em);
     const hhmm = `${String(quando.getHours()).padStart(2, '0')}:${String(quando.getMinutes()).padStart(2, '0')}`;
-    const resumo = `<div class="ss-resumo ${ruins.some(c => c.estado === 'falha') ? 'falha' : ruins.length ? 'aviso' : 'ok'}">${ruins.length ? I.alerta : I.ok}` +
-      `<span class="ss-rtx"><b>${ruins.length ? `${ruins.length} ${ruins.length === 1 ? 'coisa pede' : 'coisas pedem'} atenção` : 'Tudo de pé.'}</b>` +
-      `<small>${d.conferencias.length - ruins.length} de ${d.conferencias.length} conferências ok · conferido às ${hhmm}</small></span>` +
+    // rotina que falhou pinta o resumo de vermelho, como uma conferência que falhou
+    const titulo = ruins.length ? `${ruins.length} ${ruins.length === 1 ? 'coisa pede' : 'coisas pedem'} atenção`
+      : rf.length ? `${rf.length} ${rf.length === 1 ? 'rotina do servidor falhou' : 'rotinas do servidor falharam'}` : 'Tudo de pé.';
+    const sub = !ruins.length && rf.length ? rf.map(r => `${r.nome.toLowerCase()}, ${rotQuando(r.ultima.em)}`).join(' · ')
+      : `${d.conferencias.length - ruins.length} de ${d.conferencias.length} conferências ok · conferido às ${hhmm}`;
+    const resumo = `<div class="ss-resumo ${ruins.some(c => c.estado === 'falha') || rf.length ? 'falha' : ruins.length ? 'aviso' : 'ok'}">${ruins.length || rf.length ? I.alerta : I.ok}` +
+      `<span class="ss-rtx"><b>${titulo}</b><small>${esc(sub)}</small></span>` +
       `<button type="button" class="ss-bt" id="ssAtualiza" title="Conferir agora" aria-label="Conferir agora">${I.atualiza}</button></div>`;
     const m = d.maquina;
     const k = (nome, pct, sub) => `<div class="ss-k"><span>${nome}</span><b>${Number.isFinite(pct) ? pct + '%' : '–'}</b><div class="ss-barra${pct >= 90 ? ' alto' : pct >= 75 ? ' medio' : ''}"><i style="width:${Math.min(100, pct || 0)}%"></i></div><small>${sub}</small></div>`;
@@ -209,7 +287,7 @@
           `<div class="ss-tk-lin"><span>saída</span><div class="ss-tk-barra"><i class="s" style="width:${pct(a[periodo].saida, maxS)}%;background:${corDe(a.slug)}"></i></div><b>${num(a[periodo].saida)}</b></div></div>`).join('');
       })()}</div>` +
       (totE ? `<p class="ss-fraco">${Math.round((totC / totE) * 100)}% da entrada veio do cache, que custa bem menos. Na assinatura, o que conta é o limite de uso da conta, e não o valor.</p>` : '');
-    raiz.innerHTML = resumo + `<div class="ss-colunas"><div>${servidor}${agentes}${memoria()}</div><div>${limites()}${consumo}${plano()}</div></div>`;
+    raiz.innerHTML = resumo + `<div class="ss-colunas"><div>${rotinasServidor()}${servidor}${agentes}${memoria()}</div><div>${limites()}${consumo}${plano()}</div></div>`;
     // a lista de agentes da busca na memória é a mesma pílula com foto e cargo do Board
     const sel = document.getElementById('ssMemAg');
     if (sel) {
@@ -233,12 +311,14 @@
     const bt = document.getElementById('ssAtualiza');
     if (bt) bt.classList.add('girando');
     try {
-      const [r, ag, l, mm] = await Promise.all([
+      const [r, ag, l, mm, rt] = await Promise.all([
         fetch('/api/v1/saude-servidor' + (forca ? '?forca=1' : ''), { credentials: 'same-origin', cache: 'no-store' }),
         fetch('/api/v1/agents', { credentials: 'same-origin', cache: 'no-store' }).then(x => x.json()).catch(() => null),
         fetch('/api/v1/limites' + (forca ? '?forca=1' : ''), { credentials: 'same-origin', cache: 'no-store' }).then(x => x.json()).catch(() => null),
         fetch('/api/v1/memoria', { credentials: 'same-origin', cache: 'no-store' }).then(x => x.json()).catch(() => null),
+        fetch('/api/v1/rotinas-servidor' + (forca ? '?forca=1' : ''), { credentials: 'same-origin', cache: 'no-store' }).then(x => x.json()).catch(() => null),
       ]);
+      rotinas = rt && rt.ok ? rt.rotinas : null;
       mem = mm && mm.ok ? mm : null;
       // a página se repinta a cada minuto: não apaga o que a pessoa está digitando na busca
       const q = document.getElementById('ssMemQ'); if (q) memPergunta = q.value;
@@ -253,10 +333,26 @@
     } finally { carregando = false; }
   }
 
+  function abreRotina(id) {
+    const r = (rotinas || []).find(x => x.id === id);
+    const aberta = rotFechadas.has(id) ? false : (r && r.estado === 'falhou') || rotAbertas.has(id);
+    if (aberta) { rotAbertas.delete(id); rotFechadas.add(id); } else { rotFechadas.delete(id); rotAbertas.add(id); }
+    pinta();
+  }
+  raiz.addEventListener('keydown', ev => {
+    const ro = ev.target.closest && ev.target.closest('[data-rot-abre]');
+    if (ro && (ev.key === 'Enter' || ev.key === ' ') && ev.target === ro) { ev.preventDefault(); abreRotina(ro.dataset.rotAbre); }
+  });
   raiz.addEventListener('submit', ev => { if (ev.target.id === 'ssBusca') { ev.preventDefault(); perguntaMemoria(); } });
   raiz.addEventListener('click', ev => {
     if (ev.target.closest('#ssAtualiza')) { carrega(true); return; }
     if (ev.target.closest('#ssVerTudo')) { verTudo = !verTudo; pinta(); return; }
+    const rr = ev.target.closest('[data-rot-rodar]');
+    if (rr) { rodaRotina(rr.dataset.rotRodar); return; }
+    const ra = ev.target.closest('[data-rot-admin]');
+    if (ra) { pedeAoAdmin(ra.dataset.rotAdmin, ra); return; }
+    const ro = ev.target.closest('[data-rot-abre]');
+    if (ro) { abreRotina(ro.dataset.rotAbre); return; }
     const j = ev.target.closest('[data-janela]');
     if (j && lim) { janela = j.dataset.janela; pinta(); return; }
     const ma = ev.target.closest('[data-mem-atualiza]');

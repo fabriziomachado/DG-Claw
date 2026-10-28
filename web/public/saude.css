@@ -122,3 +122,25 @@ a.ss-li:hover{background:var(--dg-superficie-2)}
 .ss-grupo-mem{overflow:visible}
 .ss-busca .sa-pilula{min-height:28px;padding:2px 8px 2px 2px;border:0;background:var(--dg-superficie-2);font-size:12.5px}
 .ss-busca .sa-av{width:22px!important;height:22px!important}
+
+/* Rotinas do servidor (28/10/2026): uma linha por roteiro; a aberta mostra o que faz, os 7 dias e a causa da falha */
+.ss-rot{align-items:flex-start;cursor:pointer;padding:11px 8px 11px 12px}
+.ss-rot:hover{background:var(--dg-superficie-2)}
+.ss-rot .ss-est{margin-top:1px}
+.ss-rot .ss-bt-p{margin-top:-4px}
+.ss-rot-falha{color:var(--dg-erro-texto)!important}
+.ss-rot-det{padding:2px 12px 14px 38px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--dg-borda)}
+.ss-rot-det:last-child{border-bottom:0}
+.ss-rot-det p{margin:0;font-size:13px;color:var(--dg-texto-2)}
+.ss-rot-dias{display:flex;gap:4px;align-items:center;font-size:12px;color:var(--dg-texto-3)}
+.ss-rot-dias i{width:14px;height:14px;border-radius:4px;background:var(--dg-superficie-2)}
+.ss-rot-dias i.ok{background:var(--dg-entrega-texto)}
+.ss-rot-dias i.falhou{background:var(--dg-erro-texto)}
+.ss-rot-dias span{margin-left:6px}
+.ss-rot-causa{border-left:2px solid var(--dg-erro-texto);padding:2px 0 2px 10px;font-size:13px;overflow-wrap:anywhere}
+.ss-rot-causa small{display:block;font-size:11.5px;color:var(--dg-texto-3)}
+.ss-rot-acoes{display:flex;gap:8px;align-items:center}
+.ss-rot-bt1{font:inherit;font-size:13.5px;font-weight:600;min-height:34px;padding:0 14px;border-radius:999px;border:0;background:var(--dg-azul);color:var(--dg-fundo);cursor:pointer}
+.ss-rot-bt1:disabled{opacity:.6;cursor:default}
+.ss-rot-bt2{border:1px solid var(--dg-borda);color:var(--dg-texto-2)}
+.ss-est.nunca{background:var(--dg-superficie-2);color:var(--dg-texto-2)}

@@ -1,0 +1,48 @@
+#!/bin/bash
+# Cópia de segurança diária do S2 Bot (DG Claw), pedida pelo dono em 21/10/2026.
+# Guarda numa caixa compactada por dia, em /var/backups/dgclaw/diaria/, e mantém os últimos 7 dias.
+# Entra: configuração (/etc/dgclaw, Caddy), casas e cofres dos agentes, dados do Web, código ao vivo
+# (/opt/dgclaw/app, que não é git aqui) e a pasta e a memória do Admin.
+# Desde 21/10/2026 cada cópia sai trancada (age) com a chave pública de /etc/dgclaw/copia: para
+# abrir é preciso a senha do dono (dgclaw-copia-chave abrir). Sem a chave pública, não faz cópia.
+# Fica de fora o que se baixa de novo: caches, pacotes npm/pip e o modelo da memória por sentido.
+set -euo pipefail
+
+DESTINO=/var/backups/dgclaw/diaria
+MANTER=7
+DIA=$(TZ=America/Sao_Paulo date +%Y-%m-%d)
+ARQ="$DESTINO/s2bot-$DIA.tar.zst.age"
+PUBLICA=/etc/dgclaw/copia/destinatario.txt
+TMP="$ARQ.parcial"
+
+umask 077
+mkdir -p "$DESTINO"
+chmod 700 "$DESTINO"
+if [ ! -s "$PUBLICA" ]; then
+  echo "dgclaw-copia-diaria: falta a chave pública em $PUBLICA (rode dgclaw-copia-chave preparar)" >&2
+  exit 1
+fi
+
+# tar sai com 1 quando um arquivo muda durante a leitura (agente trabalhando): a cópia vale assim mesmo
+set +e
+nice -n 19 ionice -c3 tar --create --file=- \
+  --warning=no-file-changed --warning=no-file-removed --warning=no-file-shrank \
+  --exclude='*/home/.cache' --exclude='*/home/.npm' --exclude='*/node_modules' \
+  --exclude='*/home/.local/share/dgclaw/embed' --exclude='*/.claude/shell-snapshots' \
+  --exclude='/var/lib/dgclaw/embed-staging' \
+  /etc/dgclaw /etc/caddy /etc/systemd/system/dgclaw-* /usr/local/sbin/dgclaw-* \
+  /var/lib/dgclaw /opt/dgclaw/app /opt/dgclaw/admin /root/.claude /root/.claude.json \
+  2>"$DESTINO/ultima.log" | zstd -q -T2 -10 | age -R "$PUBLICA" -o "$TMP"
+st=("${PIPESTATUS[@]}")
+set -e
+if [ "${st[0]}" -gt 1 ] || [ "${st[1]}" -ne 0 ] || [ "${st[2]}" -ne 0 ]; then
+  rm -f "$TMP"
+  echo "dgclaw-copia-diaria: falhou (tar=${st[0]} zstd=${st[1]} age=${st[2]}), veja $DESTINO/ultima.log" >&2
+  exit 1
+fi
+mv -f "$TMP" "$ARQ"
+
+# guarda só os últimos $MANTER dias
+ls -1t "$DESTINO"/s2bot-*.tar.zst.age 2>/dev/null | tail -n +$((MANTER + 1)) | xargs -r rm -f
+
+echo "dgclaw-copia-diaria: $ARQ ($(du -h "$ARQ" | cut -f1))"

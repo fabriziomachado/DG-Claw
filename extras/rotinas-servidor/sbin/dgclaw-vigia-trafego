@@ -1,0 +1,77 @@
+#!/usr/bin/env node
+'use strict';
+// S2 Bot: vigia do tráfego de saída do servidor.
+// Roda a cada 5 min (dgclaw-vigia-trafego.timer). Guarda o contador de bytes enviados pela placa de
+// rede e, se a saída da última hora passar do limite, manda um aviso para o celular do dono pelos
+// mesmos avisos do painel (web/lib/push.js). Depois de avisar, espera 6 h antes de avisar de novo.
+//
+//   dgclaw-vigia-trafego            confere agora
+//   dgclaw-vigia-trafego --teste    manda um aviso de teste para o celular
+//   dgclaw-vigia-trafego --situacao mostra a saída da última hora, sem avisar
+//
+// Limite: DGCLAW_VIGIA_TRAFEGO_MB (padrão 500 MB por hora). Placa: DGCLAW_VIGIA_TRAFEGO_PLACA (padrão eth0).
+
+const fs = require('node:fs');
+const path = require('node:path');
+const { criarPush } = require('/opt/dgclaw/app/web/lib/push.js');
+
+const PLACA = process.env.DGCLAW_VIGIA_TRAFEGO_PLACA || 'eth0';
+const LIMITE_MB = Number(process.env.DGCLAW_VIGIA_TRAFEGO_MB) || 500;
+const JANELA_MS = 60 * 60 * 1000;
+const PAUSA_AVISO_MS = 6 * 60 * 60 * 1000;
+const DATA_WEB = '/var/lib/dgclaw/web';
+const ESTADO = '/var/lib/dgclaw/vigia-trafego.json';
+
+function log(nivel, msg) { console.log(`[${nivel}] ${msg}`); }
+
+function leEstado() {
+  try { return JSON.parse(fs.readFileSync(ESTADO, 'utf8')); } catch { return { amostras: [], ultimoAviso: 0 }; }
+}
+
+function gravaEstado(estado) {
+  const tmp = `${ESTADO}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(estado), { mode: 0o600 });
+  fs.renameSync(tmp, ESTADO);
+}
+
+function mb(bytes) { return Math.round(bytes / 1e6); }
+
+async function avisar(titulo, corpo) {
+  const push = criarPush({ dataDir: DATA_WEB, log });
+  const r = await push.enviar({ titulo, corpo, tag: 'vigia-trafego', url: '/saude', exigir_interacao: true });
+  log('info', `Aviso "${titulo}": ${r.ok} de ${r.inscricoes} aparelho(s).`);
+  return r;
+}
+
+async function main() {
+  const modo = process.argv[2] || '';
+  if (modo === '--teste') {
+    const r = await avisar('Teste da vigia de tráfego', `Se você viu isto, o aviso de saída alta (mais de ${LIMITE_MB} MB em 1 hora) está funcionando.`);
+    process.exit(r.ok > 0 ? 0 : 1);
+  }
+
+  const agora = Date.now();
+  const boot = fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim();
+  const tx = Number(fs.readFileSync(path.join('/sys/class/net', PLACA, 'statistics/tx_bytes'), 'utf8'));
+  const estado = leEstado();
+
+  // Contador zera quando o servidor reinicia: só vale comparar amostras do mesmo boot.
+  let amostras = (estado.amostras || []).filter((a) => a.boot === boot && a.tx <= tx && agora - a.ts <= JANELA_MS + 10 * 60 * 1000);
+  amostras.push({ ts: agora, tx, boot });
+  const base = amostras.find((a) => agora - a.ts <= JANELA_MS) || amostras[0];
+  const saida = tx - base.tx;
+  const minutos = Math.round((agora - base.ts) / 60000);
+
+  if (modo === '--situacao') {
+    console.log(`Saída pela ${PLACA} nos últimos ${minutos} min: ${mb(saida)} MB (limite ${LIMITE_MB} MB por hora).`);
+  } else if (saida > LIMITE_MB * 1e6 && agora - (estado.ultimoAviso || 0) > PAUSA_AVISO_MS) {
+    await avisar('Saída de dados alta no servidor',
+      `Saíram ${mb(saida)} MB nos últimos ${minutos} min (o normal é menos de 50 MB). Peça ao Admin para investigar.`);
+    estado.ultimoAviso = agora;
+  }
+
+  amostras = amostras.filter((a) => agora - a.ts <= JANELA_MS + 10 * 60 * 1000);
+  gravaEstado({ amostras, ultimoAviso: estado.ultimoAviso || 0 });
+}
+
+main().catch((e) => { log('erro', e.message); process.exit(1); });

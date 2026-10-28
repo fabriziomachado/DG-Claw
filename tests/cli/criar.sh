@@ -108,7 +108,7 @@ dono_real() { if [ "$(id -u)" -eq 0 ]; then stat -c %u:%g "$1"; else awk -v p="$
 echo "criar: o aviso do modo Bypass do Claude Code (skipDangerousModePermissionPrompt)"
 ST="$H/.claude/settings.json"
 igual "settings.json nasce com a chave, sem sugestoes e com os hooks vazios" "true false {}" "$(jq -r '"\(.skipDangerousModePermissionPrompt) \(.promptSuggestionEnabled) \(.hooks)"' "$ST")"
-igual "settings.json nasce com o resumo automatico em 200 mil" "200000" "$(jq -r '.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW' "$ST")"
+igual "settings.json nasce com o resumo automatico em 300 mil" "300000" "$(jq -r '.env.CLAUDE_CODE_AUTO_COMPACT_WINDOW' "$ST")"
 chmod 644 "$ST"
 printf '{"hooks": {"Stop": []}, "model": "x"}\n' >"$ST"
 criar_agente ana --nome "Ana Silva"

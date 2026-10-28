@@ -5199,10 +5199,13 @@ async function esperaPeloWait(since, limite) {
 }
 
 /* Resposta = qualquer fala nova do agente depois do envio. */
-const ehResposta = (m, since) => ehAgente(m) && m.ep > since;
+/* Aviso do sistema (m.sistema, ex. "Tô compactando a conversa... já volto" do resumo automático) não é a
+   resposta: contava como resposta, a voz lia o aviso, parava de esperar e a resposta de verdade, que chega
+   depois do resumo, ficava sem ler (28/10/2026). O /wait do servidor já ignorava esses avisos. */
+const ehResposta = (m, since) => ehAgente(m) && !m.sistema && m.ep > since;
 /* Só a conversa normal (origin 'agente') entra na fila de voz automática. A rotina também
    conta como resposta para a espera, mas só toca em voz se a pessoa apertar o 🎧 do balão. */
-const ehRespostaFalavel = (m, since) => !!m && m.origin === 'agente' && m.ep > since;
+const ehRespostaFalavel = (m, since) => !!m && m.origin === 'agente' && !m.sistema && m.ep > since;
 
 /* Depois da pergunta por voz, por 5 minutos, toda resposta nova dele também é
    lida (ele costuma mandar "vou fazer" e, um tempo depois, o resultado). */

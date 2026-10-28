@@ -44,3 +44,11 @@ test('digitação: carregada na conversa, no cache do app e desligada no modo es
   const d = pub('digitacao.js');
   assert.ok(d.includes('sigiloLigado()') && d.includes('prefers-reduced-motion'));
 });
+
+test('trocar de agente com o microfone silenciado: o modo reabre ainda silenciado', () => {
+  const v = pub('voz-modo.js');
+  assert.match(v, /JSON\.stringify\(\{ em: Date\.now\(\), mudo \}\)/, 'a marca da troca precisa levar o silenciado');
+  assert.match(v, /abre\(true, marca\.mudo === true\)/, 'a volta precisa abrir com o silenciado da marca');
+  assert.match(v, /mudo = silenciado === true/);
+  assert.match(v, /if \(!mudo && !semToque/, 'silenciado não abre o microfone sozinho');
+});

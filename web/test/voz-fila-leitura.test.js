@@ -231,6 +231,19 @@ test('só a conversa normal (origin agente) entra na fila; rotina e o resto não
   assert.equal(r({ origin: 'agente', ep: 5 }), false);
 });
 
+test('aviso do resumo automático não é a resposta: a voz não lê e a espera continua', () => {
+  const c = vm.createContext({});
+  for (const nome of ['const ehAgente', 'const ehResposta =', 'const ehRespostaFalavel']) {
+    const a = fonte.indexOf(nome);
+    vm.runInContext(fonte.slice(a, fonte.indexOf('\n', a)), c);
+  }
+  vm.runInContext('this.ehResposta = ehResposta; this.ehRespostaFalavel = ehRespostaFalavel;', c);
+  const aviso = { origin: 'agente', ep: 10, text: 'Tô compactando a conversa pra voltar mais leve... já volto', sistema: 'compactacao' };
+  assert.equal(c.ehResposta(aviso, 5), false);
+  assert.equal(c.ehRespostaFalavel(aviso, 5), false);
+  assert.equal(c.ehResposta({ origin: 'agente', ep: 11, text: 'pronto' }, 5), true);
+});
+
 test('falaNovas enfileira só origin agente, sem duplicar, e a rotina fica de fora', async () => {
   const a = fonte.indexOf('const ehRespostaFalavel');
   const b = fonte.indexOf('\n', a);

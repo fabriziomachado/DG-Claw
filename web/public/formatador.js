@@ -72,6 +72,18 @@ function ehDiff(lingua, cod) {
   const l = cod.split('\n');
   return l.some(x => /^@@ .* @@/.test(x)) || (l.some(x => x.startsWith('--- ')) && l.some(x => x.startsWith('+++ ')));
 }
+/* Caminho do arquivo na barra do bloco (28/10/2026, pedido do dono): ```php app/Models/User.php (ou
+   ```php:app/...) mostra o caminho ao lado da língua. No diff, sem caminho no cabeçalho, vale o do
+   +++ b/... quando o diff é de um arquivo só. */
+const RX_CABECALHO = /^([A-Za-z0-9_+.-]{1,20})(?:[ :]+([^\s`'"<>]{1,200}))?[ \t]*\n/;
+function arquivoDoDiff(cod) {
+  const nomes = [];
+  for (const l of cod.split('\n')) {
+    const m = /^(?:\+\+\+|---) (?:[ab]\/)?(\S+)/.exec(l);
+    if (m && m[1] !== '/dev/null' && !nomes.includes(m[1])) nomes.push(m[1]);
+  }
+  return nomes.length === 1 ? nomes[0] : '';
+}
 /* Cores de sintaxe (18/10/2026, pedido do dono): bloco com a língua no cabeçalho (```php, ```bash...)
    passa pelo highlight.js (vendor/, sem rede), que já devolve o texto escapado. Sem língua ou com
    língua que ele não conhece, fica o texto puro. O render redesenha a conversa toda hora: guarda. */
@@ -171,17 +183,20 @@ function paragrafos(txt, fmt) {
     // ```dgui: KPI, tabela e gráfico desenhados pela tela (dgui.js)
     const ui = window.dgui && window.dgui.blocoParaHtml(partes[i]);
     if (ui) { html += ui; continue; }
-    const lingua = ((/^([A-Za-z0-9_+.-]{1,20})\n/.exec(partes[i]) || [])[1] || '').toLowerCase();
-    let cod = partes[i].replace(/^[A-Za-z0-9_+.-]{1,20}\n/, '')
+    const cab = RX_CABECALHO.exec(partes[i]) || [];
+    const lingua = (cab[1] || '').toLowerCase();
+    let cod = partes[i].replace(RX_CABECALHO, '')
                          .replace(/^\n+/, '').replace(/\s+$/, '');
     // no MarkdownV2, dentro do bloco só a crase e a barra vêm escapadas
     if (fmt === 'markdownv2') cod = cod.replace(/\\([`\\])/g, '$1');
     if (!cod) continue;
     const diff = ehDiff(lingua, cod);
     const cor = diff ? null : htmlSintaxe(lingua, cod);
+    const arq = cab[2] || (diff ? arquivoDoDiff(cod) : '');
     // bloco de código com cara de código-fonte (19/10/2026): barra no topo com a língua e o Copiar
     const nomeLingua = diff ? 'diff' : lingua && lingua !== 'text' && lingua !== 'plaintext' ? (SINTAXE_NOME[lingua] || lingua) : 'texto';
     html += `<div class="cod${diff ? ' cod-diff' : ''}"><div class="cod-bar"><span class="cod-lingua">${esc(nomeLingua)}</span>` +
+            (arq ? `<span class="cod-arq" title="${esc(arq)}"><bdi>${esc(arq)}</bdi></span>` : '') +
             `<button type="button" class="codcopia" aria-label="Copiar o código" title="Copiar o código">${ICONE_COPIAR}<span>Copiar</span></button></div>` +
             `<pre${cor != null ? ' class="hljs"' : ''}>${diff ? htmlDiff(cod) : (cor != null ? cor : esc(cod))}</pre></div>`;
   }
@@ -248,6 +263,6 @@ function arquivoParaHtml(texto, nome, opcoes) {
   return `<div class="lb-md">${paragrafos('```' + lingua + '\n' + String(texto).replace(/```/g, 'ˋˋˋ') + '\n```', 'markdown')}</div>`;
 }
 
-window.DGFormatador = { esc, linkify, formata, ehDiff, SINTAXE_NOME, htmlSintaxe, htmlDiff, ICONE_COPIAR, textoEmParagrafos,
+window.DGFormatador = { esc, linkify, formata, ehDiff, arquivoDoDiff, RX_CABECALHO, SINTAXE_NOME, htmlSintaxe, htmlDiff, ICONE_COPIAR, textoEmParagrafos,
   RX_LINHA_TAB, htmlTabela, paragrafos, mdComTitulos, arquivoParaHtml, LINGUA_DA_EXT };
 })();

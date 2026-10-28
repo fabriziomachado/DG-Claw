@@ -1104,6 +1104,8 @@ button.cartaoarq:hover{background:var(--dg-superficie-2)}
 .cod{position:relative;margin:10px 0 6px;border:1px solid var(--dg-borda);border-radius:12px;overflow:hidden;background:var(--dg-codigo)}
 .cod-bar{display:flex;align-items:center;gap:8px;min-height:32px;padding:2px 4px 2px 12px;background:var(--dg-superficie-2);border-bottom:1px solid var(--dg-borda)}
 .cod-bar .cod-lingua{padding:0;font:600 11.5px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;letter-spacing:0;text-transform:none;color:var(--dg-texto-2)}
+.cod-bar .cod-arq{min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;direction:rtl;text-align:left;
+  font:12px/1.2 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--dg-texto-3)}
 .cod .codcopia{position:static;margin-left:auto;width:auto;height:28px;padding:0 8px;display:inline-flex;align-items:center;gap:5px;
   border:0;border-radius:7px;background:transparent;color:var(--dg-texto-2);font:500 12px/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;cursor:pointer}
 .cod .codcopia svg{width:14px;height:14px}

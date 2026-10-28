@@ -616,9 +616,11 @@ montar_casa() {
     if [ "$ENSAIO" = 1 ]; then
         printf '   [ensaio] escreveria %s/.claude/settings.json (dono 0:0, modo 444)\n' "$h"
     else
+        # CLAUDE_CODE_AUTO_COMPACT_WINDOW (28/10/2026): com a janela de 1 milhão o resumo automático quase
+        # nunca entrava e a conversa chegava a 250 mil tokens, mais lenta e mais cara a cada resposta.
         if [ ! -s "$h/.claude/settings.json" ]; then
             # shellcheck disable=SC2016 # $comentario e texto do JSON, nao variavel
-            printf '{\n  "$comentario": "Nasce pronto de proposito: arquivo de hook que nao existe e porta destrancada.",\n  "hooks": {},\n  "skipDangerousModePermissionPrompt": true,\n  "promptSuggestionEnabled": false\n}\n' \
+            printf '{\n  "$comentario": "Nasce pronto de proposito: arquivo de hook que nao existe e porta destrancada.",\n  "hooks": {},\n  "skipDangerousModePermissionPrompt": true,\n  "promptSuggestionEnabled": false,\n  "env": {"CLAUDE_CODE_AUTO_COMPACT_WINDOW": "200000"}\n}\n' \
                 | escrever_arquivo "$h/.claude/settings.json" 444 0:0
         else
             # Agente criado antes desta chave existir: o Claude Code abriria o aviso do modo Bypass

@@ -6119,6 +6119,25 @@ entrada.addEventListener('keydown', ev => {
 }, true);
 menLista.addEventListener('mousedown', ev => ev.preventDefault());
 menLista.addEventListener('click', ev => { const b = ev.target.closest('.men-op'); if (b) menEscolhe(b.dataset.men); });
+/* No iPhone o click chega tarde: o toque fora do campo fecha o teclado, a barra desce e o primeiro
+   toque vira só o realce do item (29/10/2026). No dedo, escolhe já no touchend, com o teclado ainda
+   aberto; o preventDefault corta o click atrasado, que cairia no que ficou embaixo da lista.
+   Arrastar (rolar a lista) não escolhe. */
+let menToque = null;
+menLista.addEventListener('touchstart', ev => {
+  const t = ev.touches[0];
+  menToque = ev.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null;
+}, { passive: true });
+menLista.addEventListener('touchend', ev => {
+  const t = ev.changedTouches[0], ini = menToque;
+  menToque = null;
+  if (!ini || !t || Math.abs(t.clientX - ini.x) > 10 || Math.abs(t.clientY - ini.y) > 10) return;
+  const b = ev.target.closest && ev.target.closest('.men-op');
+  if (!b) return;
+  if (ev.cancelable) ev.preventDefault();
+  menEscolhe(b.dataset.men);
+}, { passive: false });
+menLista.addEventListener('touchcancel', () => { menToque = null; });
 async function enviaMencao(t) {
   const r = /^@(\S+)\s+([\s\S]+)$/.exec(t);
   if (!r) return false;

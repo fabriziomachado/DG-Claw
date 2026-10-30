@@ -103,6 +103,21 @@
     return undefined;
   }
 
+  const vai = destino => {
+    const n = ((history.state && history.state.n) || 0) + 1;
+    history.pushState({ caminho: destino, n }, '', enderecoDe(destino));
+    abre(destino);
+  };
+  /* Imagem de carrossel ou de figura dentro do documento (30/10/2026, pedido do dono): no chat o toque
+     amplia; aqui abre a imagem inteira no próprio visor, e o Voltar traz o documento. Só imagem da
+     Pasta deste mesmo agente (/api/v1/agents/<agente>/pasta/imagem?caminho=...). */
+  function caminhoDaImagem(img) {
+    let u;
+    try { u = new URL(img.getAttribute('src') || '', location.origin); } catch (_) { return null; }
+    if (u.origin !== location.origin || u.pathname !== `/api/v1/agents/${encodeURIComponent(agente)}/pasta/imagem`) return null;
+    return resolve('', '/' + (u.searchParams.get('caminho') || ''));
+  }
+
   raiz.addEventListener('click', ev => {
     // link para outro arquivo da Pasta: abre aqui, e o Voltar (da barra ou do navegador) volta
     const ln = ev.target.closest ? ev.target.closest('.lnk-pasta') : null;
@@ -110,11 +125,12 @@
       ev.preventDefault();
       const destino = resolve(atual, ln.getAttribute('data-pasta'));
       if (!destino) return aviso('Este link aponta para fora da Pasta do agente e não abre aqui.');
-      const n = ((history.state && history.state.n) || 0) + 1;
-      history.pushState({ caminho: destino, n }, '', enderecoDe(destino));
-      abre(destino);
+      vai(destino);
       return;
     }
+    const img = ev.target.closest ? ev.target.closest('.dg-car-img, .dgui-imagem img') : null;
+    const daImagem = img && caminhoDaImagem(img);
+    if (daImagem) { ev.preventDefault(); vai(daImagem); return; }
     // o Copiar dos blocos de código, igual ao da conversa
     const bt = ev.target.closest ? ev.target.closest('.codcopia') : null;
     const pre = bt && bt.closest('.cod') && bt.closest('.cod').querySelector('pre');
